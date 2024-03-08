@@ -6,6 +6,19 @@ def get_filt_vcf(wildcards):
     else:
         return "filtered/{p}/{family}.{p}.vcf.gz".format(p=wildcards.p,family=project)
 
+rule input_prep:
+    input:
+        units=config["run"]["units"]
+    params:
+        outdir= "filtered"
+    output:
+        "filtered/{family}.vcf.gz"
+    log:
+        "logs/input_prep/{family}.log"
+    threads:
+        4
+    wrapper:
+        get_wrapper_path("input_prep")
 
 rule vt:
     input: get_filt_vcf # (vcf, bcf, or vcf.gz)
