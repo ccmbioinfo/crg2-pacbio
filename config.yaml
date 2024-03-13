@@ -33,3 +33,11 @@ annotation:
     dir_cache: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/vep"
   cre:
      database_path: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/"
+
+trgt:
+  vcf_path: ""
+  samples: "samples.tsv"
+  ensembl_gtf: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations/Homo_sapiens.GRCh38.109.chr.gtf.gz"
+  gnomad_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations/gnomad.v4.0.constraint_metrics.tsv"
+  omim_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations"
+  hpo: "" # family/proband-specific HPO terms 
