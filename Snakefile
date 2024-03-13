@@ -2,6 +2,7 @@ PIPELINE_VERSION="0.9.0"
 
 include: "rules/common.smk"
 include: "rules/annotation.smk"
+include: "rules/snvreport.smk"
 
 samples = pd.read_table(config["run"]["samples"]).set_index("sample", drop=False)
 
@@ -11,5 +12,4 @@ family = project
 
 rule all:
     input:
-        "filtered/{}.vcf.gz".format(family)
-        
+        "report/coding/{family}".format(family=project)

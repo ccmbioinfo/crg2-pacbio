@@ -73,7 +73,7 @@ rule vcfanno:
     params:
         lua_script=config["annotation"]["pacbio.vcfanno"]["lua_script"],
        	conf=config["annotation"]["pacbio.vcfanno"]["conf"],
-        base_path=config["annotation"]["vcfanno"]["base_path"],
+        base_path=config["annotation"]["pacbio.vcfanno"]["base_path"],
     wrapper:
         get_wrapper_path("vcfanno")
 
@@ -110,7 +110,7 @@ rule bgzip:
     output:
         "{prefix}.vcf.gz"
     conda:
-        "../../envs/common.yaml"
+        "../envs/common.yaml"
 
     shell:
         '''
@@ -125,6 +125,6 @@ rule tabix:
     log: 
         "logs/{prefix}.log"
     conda:
-           "../../envs/common.yaml"
+           "../envs/common.yaml"
     wrapper:
         get_wrapper_path("tabix")
