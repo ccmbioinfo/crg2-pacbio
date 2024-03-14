@@ -15,7 +15,7 @@ fill_tags_cmd = (
 )
 
 rename_dp_cmd = (
-    "sed -i 's/DP2/DP/' {snakemake.output}"
+    "sed -i 's/DP2/DP/g' {snakemake.output}"
 )
 
 shell("(" + fill_tags_cmd + rename_dp_cmd + ") {log}")

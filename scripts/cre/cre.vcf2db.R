@@ -453,7 +453,7 @@ select_and_write2 <- function(variants, samples, prefix, type)
                             "Gnomad_oe_lof_score", "Gnomad_oe_mis_score", "Exac_pli_score", "Exac_prec_score", "Exac_pnull_score",
                             "Conserved_in_30_mammals", "SpliceAI_impact", "SpliceAI_score", "Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score", "Gerp_score",
                             "Imprinting_status", "Imprinting_expressed_allele", "Pseudoautosomal", "Gnomad_male_ac",
-                            "Number_of_callers", "Old_multiallelic", "UCE_100bp", "UCE_200bp", "Dark_genes"), noncoding_cols)]
+                            "Number_of_callers", "Old_multiallelic", "UCE_100bp", "UCE_200bp", "Dark_genes","ps"), noncoding_cols)]
   
     variants <- variants[order(variants$Position),]
 
