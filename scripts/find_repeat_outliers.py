@@ -1,3 +1,4 @@
+import argparse
 import gzip
 import itertools
 import os
@@ -91,10 +92,32 @@ def main(alleles_path, out_filepath, case_ids):
     df = pd.DataFrame(hits)
     df.to_csv(out_filepath, index=False)
 
-alleles_path = snakemake.input.alleles_path
-case_ids = snakemake.input.case_ids
-case_ids = pd.read_table(case_ids)["sample"].to_list()
-out_filepath = snakemake.output.out_path
-main(alleles_path, out_filepath, case_ids)
 
+if __name__ == "__main__":
+    # if running from the command-line
+    description = "Find outlier repeats in family vs controls"
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument(
+        "--alleles_path",
+        type=str,
+        required=True,
+        help="Alleles from generate_allele_db",
+    )
+    parser.add_argument(
+        "--output_file",
+        type=str,
+        required=True,
+        help="Output filepath",
+    )
+    parser.add_argument(
+        "--case_ids",
+        type=str,
+        required=True,
+        help="Path to Ensembl gene GTF",
+    )
 
+    args = parser.parse_args()
+    print("Determining outlier repeats")
+    case_ids = args.case_ids
+    case_ids = pd.read_table(case_ids)["sample"].to_list()
+    main(args.alleles_path, args.output_file, case_ids)

@@ -1,3 +1,4 @@
+import argparse
 import os
 from pathlib import Path, PosixPath
 import gzip
@@ -39,8 +40,8 @@ def get_alleles(path: PosixPath):
             yield gt_actions[gt]()        
 
 def main(vcf_path, out_filepath):     
-    if not os.path.exists("allele_db"):
-        Path("allele_db").mkdir(exist_ok=True)
+    if not os.path.exists("repeat_outliers"):
+        Path("repeat_outliers").mkdir(exist_ok=True)
 
     print(vcf_path)
     vcf_path = Path(vcf_path).resolve(strict=True) 
@@ -51,6 +52,24 @@ def main(vcf_path, out_filepath):
                 alleles = ",".join(alleles)
                 f_out.write(f"{trid} {sample} {alleles}\n".encode())  
 
-vcf_path = snakemake.input.vcf_path
-out_filepath = snakemake.output.out_path
-main(vcf_path, out_filepath)
+
+if __name__ == "__main__":
+    # if running from the command-line
+    description = "Generate repeat allele database from TRGT VCF"
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument(
+        "--vcf_path",
+        type=str,
+        required=True,
+        help="Path to TRGT VCFs for cases and controls",
+    )
+    parser.add_argument(
+        "--output_file",
+        type=str,
+        required=True,
+        help="Output filepath",
+    )
+
+    args = parser.parse_args()
+    print("Generating repeat allele database")
+    main(args.vcf_path, args.output_file)
