@@ -1,22 +1,25 @@
 rule generate_allele_db:
-    input: 
-        vcf_path = config["trgt"]["vcf_path"]
-    output: 
-        out_path = "allele_db/alleles_db.gz"
-    log: "logs/allele_db/allele_db.log"
+    input: config["trgt"]["vcf_path"]
+    output: "repeat_outliers/alleles_db.gz"
+    params:
+        crg2_path = config["run"]["crg2_path"]
+    log: "logs/repeat_outliers/allele_db.log"
     resources:
         mem_mb = 10000
     conda:
         "../envs/outlier_expansions.yaml"
-    script:
-        "../scripts/generate_allele_db.py"
+    shell: 
+        """
+        (python3 {params.crg2_path}/scripts/generate_allele_db.py --vcf_path {input} \
+            --output_file  {output}) > {log} 2>&1
+        """
 
 rule sort_allele_db:
     input: 
-        input_dir = "allele_db/",
-        input_file = "allele_db/alleles_db.gz"
-    output: "allele_db/sorted_alleles_db.gz"
-    log: "logs/allele_db/sort_allele_db.log"
+        input_dir = "repeat_outliers/",
+        input_file = "repeat_outliers/alleles_db.gz"
+    output: "repeat_outliers/sorted_alleles_db.gz"
+    log: "logs/repeat_outliers/sort_allele_db.log"
     shell:
         """
         (zcat < {input.input_file} | sort -T {input.input_dir}  -k 1,1 | gzip > {output}) > {log} 2>&1
@@ -24,17 +27,23 @@ rule sort_allele_db:
 
 rule find_repeat_outliers:
     input: 
-        alleles_path = "allele_db/sorted_alleles_db.gz",
+        alleles_path = "repeat_outliers/sorted_alleles_db.gz",
         case_ids = config["trgt"]["samples"]
     output:
         out_path =  "repeat_outliers/repeat_outliers.csv"
+    params:
+        crg2_path = config["run"]["crg2_path"]
     log:  "logs/repeat_outliers/repeat_outliers.log"
     resources:
         mem_mb = 20000
     conda: 
         "../envs/outlier_expansions.yaml"
-    script:
-        "../scripts/find_repeat_outliers.py"
+    shell: 
+        """
+        (python3 {params.crg2_path}/scripts/find_repeat_outliers.py --alleles_path {input.alleles_path} \
+            --output_file  {output} \
+            --case_ids {input.case_ids}) > {log} 2>&1
+        """
 
 
 rule annotate_repeat_outliers:
