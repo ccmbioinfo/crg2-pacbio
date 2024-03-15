@@ -2,14 +2,7 @@ run:
   project: "NA12878"
   samples: samples.tsv
   units: units.tsv
-  ped: "" # leave this string empty if there is no ped
-  panel: "" # three-column BED file based on hpo file; leave this string empty if there is no panel
-  hpo: "" # five-column TSV with HPO terms; leave this string empty is there are no hpo terms
-  flank: 100000
-  gatk: "gatk" #or gatk3, or dragen (for dragen-gatk variant calling)
-  pipeline: "pacbio" #pacbio
-  minio: ""
-  PT_credentials: ""
+  pipeline: "pacbio"
 
 genes:
   ensembl: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/ensembl_genes_hg38_gtf.csv"
@@ -40,5 +33,3 @@ annotation:
     dir_cache: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/vep"
   cre:
      database_path: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/"
-
-
