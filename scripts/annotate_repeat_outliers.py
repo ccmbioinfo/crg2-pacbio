@@ -253,47 +253,47 @@ def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim:
             round(score, 3) if not pd.isnull(score) else None
             for score in hits_gene_omim[col]
         ]
-        hits_gene_omim["max_z_score"] = hits_gene_omim[z_score_cols].max(axis=1)
+    hits_gene_omim["max_z_score"] = hits_gene_omim[z_score_cols].max(axis=1)
 
-        # make a column that sums the number of individuals carrying a particular repeat expansion
-        al_cols = [col for col in hits_gene_omim.columns if '_allele_len' in col]
-        hits_gene_omim['num_samples'] = hits_gene_omim[al_cols].notna().sum(axis=1)
+    # make a column that sums the number of individuals carrying a particular repeat expansion
+    al_cols = [col for col in hits_gene_omim.columns if '_allele_len' in col]
+    hits_gene_omim['num_samples'] = hits_gene_omim[al_cols].notna().sum(axis=1)
 
-        # column cleanup
-        for col in ["gene_name", "gene_id", "gene_biotype", "Feature"]:
-            hits_gene_omim[col] = hits_gene_omim[col].apply(lambda genes: gene_set(genes))
+    # column cleanup
+    for col in ["gene_name", "gene_id", "gene_biotype", "Feature"]:
+        hits_gene_omim[col] = hits_gene_omim[col].apply(lambda genes: gene_set(genes))
 
-        hits_gene_omim = hits_gene_omim[
-            [
-                "Chromosome",
-                "Start",
-                "End",
-                "trid",
-                "gene_name",
-                "gene_id",
-                "gene_biotype"]
-                + constraint_cols
-                + [
-                "Feature",
-                "control_range",
-                "max_z_score",
-                "num_samples"
-            ]
-            + al_cols
-            + z_score_cols
-            + ["OMIM_phenotype", "HPO"]
+    hits_gene_omim = hits_gene_omim[
+        [
+            "Chromosome",
+            "Start",
+            "End",
+            "trid",
+            "gene_name",
+            "gene_id",
+            "gene_biotype"]
+            + constraint_cols
+            + [
+            "Feature",
+            "control_range",
+            "max_z_score",
+            "num_samples"
         ]
-        hits_gene_omim = hits_gene_omim.rename(
-            columns={"Feature": "feature", "Chromosome": "chr", "Start": "start", "End": "end", "gene": "gnomad_constraint_gene"}
-        )
+        + al_cols
+        + z_score_cols
+        + ["OMIM_phenotype", "HPO"]
+    ]
+    hits_gene_omim = hits_gene_omim.rename(
+        columns={"Feature": "feature", "Chromosome": "chr", "Start": "start", "End": "end", "gene": "gnomad_constraint_gene"}
+    )
 
-        # recode missing values
-        hits_gene_omim["chr"] = hits_gene_omim["chr"].astype(str)
-        hits_gene_omim.fillna(".", inplace=True)
-        hits_gene_omim.replace({"-1": "."}, inplace=True)
+    # recode missing values
+    hits_gene_omim["chr"] = hits_gene_omim["chr"].astype(str)
+    hits_gene_omim.fillna(".", inplace=True)
+    hits_gene_omim.replace({"-1": "."}, inplace=True)
 
-        # write to file 
-        hits_gene_omim.to_csv(out_file, index=False)
+    # write to file 
+    hits_gene_omim.to_csv(out_file, index=False)
 
 
 
