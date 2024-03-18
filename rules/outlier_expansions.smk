@@ -16,13 +16,12 @@ rule generate_allele_db:
 
 rule sort_allele_db:
     input: 
-        input_dir = "repeat_outliers/",
         input_file = "repeat_outliers/alleles_db.gz"
     output: "repeat_outliers/sorted_alleles_db.gz"
     log: "logs/repeat_outliers/sort_allele_db.log"
     shell:
         """
-        (zcat < {input.input_file} | sort -T {input.input_dir}  -k 1,1 | gzip > {output}) > {log} 2>&1
+        (zcat < {input.input_file} | sort -T . -k 1,1 | gzip > {output}) > {log} 2>&1
         """
 
 rule find_repeat_outliers:
