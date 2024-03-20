@@ -6,6 +6,19 @@ def get_filt_vcf(wildcards):
     else:
         return "filtered/{p}/{family}.{p}.vcf.gz".format(p=wildcards.p,family=project)
 
+rule input_prep:
+    input:
+        units=config["run"]["units"]
+    params:
+        outdir= "filtered"
+    output:
+        "filtered/{family}.vcf.gz"
+    log:
+        "logs/input_prep/{family}.log"
+    threads:
+        4
+    wrapper:
+        get_wrapper_path("input_prep")
 
 rule vt:
     input: get_filt_vcf # (vcf, bcf, or vcf.gz)
@@ -51,7 +64,7 @@ rule vcfanno:
     input:
         "annotated/{p}/vep/{family}.{p}.vep.vcf",
     output:
-        temp("annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.noDP.vcf.gz"),
+        temp("annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.noDP.noPS_info.vcf.gz"),
     log:
         "logs/vcfanno/{family}.vcfanno.{p}.log"
     threads: 10
@@ -60,20 +73,45 @@ rule vcfanno:
     params:
         lua_script=config["annotation"]["pacbio.vcfanno"]["lua_script"],
        	conf=config["annotation"]["pacbio.vcfanno"]["conf"],
-        base_path=config["annotation"]["vcfanno"]["base_path"],
+        base_path=config["annotation"]["pacbio.vcfanno"]["base_path"],
     wrapper:
         get_wrapper_path("vcfanno")
 
 rule add_dp_field:
     input: 
-        "annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.noDP.vcf.gz",
+        "annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.noDP.noPS_info.vcf.gz",
     output:
-        temp("annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.vcf"),
+        temp("annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.noPS_info.vcf"),
     log:
         "logs/bcftools/{family}.add_dp_field.{p}.log"
     wrapper:
         get_wrapper_path("bcftools","fill-tags")
 
+rule add_ps_field:
+    input:
+       vcf="annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.noPS_info.vcf",
+    output:
+        temp("annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.vcf"),
+    log:
+        "logs/bcftools/{family}.add_PS_INFO_field.{p}.log"
+    shell:
+        '''
+            #Get the PS values for every sample from the FORMAT VCF field, remove the trailing comma and store the results in PS_annot.txt
+            bcftools query -f '%CHROM\t%POS\t[%PS,]\n' {input.vcf} | sed 's/,*$//g' > annotated/{wildcards.p}/vcfanno/PS_annot.txt
+
+            #BGZIP and TABIX the PS_annot.txt file
+            bgzip annotated/{wildcards.p}/vcfanno/PS_annot.txt
+            tabix -s1 -b2 -e2 annotated/{wildcards.p}/vcfanno/PS_annot.txt.gz
+
+            #create header file containing PS INFO field info
+            echo -e "##INFO=<ID=PS,Number=.,Type=String,Description="Phase set">" > annotated/{wildcards.p}/vcfanno/hdr.txt
+
+            #Annotate the VCF with the PS_annot.txt.gz file to add PS tag info to the VCF
+            bcftools annotate -a annotated/{wildcards.p}/vcfanno/PS_annot.txt.gz -h annotated/{wildcards.p}/vcfanno/hdr.txt -c CHROM,POS,INFO/PS {input.vcf} > {output}
+
+            #Remove intermediate files  
+            rm annotated/{wildcards.p}/vcfanno/PS_annot.txt.gz annotated/{wildcards.p}/vcfanno/PS_annot.txt.gz.tbi annotated/{wildcards.p}/vcfanno/hdr.txt
+        '''
 
 rule vcf2db:
     input:
@@ -97,7 +135,7 @@ rule bgzip:
     output:
         "{prefix}.vcf.gz"
     conda:
-        "../../envs/common.yaml"
+        "../envs/common.yaml"
 
     shell:
         '''
@@ -112,6 +150,6 @@ rule tabix:
     log: 
         "logs/{prefix}.log"
     conda:
-           "../../envs/common.yaml"
+           "../envs/common.yaml"
     wrapper:
         get_wrapper_path("tabix")
