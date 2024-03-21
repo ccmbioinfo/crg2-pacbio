@@ -2,17 +2,11 @@ run:
   project: "NA12878"
   samples: samples.tsv
   units: units.tsv
-  pipeline: "pacbio"
-
-genes:
-  ensembl: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/ensembl_genes_hg38_gtf.csv"
-  refseq: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation/GRCh37_latest_genomic.gff_subset.csv" 
-  hgnc: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation/HGNC_20210617.txt"
 
 tools:
   cre: "~/crg2-pacbio/scripts/cre"
   crg: "~/crg"
-  crg2: "~/crg2-pacbio"
+  crg2-pacbio: "~/crg2-pacbio"
 
 ref:
   name: GRCh38.86

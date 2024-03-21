@@ -50,7 +50,7 @@ rule annotate_repeat_outliers:
     output: "repeat_outliers/annotated_repeat_outliers.csv"
     log:  "logs/repeat_outliers/annotate_repeat_outliers.log"
     params: 
-      crg2_path = config["run"]["crg2_path"],
+      crg2-pacbio_path = config["run"]["tools"]["crg2-pacbio_path"],
       genes = config["trgt"]["ensembl_gtf"],
       OMIM = config["trgt"]["omim_path"],
       HPO = config["trgt"]["hpo"],
@@ -61,7 +61,7 @@ rule annotate_repeat_outliers:
         "../envs/outlier_expansions.yaml"
     shell: 
         """
-        (python3 {params.crg2_path}/scripts/annotate_repeat_outliers.py --repeats {input} \
+        (python3 {params.crg2-pacbio_path}/scripts/annotate_repeat_outliers.py --repeats {input} \
             --output_file  {output} \
             --ensembl_gtf {params.genes} \
             --gnomad_constraint {params.constraint} \
