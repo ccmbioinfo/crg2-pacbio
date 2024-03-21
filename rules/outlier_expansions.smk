@@ -1,8 +1,9 @@
 rule generate_allele_db:
-    input: config["trgt"]["vcf_path"]
+    input: config["run"]["units"]
     output: "repeat_outliers/alleles_db.gz"
     params:
-        crg2_path = config["run"]["crg2_path"]
+        crg2_pacbio = config["tools"]["crg2_pacbio"],
+        family = config["run"]["project"]
     log: "logs/repeat_outliers/allele_db.log"
     resources:
         mem_mb = 10000
@@ -10,8 +11,8 @@ rule generate_allele_db:
         "../envs/outlier_expansions.yaml"
     shell: 
         """
-        (python3 {params.crg2_path}/scripts/generate_allele_db.py --vcf_path {input} \
-            --output_file  {output}) > {log} 2>&1
+        (python3 {params.crg2_pacbio}/scripts/generate_allele_db.py --vcf_path {input} \
+            --output_file  {output} --family {params.family}) > {log} 2>&1
         """
 
 rule sort_allele_db:
@@ -31,7 +32,7 @@ rule find_repeat_outliers:
     output:
         out_path =  "repeat_outliers/repeat_outliers.csv"
     params:
-        crg2_path = config["run"]["crg2_path"]
+        crg2_pacbio = config["tools"]["crg2_pacbio"]
     log:  "logs/repeat_outliers/repeat_outliers.log"
     resources:
         mem_mb = 20000
@@ -39,7 +40,7 @@ rule find_repeat_outliers:
         "../envs/outlier_expansions.yaml"
     shell: 
         """
-        (python3 {params.crg2_path}/scripts/find_repeat_outliers.py --alleles_path {input.alleles_path} \
+        (python3 {params.crg2_pacbio}/scripts/find_repeat_outliers.py --alleles_path {input.alleles_path} \
             --output_file  {output} \
             --case_ids {input.case_ids}) > {log} 2>&1
         """
@@ -50,7 +51,7 @@ rule annotate_repeat_outliers:
     output: "repeat_outliers/annotated_repeat_outliers.csv"
     log:  "logs/repeat_outliers/annotate_repeat_outliers.log"
     params: 
-      crg2-pacbio_path = config["run"]["tools"]["crg2-pacbio_path"],
+      crg2_pacbio = config["tools"]["crg2_pacbio"],
       genes = config["trgt"]["ensembl_gtf"],
       OMIM = config["trgt"]["omim_path"],
       HPO = config["trgt"]["hpo"],
@@ -61,7 +62,7 @@ rule annotate_repeat_outliers:
         "../envs/outlier_expansions.yaml"
     shell: 
         """
-        (python3 {params.crg2-pacbio_path}/scripts/annotate_repeat_outliers.py --repeats {input} \
+        (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input} \
             --output_file  {output} \
             --ensembl_gtf {params.genes} \
             --gnomad_constraint {params.constraint} \

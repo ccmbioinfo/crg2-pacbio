@@ -1,5 +1,6 @@
 import argparse
 import os
+import pandas as pd
 from pathlib import Path, PosixPath
 import gzip
 
@@ -69,7 +70,15 @@ if __name__ == "__main__":
         required=True,
         help="Output filepath",
     )
+    parser.add_argument(
+        "--family",
+        type=str,
+        required=True,
+        help="Family ID",
+    )
 
     args = parser.parse_args()
+    units = pd.read_table(args.vcf_path, dtype=str).set_index(["family"], drop=False)
+    input_vcf_path=units.loc[args.family, "trgt_vcf_dir"]
     print("Generating repeat allele database")
-    main(args.vcf_path, args.output_file)
+    main(args.input_vcf_path, args.output_file)
