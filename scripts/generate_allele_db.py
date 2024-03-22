@@ -81,4 +81,4 @@ if __name__ == "__main__":
     units = pd.read_table(args.vcf_path, dtype=str).set_index(["family"], drop=False)
     input_vcf_path=units.loc[args.family, "trgt_vcf_dir"]
     print("Generating repeat allele database")
-    main(args.input_vcf_path, args.output_file)
+    main(input_vcf_path, args.output_file)

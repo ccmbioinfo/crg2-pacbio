@@ -1,4 +1,5 @@
 import argparse
+from datetime import date
 import numpy as np
 import pandas as pd
 import pyranges as pr
@@ -293,7 +294,11 @@ def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim:
     hits_gene_omim.replace({"-1": "."}, inplace=True)
 
     # write to file 
-    hits_gene_omim.to_csv(out_file, index=False)
+    today = date.today()
+    today = today.strftime("%Y-%m-%d")
+    out_file = out_file.replace(".csv", "")
+    hits_gene_omim.to_csv(f"{out_file}.csv", index=False)
+    hits_gene_omim.to_csv(f"{out_file}_{today}.csv", index=False)
 
 
 
