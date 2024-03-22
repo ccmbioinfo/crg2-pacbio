@@ -1,2 +1,2 @@
-family	platform	vcf
-NA12878	ILLUMINA    
+family	platform	small_variant_vcf   trgt_vcf_dir    pbsv_vcf
+NA12878	PACBIO    
