@@ -58,7 +58,13 @@ def process_alleles():
     """
     # Argument parser setup
     parser = argparse.ArgumentParser(description="Process alleles data and save to a compressed TSV file.")
-    parser.add_argument("input_file", help="Path to the input file (e.g., /Users/Downloads/alleles.gz)")
+    parser.add_argument(
+        "input_file",
+        help='''Path to the input file (e.g., /Users/Downloads/alleles.gz). The input file should contain alleles data organized in the following format:
+                1) Each line of the file should represent a repeat locus
+                2) The columns should include the repeat ID, sample ID, and alleles sizes separated by commas.
+                Example format (per line): 'chr10_100000834_100000912_A HG00099 TTTAG,TTTAGAA'.'''
+            )
     args = parser.parse_args()
 
     # File paths
