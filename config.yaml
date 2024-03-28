@@ -2,6 +2,7 @@ run:
   project: "NA12878"
   samples: samples.tsv
   units: units.tsv
+  ped: "" # leave this string empty if there is no ped
 
 tools:
   cre: "~/crg2-pacbio/scripts/cre"
