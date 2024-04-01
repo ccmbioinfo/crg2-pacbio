@@ -2,17 +2,12 @@ run:
   project: "NA12878"
   samples: samples.tsv
   units: units.tsv
-  pipeline: "pacbio"
-
-genes:
-  ensembl: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/ensembl_genes_hg38_gtf.csv"
-  refseq: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation/GRCh37_latest_genomic.gff_subset.csv" 
-  hgnc: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation/HGNC_20210617.txt"
+  ped: "" # leave this string empty if there is no ped
 
 tools:
   cre: "~/crg2-pacbio/scripts/cre"
   crg: "~/crg"
-  crg2: "~/crg2-pacbio"
+  crg2_pacbio: "~/crg2-pacbio"
 
 ref:
   name: GRCh38.86
@@ -33,3 +28,10 @@ annotation:
     dir_cache: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/vep"
   cre:
      database_path: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/"
+
+trgt:
+  samples: "samples.tsv"
+  ensembl_gtf: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations/Homo_sapiens.GRCh38.109.chr.gtf.gz"
+  gnomad_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations/gnomad.v4.0.constraint_metrics.tsv"
+  omim_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations"
+  hpo: "" # family/proband-specific HPO terms 
