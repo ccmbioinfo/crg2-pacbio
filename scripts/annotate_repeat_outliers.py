@@ -3,6 +3,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 import pyranges as pr
+from typing import Optional
 
 def pivot_hits(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -209,7 +210,7 @@ def add_hpo(hpo: pd.DataFrame, gene: str) -> list:
         return terms
 
 
-def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim: str, hpo: str) -> None:
+def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim: str, hpo: Optional[str] = None) -> None:
     # convert hits dataframe from long to wide format
     hits = pd.read_csv(hits)
     hits_pivot = pivot_hits(hits)
@@ -240,11 +241,15 @@ def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim:
     hits_gene_omim = annotate_OMIM(hits_gene, omim)
 
     # annotate with HPO terms
-    print("Add HPO terms")
-    hpo = pd.read_csv(hpo, sep="\t")
-    hits_gene_omim["HPO"] = [
-            add_hpo(hpo, gene) for gene in hits_gene_omim["gene_id"].values
-        ]
+    if hpo==None:
+        print("No HPO terms supplied")
+        hits_gene_omim["HPO"] = ""
+    else:
+        print("Add HPO terms")
+        hpo = pd.read_csv(hpo, sep="\t")
+        hits_gene_omim["HPO"] = [
+                add_hpo(hpo, gene) for gene in hits_gene_omim["gene_id"].values
+            ]
 
     # make a column with maximum z score across samples
     print("Format dataframe")
@@ -339,7 +344,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--hpo",
         type=str,
-        required=True,
         help="Path to HPO terms file",
     )
 

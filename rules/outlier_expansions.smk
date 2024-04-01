@@ -54,7 +54,7 @@ rule annotate_repeat_outliers:
       crg2_pacbio = config["tools"]["crg2_pacbio"],
       genes = config["trgt"]["ensembl_gtf"],
       OMIM = config["trgt"]["omim_path"],
-      HPO = config["trgt"]["hpo"],
+      HPO = config["trgt"]["hpo"] if config["trgt"]["hpo"] else "none",
       constraint = config["trgt"]["gnomad_constraint"]
     resources:
         mem_mb = 20000
@@ -62,11 +62,20 @@ rule annotate_repeat_outliers:
         "../envs/outlier_expansions.yaml"
     shell: 
         """
-        (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input} \
-            --output_file  {output} \
-            --ensembl_gtf {params.genes} \
-            --gnomad_constraint {params.constraint} \
-            --OMIM_path {params.OMIM} \
-            --hpo {params.HPO}) > {log} 2>&1
+        if [[ {params.HPO} == "none" ]]
+        then
+            (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input} \
+                --output_file  {output} \
+                --ensembl_gtf {params.genes} \
+                --gnomad_constraint {params.constraint} \
+                --OMIM_path {params.OMIM}) > {log} 2>&1
+        else
+            (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input} \
+                --output_file  {output} \
+                --ensembl_gtf {params.genes} \
+                --gnomad_constraint {params.constraint} \
+                --OMIM_path {params.OMIM} \
+                --hpo {params.HPO}) > {log} 2>&1
+        fi
         """
           
