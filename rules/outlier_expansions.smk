@@ -8,7 +8,7 @@ rule generate_allele_db:
     resources:
         mem_mb = 10000
     conda:
-        "../envs/outlier_expansions.yaml"
+        "../envs/str_sv.yaml"
     shell: 
         """
         (python3 {params.crg2_pacbio}/scripts/generate_allele_db.py --vcf_path {input} \
@@ -37,7 +37,7 @@ rule find_repeat_outliers:
     resources:
         mem_mb = 20000
     conda: 
-        "../envs/outlier_expansions.yaml"
+        "../envs/str_sv.yaml"
     shell: 
         """
         (python3 {params.crg2_pacbio}/scripts/find_repeat_outliers.py --alleles_path {input.alleles_path} \
@@ -54,12 +54,12 @@ rule annotate_repeat_outliers:
       crg2_pacbio = config["tools"]["crg2_pacbio"],
       genes = config["trgt"]["ensembl_gtf"],
       OMIM = config["trgt"]["omim_path"],
-      HPO = config["trgt"]["hpo"] if config["trgt"]["hpo"] else "none",
+      HPO = config["hpo"] if config["hpo"] else "none",
       constraint = config["trgt"]["gnomad_constraint"]
     resources:
         mem_mb = 20000
     conda: 
-        "../envs/outlier_expansions.yaml"
+        "../envs/str_sv.yaml"
     shell: 
         """
         if [[ {params.HPO} == "none" ]]

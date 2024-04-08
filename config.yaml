@@ -3,7 +3,7 @@ run:
   samples: samples.tsv
   units: units.tsv
   pipeline: "pacbio"
-  hpo: ""
+  hpo: "" # proband-specific HPO terms
 
 genes:
   ensembl: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/ensembl_genes_hg38_gtf.csv"
@@ -50,5 +50,4 @@ trgt:
   ensembl_gtf: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations/Homo_sapiens.GRCh38.109.chr.gtf.gz"
   gnomad_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations/gnomad.v4.0.constraint_metrics.tsv"
   omim_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations"
-  hpo: "" # family/proband-specific HPO terms 
 
