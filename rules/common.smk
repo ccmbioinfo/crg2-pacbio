@@ -54,3 +54,9 @@ def format_pedigree(wildcards):
     ped.to_csv(f"{family}.ped", sep=" ", index=False, header=False)
 
     return f"{family}.ped"
+
+def get_pbsv_vcf(wildcards):
+    family = wildcards.family
+    input_vcf = units.loc[family, "pbsv_vcf"]
+
+    return input_vcf
