@@ -3,7 +3,7 @@
 Contributors (in alphabetical order)
 - Madeline Couse, SickKids
 - Giulia Del Gobbo, CHEO
-- Egor Dolzhenko, PacBio
+- Egor Dolzhenko, PacBio (repeat expansion outliers)
 - Anjali Jain, SickKids
 
 crg2-pacbio is a research pipeline aimed at discovering clinically relevant variants from PacBio HiFi whole genome sequence data in a family-based manner. crg2-pacbio uses Snakemake and Conda to manage jobs and software dependencies.
@@ -26,6 +26,7 @@ Structural variant annotation and report
 
 Repeat expansion outlier report
 - TRGT must have previously been run on each sample against the [937,122](https://zenodo.org/record/7987365#.ZHY9TOzMJAc) repeats originally released by the Genome in a Bottle tandem repeat benchmarking project
+- this module is derived from the [find-outlier-expansions workflow](https://github.com/tandem-repeat-workflows/find-outlier-expansions/blob/main/find-outlier-expansions.ipynb) developed by Egor Dolzhenko, Giulia Del Gobbo, and Madeline Couse 
 - construct a repeat database from 98 HPRC samples and the individuals from the family of interest
 - identify repeats with outlying size in family members
 - annnotate repeat outliers with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_repeat_outliers.py)
