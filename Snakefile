@@ -14,7 +14,7 @@ family = project
 
 rule all:
     input:
-        "report/coding/{family}".format(family=project),
+        "small_variants/coding/{family}".format(family=project),
         "sv/{family}.pbsv.csv".format(family=project),
-        "repeat_outliers/annotated_repeat_outliers.csv"
+        "repeat_outliers/{family}.repeat.outliers.annotated.csv".format(family=project)
 

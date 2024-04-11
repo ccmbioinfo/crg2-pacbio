@@ -1,10 +1,10 @@
 rule generate_allele_db:
     input: config["run"]["units"]
-    output: "repeat_outliers/alleles_db.gz"
+    output: "repeat_outliers/allele_db/{family}.alleles.db.gz"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         family = config["run"]["project"]
-    log: "logs/repeat_outliers/allele_db.log"
+    log: "logs/repeat_outliers/{family}_allele_db.log"
     resources:
         mem_mb = 10000
     conda:
@@ -17,9 +17,9 @@ rule generate_allele_db:
 
 rule sort_allele_db:
     input: 
-        input_file = "repeat_outliers/alleles_db.gz"
-    output: "repeat_outliers/sorted_alleles_db.gz"
-    log: "logs/repeat_outliers/sort_allele_db.log"
+        input_file = "repeat_outliers/allele_db/{family}.alleles.db.gz"
+    output: "repeat_outliers/allele_db/{family}.alleles.sorted.db.gz"
+    log: "logs/repeat_outliers/{family}.allele.sorted.db.log"
     shell:
         """
         (zcat < {input.input_file} | sort -T . -k 1,1 | gzip > {output}) > {log} 2>&1
@@ -27,13 +27,13 @@ rule sort_allele_db:
 
 rule find_repeat_outliers:
     input: 
-        alleles_path = "repeat_outliers/sorted_alleles_db.gz",
+        alleles_path = "repeat_outliers/allele_db/{family}.alleles.sorted.db.gz",
         case_ids = config["trgt"]["samples"]
     output:
-        out_path =  "repeat_outliers/repeat_outliers.csv"
+        out_path =  "repeat_outliers/{family}.repeat.outliers.csv"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"]
-    log:  "logs/repeat_outliers/repeat_outliers.log"
+    log:  "logs/repeat_outliers/{family}.repeat.outliers.log"
     resources:
         mem_mb = 20000
     conda: 
@@ -47,14 +47,14 @@ rule find_repeat_outliers:
 
 
 rule annotate_repeat_outliers:
-    input: "repeat_outliers/repeat_outliers.csv"
-    output: "repeat_outliers/annotated_repeat_outliers.csv"
-    log:  "logs/repeat_outliers/annotate_repeat_outliers.log"
+    input: "repeat_outliers/{family}.repeat.outliers.csv"
+    output: "repeat_outliers/{family}.repeat.outliers.annotated.csv"
+    log:  "logs/repeat_outliers/{family}.annotate.repeat.outliers.log"
     params: 
       crg2_pacbio = config["tools"]["crg2_pacbio"],
       genes = config["trgt"]["ensembl_gtf"],
       OMIM = config["trgt"]["omim_path"],
-      HPO = config["hpo"] if config["hpo"] else "none",
+      HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
       constraint = config["trgt"]["gnomad_constraint"]
     resources:
         mem_mb = 20000

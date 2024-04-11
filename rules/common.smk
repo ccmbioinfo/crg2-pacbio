@@ -56,7 +56,7 @@ def format_pedigree(wildcards):
     return f"{family}.ped"
 
 def get_pbsv_vcf(wildcards):
-    family = wildcards.family
+    family = project
     input_vcf = units.loc[family, "pbsv_vcf"]
 
     return input_vcf
