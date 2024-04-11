@@ -3,7 +3,7 @@ rule allsnvreport:
         db="annotated/{p}/{family}-gemini.db",
         vcf="annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.vcf.gz"
     output:
-        directory("report/{p}/{family}")
+        directory("small_variants/{p}/{family}")
     conda:
         "../envs/cre.yaml"
     log:

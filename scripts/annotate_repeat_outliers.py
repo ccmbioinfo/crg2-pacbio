@@ -303,7 +303,7 @@ def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim:
     today = today.strftime("%Y-%m-%d")
     out_file = out_file.replace(".csv", "")
     hits_gene_omim.to_csv(f"{out_file}.csv", index=False)
-    hits_gene_omim.to_csv(f"{out_file}_{today}.csv", index=False)
+    hits_gene_omim.to_csv(f"{out_file}.{today}.csv", index=False)
 
 
 

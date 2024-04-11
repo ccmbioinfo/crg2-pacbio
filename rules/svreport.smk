@@ -7,7 +7,7 @@ rule snpeff:
     params:
         java_opts = config["params"]["snpeff"]["java_opts"],
         reference = config["ref"]["name"],
-        data_dir = config["annotation"]["snpeff"]["dataDir"]
+        data_dir = config["annotation"]["snpeff"]["data_dir"]
     wrapper:
         get_wrapper_path("snpeff")
 
@@ -38,7 +38,7 @@ rule sv_report:
         snpeff = "sv/{family}.pbsv.snpeff.vcf",
         annotsv = "sv/{family}.AnnotSV.tsv"
     output: "sv/{family}.pbsv.csv"
-    log: "logs/sv/{family}.sv_report.log"
+    log: "logs/sv/{family}.sv.report.log"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         hpo = config["run"]["hpo"],
