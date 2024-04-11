@@ -4,6 +4,7 @@ run:
   units: units.tsv
   pipeline: "pacbio"
   hpo: "" # proband-specific HPO terms
+  ped: ""
 
 genes:
   ensembl: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/ensembl_genes_hg38_gtf.csv"
