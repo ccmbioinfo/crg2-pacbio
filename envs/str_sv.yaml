@@ -5,6 +5,7 @@ channels:
 dependencies:
   - bedtools =2.29.2
   - python=3
+  - scikit-allel
   - numpy
   - pandas
   - pyranges

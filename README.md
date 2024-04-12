@@ -1,4 +1,4 @@
-# Clinical research pipeline for exploring variants in PacBio HiFi whole genome (WGS) data
+# Clinical research pipeline for exploring variants in PacBio HiFi whole genome (WGS) data (Hg38)
 
 crg2-pacbio is a research pipeline aimed at discovering clinically relevant variants from PacBio HiFi whole genome sequence data in a family-based manner. crg2-pacbio uses Snakemake and Conda to manage jobs and software dependencies.
 
@@ -25,6 +25,9 @@ Repeat expansion outlier report
 - identify repeats with outlying size in family members
 - annnotate repeat outliers with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_repeat_outliers.py)
 
-
+Pathogenic repeat loci report
+- TRGT must have previously been run on each sample against the [pathogenic repeat loci BED file](https://github.com/PacificBiosciences/trgt/blob/main/repeats/pathogenic_repeats.hg38.bed) provided by TRGT
+- merge sample VCFs into multi-sample family VCF
+- annotate repeat loci with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_path_str_loci.py)
 
 

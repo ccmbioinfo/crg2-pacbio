@@ -1,2 +1,2 @@
-family	platform	small_variant_vcf	trgt_vcf_dir	pbsv_vcf
+family	platform	small_variant_vcf	trgt_vcf_dir	pbsv_vcf    trgt_pathogenic_vcf_dir
 NA12878	PACBIO
