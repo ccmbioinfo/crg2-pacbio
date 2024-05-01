@@ -36,6 +36,8 @@ annotation:
     dir_cache: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/vep"
   cre:
      database_path: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/"
+  snpeff:
+    data_dir: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/snpeff/data"
   sv_report:
       exon: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/annotate_SV/genes/MANE.GRCh38.v1.0.ensembl_genomic.bed"
       inhouse: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/SV_database/pbsv.allsamples.counts.2022-04-19.bed"
