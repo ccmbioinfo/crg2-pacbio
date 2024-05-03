@@ -155,7 +155,7 @@ def add_hpo(hpo, gene):
         gene = gene.split("-")
         for g in gene:
             try:
-                term = str(hpo[hpo["ensembl_gene_id"] == g]["Features"].values[0])
+                term = str(hpo[hpo["Gene ID"] == g]["Features"].values[0])
                 term = term.replace("; ", ";").split(";")
                 term = list(set(term))
                 for t in term:
@@ -201,17 +201,14 @@ def add_omim(omim_df, gene):
 
 def get_genotype(sample_GT_AD_DP):
     genotype = sample_GT_AD_DP.split(":")[0]
-    if genotype == "0/1":
-        return "het"
-    elif genotype == "1/1":
-        return "hom"
-    elif genotype == "./.":
-        return genotype
-    elif genotype == "0/0":
-        return "-"
-    else:
-        return genotype
+    return genotype
 
+def get_phase_set(sample_GT_AD_DP):
+    try:
+        ps = sample_GT_AD_DP.split(":")[3]
+    except IndexError:
+        ps = "."
+    return ps
 
 def get_alt_depth(sample_GT_AD_DP):
     try:
@@ -622,6 +619,10 @@ def main(
         # for TCAG sequence IDs
         regexp = re.compile("[0-9][0-9]-[0-9]+")
         sample_cols = [col for col in df.columns if re.match(regexp, col)]
+        if len(sample_cols) == 0:
+            # C4R TCAG IDs
+            sample_cols = [col for col in df.columns if "RLGS" in col]
+                     
     # extract genotype and alt allele depth
     for sample in sample_cols:
         df_merge[f"{sample}_GT"] = [
@@ -633,9 +634,13 @@ def main(
         df_merge[f"{sample}_DP"] = [
             get_depth(row[sample]) for index, row in df_merge.iterrows()
         ]
+        df_merge[f"{sample}_PS"] = [
+            get_phase_set(row[sample]) for index, row in df_merge.iterrows()
+        ]
     gt_cols = [col for col in df_merge.columns if "_GT" in col]
     ad_cols = [col for col in df_merge.columns if "_AD" in col]
     dp_cols = [col for col in df_merge.columns if "_DP" in col]
+    ps_cols = [col for col in df_merge.columns if "_PS" in col]
 
     # filter out benign SVs with AF > 1%
     # df_merge_notbenign = df_merge[apply_filter_benign(df_merge)]
@@ -767,6 +772,7 @@ def main(
         + gt_cols
         + ad_cols
         + dp_cols
+        + ps_cols
         + ["Tx", "Frameshift", "EXONS_SPANNED", "Nearest_SS_type", "Dist_nearest_SS"]
         + cmh_cols
         + hprc_cols
@@ -930,10 +936,13 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # pull chrom, pos, end, SVtype, format fields and DDD annotations from AnnotSV text file
     df = pd.read_csv(args.annotsv, sep="\t", low_memory=False)
+    # pull gene annotations from SnpEff VCF
     snpeff_df = vcf_to_df(args.snpeff)
     df = rename_SV_cols(df)
     prefix = args.annotsv.replace(".AnnotSV.tsv", "")
+    # parse original pbsv VCF just to ensure all SVs are included in final report
     vcf = VariantFile(args.vcf)
 
     omim = pd.read_csv(args.omim, sep="\t")
