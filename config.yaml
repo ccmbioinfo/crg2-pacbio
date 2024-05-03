@@ -15,7 +15,7 @@ tools:
   cre: "~/crg2-pacbio/scripts/cre"
   crg: "~/crg"
   crg2_pacbio: "~/crg2-pacbio"
-  annotSV: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/annotate_SV/tools/AnnotSV-3.1.1"
+  annotSV: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/tools/AnnotSV-3.1.1"
 
 ref:
   name: GRCh38.86
@@ -39,10 +39,10 @@ annotation:
   snpeff:
     data_dir: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/snpeff/data"
   sv_report:
-      exon: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/annotate_SV/genes/MANE.GRCh38.v1.0.ensembl_genomic.bed"
-      inhouse: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/SV_database/pbsv.allsamples.counts.2022-04-19.bed"
+      exon: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/genes/MANE.GRCh38.v1.0.ensembl_genomic.bed"
+      inhouse: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/SV_database/pbsv.allsamples.counts.2022-04-19.bed"
       c4r: True # if samples belong to C4R, annotate against C4R pbsv SV database
-      anno_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/annotate_SV/annotations/"
+      anno_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/annotations/"
   pathogenic_repeats:
       disease_thresholds: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation/ExpansionHunter/tandem_repeat_disease_loci_v1.1.tsv"
 
@@ -52,7 +52,7 @@ params:
 
 trgt:
   samples: "samples.tsv"
-  ensembl_gtf: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations/Homo_sapiens.GRCh38.109.chr.gtf.gz"
-  gnomad_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations/gnomad.v4.0.constraint_metrics.tsv"
-  omim_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/proband_only_workflow/annotations"
+  ensembl_gtf: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/Homo_sapiens.GRCh38.109.chr.gtf.gz"
+  gnomad_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/gnomad.v4.0.constraint_metrics.tsv"
+  omim_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations"
 
