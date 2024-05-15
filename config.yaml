@@ -16,6 +16,7 @@ tools:
   crg: "~/crg"
   crg2_pacbio: "~/crg2-pacbio"
   annotSV: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/tools/AnnotSV-3.1.1"
+  trgt: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/TRGTv1.0.0/trgt"
 
 ref:
   name: GRCh38.86
@@ -44,6 +45,7 @@ annotation:
       c4r: True # if samples belong to C4R, annotate against C4R pbsv SV database
       anno_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/annotations/"
   pathogenic_repeats:
+      trgt_catalog: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/TRGTv1.0.0/repeats/pathogenic_repeats.hg38.bed"
       disease_thresholds: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation/ExpansionHunter/tandem_repeat_disease_loci_v1.1.tsv"
 
 params:

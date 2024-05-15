@@ -1,16 +1,61 @@
-# rule genotype_pathogenic_loci:
-# /hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread/TRGT/scripts/genotype_repeats.sh
+rule genotype_pathogenic_loci:
+    input: get_bam
+    output: 
+        vcf = temp("pathogenic_repeats/{family}_{sample}.trgt.unsorted.vcf.gz"),
+        spanning_bam = "pathogenic_repeats/{family}_{sample}.trgt.unsorted.spanning.bam"
+    params: 
+        trgt = config["tools"]["trgt"],
+        ref = config["ref"]["genome"],
+        path_repeats = config["annotation"]["pathogenic_repeats"]["trgt_catalog"]
+    log: "logs/pathogenic_repeats/{family}_{sample}.trgt.log"
+    conda:
+        "../envs/common.yaml"
+    shell: 
+        """
+        # get sex, code from https://github.com/ccmbioinfo/crg/get_XY.sh
+        x=`samtools idxstats {input} | egrep  "X|chrX"`;
+        y=`samtools idxstats {input} | egrep  "Y|chrY"`;
+        xcov=`echo $x | awk '{{ printf("%0.5f", $3/$2); }}'`;
+        ycov=`echo $y | awk '{{ printf("%0.5f", $3/$2); }}'`;
+
+        rat=$(echo "scale=4; ${{xcov}}/${{ycov}}" | bc)
+        if (( $(echo "$rat > 5.0" | bc -l) )); then
+            sex=XX
+        else
+            sex=XY
+        fi
+
+        echo "$sex"
+
+        {params.trgt} genotype --genome {params.ref} \
+            --reads {input} \
+            --repeats {params.path_repeats} \
+            --output-prefix pathogenic_repeats/{wildcards.family}_{wildcards.sample}.trgt.unsorted \
+            --karyotype $sex
+        """
+
+rule sort_trgt_vcf:
+    input: "pathogenic_repeats/{family}_{sample}.trgt.unsorted.vcf.gz"
+    output: "pathogenic_repeats/{family}_{sample}.trgt.vcf.gz"
+    log: "logs/bcftools/{family}_{sample}.sort.trgt.log"
+    conda:
+        "../envs/common.yaml"
+    shell:
+        """
+        bcftools sort -Ob -o {output} {input};
+        bcftools index {output}
+        """
 
 rule merge_vcfs:
-    input: get_trgt_path_str_vcf_dir
+    input: 
+       vcfs=expand("pathogenic_repeats/{{family}}_{sample}.trgt.vcf.gz", sample=samples.index)
     output: "pathogenic_repeats/{family}.known.path.str.loci.vcf"
     log: "logs/pathogenic_repeats/{family}.merge.repeat.vcfs.log"
     conda:
         "../envs/common.yaml"
     shell: 
         """
-        echo {input}/*vcf.gz | tr ' ' '\\n' > pathogenic_repeats/{wildcards.family}_vcfs.txt
-        bcftools merge -l pathogenic_repeats/{wildcards.family}_vcfs.txt -o pathogenic_repeats/{wildcards.family}.known.path.str.loci.vcf -O v -F x -m all
+        bcftools merge {input.vcfs} -o pathogenic_repeats/{wildcards.family}.known.path.str.loci.vcf -O v -F x -m all
         """
 
 rule annotate_pathogenic_repeats:
