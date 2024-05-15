@@ -33,8 +33,6 @@ def recode_genes(disease_thresholds):
     disease_thresholds.loc[
         disease_thresholds["Gene"] == "ATXN8/ATXN8OS", "Gene"
     ] = "ATXN8"
-    # disease_thresholds.loc[disease_thresholds["Gene"] == "NOTCH2NLC", "Gene"] = "NOTCH2NL"
-    # in the TRGT vcf, one locus is annotated as NOTCH2NL, one as NOTCH2NLC- are they both NOTCH2NLC?
     disease_thresholds.loc[disease_thresholds["Gene"] == "CBL2", "Gene"] = "CBL"
     disease_thresholds.loc[disease_thresholds["Gene"] == "XYLT", "Gene"] = "XYLT1"
     disease_thresholds.loc[disease_thresholds["Gene"] == "TK2/BEAN", "Gene"] = "BEAN1"
@@ -128,7 +126,7 @@ def main(vcf, disease_thresholds, output_file):
         "variants/ID",
         "variants/altlen",
         "variants/is_snp",
-        "calldata/ALCI",
+        "calldata/ALLR",
         "calldata/AM",
         "calldata/MC",
         "calldata/MS",
@@ -147,7 +145,7 @@ def main(vcf, disease_thresholds, output_file):
     )
 
     vcf_df = parse_sample_field(vcf_dict_pysam, vcf_df, "AL", "allele_length")
-    vcf_df = parse_sample_field(vcf_dict_pysam, vcf_df, "ALCI", "allele_CI")
+    vcf_df = parse_sample_field(vcf_dict_pysam, vcf_df, "ALLR", "allele_CI")
     vcf_df = parse_sample_field(vcf_dict_pysam, vcf_df, "MC", "motif_count")
     vcf_df = parse_sample_field(vcf_dict_pysam, vcf_df, "MS", "motif_span")
     vcf_df = parse_sample_field(vcf_dict_pysam, vcf_df, "AM", "avg_methylation")

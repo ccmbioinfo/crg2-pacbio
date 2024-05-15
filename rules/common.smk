@@ -66,3 +66,9 @@ def get_trgt_path_str_vcf_dir(wildcards):
     input_vcf = units.loc[family, "trgt_pathogenic_vcf_dir"]
 
     return input_vcf
+
+def get_bam(wildcards):
+    print(wildcards.sample)
+    bam = samples.loc[wildcards.sample, "BAM"]
+
+    return bam
