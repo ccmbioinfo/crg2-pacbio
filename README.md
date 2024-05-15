@@ -26,7 +26,7 @@ Repeat expansion outlier report
 - annnotate repeat outliers with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_repeat_outliers.py)
 
 Pathogenic repeat loci report
-- TRGT must have previously been run on each sample against the [pathogenic repeat loci BED file](https://github.com/PacificBiosciences/trgt/blob/main/repeats/pathogenic_repeats.hg38.bed) provided by TRGT
+- genotype repeats per-sample using TRGTv1.0.0 against the [pathogenic repeat loci BED file](https://github.com/PacificBiosciences/trgt/blob/main/repeats/pathogenic_repeats.hg38.bed) provided by TRGT (the GIAB 937,122 catalog only contains 50/56 loci). Note that TRGT requires BAMs; these must be added to the samples.tsv file
 - merge sample VCFs into multi-sample family VCF
 - annotate repeat loci with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_path_str_loci.py)
 
