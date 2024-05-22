@@ -7,6 +7,11 @@ CRG2_PACBIO=~/crg2-pacbio
 
 module load python/3.7.1
 
+if [ -z $analyses ]; then
+        echo 'Must specify path to Stager analyses_report.csv, exiting'
+        exit
+fi
+
 while read -r line
 do
     family=`echo $line | cut -d] -f2 |  tr '"' ' ' | tr "'[]" ' ' | cut -d, -f2 | sed 's/ //g'`
@@ -33,7 +38,7 @@ do
             -i ${family}_${sample1} \
             -c /home/ccmmarvin/crg2/credentials.csv
     
-    # # copy pipeline files to analysis directory and modify to add family, HPO, and pedigree 
+    # copy pipeline files to analysis directory and modify to add family, HPO, and pedigree 
     cp ${CRG2_PACBIO}/config.yaml ${CRG2_PACBIO}/crg2-pacbio.sh ${CRG2_PACBIO}/slurm_profile/slurm-config.yaml ${ANALYSIS_DIR}/${family}/${analysis}
     sed -i "s/NA12878/$family/" ${ANALYSIS_DIR}/${family}/${analysis}/config.yaml
     sed -i ${ANALYSIS_DIR}/${family}/${analysis}/config.yaml
@@ -43,18 +48,18 @@ do
     sed -i "s+hpo: \"\"+hpo: \"${HPO}\"+"  ${ANALYSIS_DIR}/${family}/${analysis}/config.yaml
     sed -i "s+ped: \"\"+ped: \"${pedigree}\"+"  ${ANALYSIS_DIR}/${family}/${analysis}/config.yaml
     # add targets to job submission script
-    sed -i "s+{SLURM}+{SLURM} -p sv/${family}.pbsv.csv small_variants/coding/${family}+g" ${ANALYSIS_DIR}/${family}/${analysis}/crg2-pacbio.sh
+    sed -i "s+{SLURM}+{SLURM} -p sv/${family}.pbsv.csv small_variants/coding/${family} pathogenic_repeats/${family}.known.path.str.loci.csv+g" ${ANALYSIS_DIR}/${family}/${analysis}/crg2-pacbio.sh
 
 
     # create samples.tsv 
-    echo sample > ${ANALYSIS_DIR}/${family}/${analysis}/samples.tsv
+    echo -e "sample\tBAM" > ${ANALYSIS_DIR}/${family}/${analysis}/samples.tsv
     echo -e "family\tplatform\tsmall_variant_vcf\ttrgt_vcf_dir\tpbsv_vcf\ttrgt_pathogenic_vcf_dir" > ${ANALYSIS_DIR}/${family}/${analysis}/units.tsv
     for cram in ${crams[@]}
     do
             echo $cram
             sample=`basename $cram | cut -d '.' -f1 | cut -d '_' -f2`
             sample=`echo $sample | sed 's/-ready//'`
-            echo $sample >> ${ANALYSIS_DIR}/${family}/${analysis}/samples.tsv
+            echo -e "$sample\t$cram" >> ${ANALYSIS_DIR}/${family}/${analysis}/samples.tsv
     done
 
     # create units.tsv
