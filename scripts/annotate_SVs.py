@@ -619,9 +619,13 @@ def main(
         # for TCAG sequence IDs
         regexp = re.compile("[0-9][0-9]-[0-9]+")
         sample_cols = [col for col in df.columns if re.match(regexp, col)]
-        if len(sample_cols) == 0:
-            # C4R TCAG IDs
-            sample_cols = [col for col in df.columns if "RLGS" in col]
+    if len(sample_cols) == 0:
+        # C4R TCAG IDs
+        sample_cols = [col for col in df.columns if "RLGS" in col]
+    if len(sample_cols) == 0:
+        # C4R IDs
+        regexp = re.compile("\d+[A-Z]*_[A-Z]+\d+")
+        sample_cols = [col for col in df.columns if re.match(regexp, col)]
                      
     # extract genotype and alt allele depth
     for sample in sample_cols:
