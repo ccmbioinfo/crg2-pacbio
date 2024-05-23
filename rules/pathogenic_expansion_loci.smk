@@ -55,7 +55,24 @@ rule merge_vcfs:
         "../envs/common.yaml"
     shell: 
         """
-        bcftools merge {input.vcfs} -o pathogenic_repeats/{wildcards.family}.known.path.str.loci.vcf -O v -F x -m all
+        # determine if there is one TRGT VCF or multiple
+        vcfs={input.vcfs} 
+        count=0
+        for file in ${{vcfs[@]}} ; do
+        if [[ -f "$file" ]]; then
+            count=$((count+1))
+        fi
+        done
+
+        if [[ $count -eq 1 ]]; then
+            echo "Single VCF"
+            input_prefix=`echo {input.vcfs} | sed 's/.gz//'`
+            gunzip {input.vcfs}
+            mv $input_prefix {output}
+        else
+            echo "Multiple VCFs, merging"
+            bcftools merge {input.vcfs} -o {output} -O v -F x -m all
+        fi
         """
 
 rule annotate_pathogenic_repeats:
