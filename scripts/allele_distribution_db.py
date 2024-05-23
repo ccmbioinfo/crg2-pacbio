@@ -1,7 +1,8 @@
 import argparse
+import os
 import pandas as pd
 import numpy as np
-from pathlib import Path
+import sys
 
 def resample_quantiles(counts: pd.Series, num_resamples: int) -> list:
     """Based on https://github.com/Illumina/ExpansionHunterDenovo/blob/master/scripts/core/common.py"""
@@ -56,8 +57,11 @@ def get_quantiles_cutoffs(trid: str, allele_type: str, alleles: pd.DataFrame) ->
 
 
 print("Loading allele db")
-alleles = pd.read_csv("/hpf/largeprojects/ccmbio/mcouse/pacbio_report_dev/results/create_cmh_allele_db/repeat_outliers/allele_db/CMH.alleles.sorted.db.gz", compression="gzip",
-                      header=None, names=["trid", "sample", "motif_purity", "avg_methylation", "alleles"], sep=" ")
+alleles = sys.argv[1]
+dirname = os.path.dirname(alleles)
+outfile = os.path.basename(alleles).replace('.db', '.distribution.tsv')
+outpath = os.path.join(dirname, outfile)
+alleles = pd.read_csv(alleles, header=None, names=["trid", "sample", "motif_purity", "avg_methylation", "alleles"], sep=" ")
 
 # get length of shortest and longest alleles
 alleles["short_allele_len"], alleles["long_allele_len"] = zip(*alleles["alleles"].map(lambda x: split_alleles(x)))
@@ -107,4 +111,4 @@ columns = ["trid",
            "cutoff_long", 
            "range_long"]
 
-grouped_alleles.to_csv("allele_distribution_db.tsv", sep="\t", compression="gzip", header=columns, index=False)
+grouped_alleles.to_csv(outpath, sep="\t", compression="gzip", header=columns, index=False)
