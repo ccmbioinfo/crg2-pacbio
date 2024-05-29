@@ -442,18 +442,18 @@ select_and_write2 <- function(variants, samples, prefix, type)
                           paste0("Zygosity.", samples),
                           c("Gene"),
                           paste0("Burden.", samples),
-                          c("gts", "Variation", "Info", "Refseq_change", "Depth", "Quality"),
+                          c("gts", "PS", "Variation", "Info", "Refseq_change", "Depth", "Quality"),
                           paste0("Alt_depths.", samples),
                           paste0("gt_quals.", samples),
                           c("Trio_coverage", "Ensembl_gene_id", "Gene_description", "omim_phenotype", "omim_inheritance",
                             "Orphanet","Clinvar",
-                            "C4R_WES_counts", "C4R_WES_samples", "HPRC_af", "HPRC_ac", "HPRC_hom", "CMH_af", "CMH_ac","HGMD_id", "HGMD_gene", "HGMD_tag", "HGMD_ref",
+                            "HPRC_af", "HPRC_ac", "HPRC_hom", "CMH_af", "CMH_ac","HGMD_id", "HGMD_gene", "HGMD_tag", "HGMD_ref",
                             "Gnomad_af_popmax", "Gnomad_af", "Gnomad_ac", "Gnomad_hom",
                             "Ensembl_transcript_id", "AA_position", "Exon", "Protein_domains", "rsIDs",
                             "Gnomad_oe_lof_score", "Gnomad_oe_mis_score", "Exac_pli_score", "Exac_prec_score", "Exac_pnull_score",
                             "Conserved_in_30_mammals", "SpliceAI_impact", "SpliceAI_score", "Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score", "Gerp_score",
                             "Imprinting_status", "Imprinting_expressed_allele", "Pseudoautosomal", "Gnomad_male_ac",
-                            "Number_of_callers", "Old_multiallelic", "UCE_100bp", "UCE_200bp", "Dark_genes","ps"), noncoding_cols)]
+                            "Old_multiallelic", "UCE_100bp", "UCE_200bp", "Dark_genes"), noncoding_cols)]
   
     variants <- variants[order(variants$Position),]
 
@@ -754,29 +754,10 @@ parse_ad <- function(ad_cell) {
   return(alt_depth)
 }
 
-annotate_w_care4rare <- function(family,samples,type){
+annotate_w_care4rare <- function(family,samples,type){		    
     variants <- read.csv(paste0(family, ".merge_reports.csv"), stringsAsFactors = F)
   
     variants$superindex <- with(variants, paste(Position, Ref, Alt, sep='-'))
-    
-    if(exists("seen_in_c4r_counts")){
-        variants <- merge(variants, seen_in_c4r_counts, by.x = "superindex", 
-                          by.y = "Position.Ref.Alt", all.x = T)
-        variants$C4R_WES_counts <- variants$Frequency
-        variants$Frequency <- NULL
-    }
-    
-    variants$C4R_WES_counts[is.na(variants$C4R_WES_counts)] <- 0
-    
-    if(exists("seen_in_c4r_samples")){
-        variants <- merge(variants,seen_in_c4r_samples,by.x = "superindex", 
-                          by.y = "Position.Ref.Alt", all.x = T)
-        variants$C4R_WES_samples <- variants$Samples
-    }
-    
-    variants$C4R_WES_samples[is.na(variants$C4R_WES_samples)] <- 0        
-		# truncate column if it has more than 30000 variants
-		variants$C4R_WES_samples <- strtrim(variants$C4R_WES_samples, 30000)
 		    
     if (exists("hgmd")){
         variants$HGMD_gene <- NULL
@@ -834,63 +815,6 @@ load_tables <- function(debug = F){
     }
 }
 
-# creates clinical report - more conservative filtering and less columns
-clinical_report <- function(project,samples,type){
-    report_file_name <- paste0(project, ".", type, ".", datetime,".csv")
-    full_report <- read.csv(report_file_name, header = T, stringsAsFactors = F)
-    
-    full_report$max_alt <- with(full_report, pmax(get(paste0("Alt_depths.", samples))))
-
-    for (i in 1:nrow(full_report)){
-        for (sample in samples){
-            field_depth <- paste0("Alt_depths.", sample)
-            parsed_alt_depth <- parse_ad(full_report[i,field_depth])
-            full_report[i,field_depth] <- parsed_alt_depth
-        }
-    }
-
-    # for clinical, only keep variants where one of the alt depths was >= 20
-    full_report <- dplyr::filter_at(full_report, paste0("Alt_depths.",samples), any_vars(as.integer(.) >= 20))   
-    filtered_report <- subset(full_report, 
-               Quality > 1000 & Gnomad_af_popmax < 0.005 & C4R_WES_counts < 6,
-               select = c("Position", "GNOMAD_Link", "Ref", "Alt", "Gene", paste0("Zygosity.", samples), 
-                        paste0("Burden.",samples),
-                        paste0("Alt_depths.",samples),
-                        "Variation", "Info", "Refseq_change", "omim_phenotype", "omim_inheritance",
-                        "Orphanet", "Clinvar", "C4R_WES_counts", "HPRC_af", "HPRC_ac", "HPRC_hom", "CMH_af", "CMH_ac",
-                        "Gnomad_af_popmax", "Gnomad_af", "Gnomad_ac", "Gnomad_hom",
-                        "Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score",
-                        "Imprinting_status", "Pseudoautosomal", "Gnomad_male_ac", "UCE_100bp","UCE_200bp")
-               )
-    
-    # recalculate burden using the filtered report
-    for(sample in samples){
-        zygosity_column_name <- paste0("Zygosity.", sample)
-        burden_column_name <- paste0("Burden.", sample)
-        t <- subset(filtered_report, 
-                    get(zygosity_column_name) == 'Hom' | get(zygosity_column_name) == 'Het',
-                    select = c("Gene", zygosity_column_name))
-        # count is from plyr
-        df_burden <- plyr::count(t, "Gene")    
-        colnames(df_burden)[2] <- burden_column_name
-        filtered_report[,burden_column_name] <- NULL
-        filtered_report <- merge(filtered_report, df_burden, all.x = T)
-        filtered_report[,burden_column_name][is.na(filtered_report[, burden_column_name])] <- 0
-        filtered_report[,burden_column_name][is.na(filtered_report$Gene)] <-0
-    }
-    
-    #order columns
-    filtered_report <- filtered_report[c("Position", "GNOMAD_Link", "Ref", "Alt", "Gene", paste0("Zygosity.", samples), 
-      paste0("Burden.", samples),
-      "Variation", "Info", "Refseq_change", "omim_phenotype", "omim_inheritance",
-      "Orphanet", "Clinvar", "C4R_WES_counts", "HPRC_af", "HPRC_ac", "HPRC_hom", "CMH_af", "CMH_ac", 
-      "Gnomad_af_popmax", "Gnomad_af", "Gnomad_ac", "Gnomad_hom",
-      "Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score",
-      "Imprinting_status", "Pseudoautosomal", "Gnomad_male_ac", "UCE_100bp", "UCE_200bp")]
-
-    write.csv(filtered_report, paste0(project, ".clinical.", type, ".", datetime, ".csv"), row.names = F)
-}
-
 library(stringr)
 library(data.table)
 library(plyr)
@@ -929,7 +853,5 @@ print("Merging reports")
 merge_reports(family,samples,type)
 print("Annotating Reports")
 annotate_w_care4rare(family,samples,type)
-print("Writing Clinical Report")
-clinical_report(family,samples,type)
 
 setwd("..")
