@@ -97,7 +97,7 @@ sQuery="select \
         COALESCE(spliceai_score, '') as SpliceAI_score, \
         uce_100bp as UCE_100bp, uce_200bp as UCE_200bp, \
         Dark_genes as Dark_genes, \
-        ps as ps, \
+        ps as PS, \
         $noncoding_anno, \
         gts,"
 
