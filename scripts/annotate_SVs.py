@@ -201,7 +201,18 @@ def add_omim(omim_df, gene):
 
 def get_genotype(sample_GT_AD_DP):
     genotype = sample_GT_AD_DP.split(":")[0]
-    return genotype
+    if genotype == "0/1" or genotype == "0|1" or genotype == "1|0":
+        zyg = "het"
+    elif genotype == "1/1":
+        zyg =  "hom"
+        genotype = "1//1"
+    elif genotype == "./.":
+        zyg = genotype
+    elif genotype == "0/0":
+        zyg =  "-"
+    else:
+        zyg = genotype
+    return [zyg, genotype]
 
 def get_phase_set(sample_GT_AD_DP):
     try:
@@ -629,8 +640,11 @@ def main(
                      
     # extract genotype and alt allele depth
     for sample in sample_cols:
+        df_merge[f"{sample}_zyg"] = [
+            get_genotype(row[sample])[0] for index, row in df_merge.iterrows()
+        ]
         df_merge[f"{sample}_GT"] = [
-            get_genotype(row[sample]) for index, row in df_merge.iterrows()
+            get_genotype(row[sample])[1] for index, row in df_merge.iterrows()
         ]
         df_merge[f"{sample}_AD"] = [
             get_alt_depth(row[sample]) for index, row in df_merge.iterrows()
@@ -641,6 +655,7 @@ def main(
         df_merge[f"{sample}_PS"] = [
             get_phase_set(row[sample]) for index, row in df_merge.iterrows()
         ]
+    zyg_cols = [col for col in df_merge.columns if "_zyg" in col]
     gt_cols = [col for col in df_merge.columns if "_GT" in col]
     ad_cols = [col for col in df_merge.columns if "_AD" in col]
     dp_cols = [col for col in df_merge.columns if "_DP" in col]
@@ -773,6 +788,7 @@ def main(
             "clingen_TS",
         ]
         + hpo_cols
+        + zyg_cols
         + gt_cols
         + ad_cols
         + dp_cols
