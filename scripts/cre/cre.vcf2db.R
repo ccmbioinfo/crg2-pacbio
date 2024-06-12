@@ -200,7 +200,10 @@ create_report <- function(family, samples, type){
       
         n_sample <- n_sample+1
     }
-    
+
+    # change ps column separator
+    variants[,"PS"] <- with(variants, gsub(",", "|", PS), fixed = T)
+
     # Column17 = Ensembl_gene_id
 
     # Column18 = Gene_description
