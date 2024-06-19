@@ -60,7 +60,7 @@ def get_quantiles_cutoffs(trid: str, allele_type: str, alleles: pd.DataFrame) ->
 print("Loading allele db")
 alleles = sys.argv[1]
 dirname = os.path.dirname(alleles)
-outfile = os.path.basename(alleles).replace(".db", ".distribution.tsv")
+outfile = os.path.basename(alleles).replace(".db", ".distribution.tsv.gz")
 outpath = os.path.join(dirname, outfile)
 alleles = pd.read_csv(
     alleles,
@@ -74,16 +74,24 @@ alleles["short_allele_len"], alleles["long_allele_len"] = zip(
     *alleles["alleles"].map(lambda x: split_alleles(x))
 )
 
-# split motif purity column
-alleles[["MP1", "MP2"]] = alleles["motif_purity"].str.split(
-    ",",
-    expand=True,
-)
-# split average methylation column
-alleles[["AM1", "AM2"]] = alleles["avg_methylation"].str.split(
-    ",",
-    expand=True,
-)
+try:
+    # split motif purity column
+    alleles[["MP1", "MP2"]] = alleles["motif_purity"].str.split(
+        ",",
+        expand=True,
+    )
+    # split average methylation column
+    alleles[["AM1", "AM2"]] = alleles["avg_methylation"].str.split(
+        ",",
+        expand=True,
+    )
+except:
+    # on Y chromosome, MP is a single float value
+    # for simplicity, just encode MP1/MP2 and AM1/AM2 as the same value
+    alleles["MP1"] = alleles["motif_purity"]
+    alleles["MP2"] = alleles["motif_purity"]
+    alleles["AM1"] = alleles["avg_methylation"]
+    alleles["AM2"] = alleles["avg_methylation"]
 
 alleles = alleles.replace(".", np.nan)
 alleles = alleles.astype({"MP1": float, "MP2": float})
@@ -118,6 +126,8 @@ grouped_alleles["cutoff_long"], grouped_alleles["range_long"] = zip(
         lambda x: get_quantiles_cutoffs(x, "long_allele_len", alleles)
     )
 )
+
+grouped_alleles = grouped_alleles.round(2)
 
 columns = [
     "trid",
