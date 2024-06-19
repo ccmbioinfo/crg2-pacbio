@@ -5,6 +5,7 @@ from pathlib import Path, PosixPath
 import gzip
 
 # https://github.com/egor-dolzhenko/discover-expansions/blob/main/discover-expansions.ipynb
+# MC: added motif purity and methylation
 
 def skip_header(file_handle: gzip.GzipFile, prefix: bytes = b'#') -> None:
     last_pos = file_handle.tell()
@@ -38,7 +39,7 @@ def get_alleles(path: PosixPath):
             ref, alt = sl[3], sl[4]               
             trid = sl[-3].split(";")[0].lstrip("TRID=")
             motif = sl[-3].split(";")[2].lstrip("MOTIFS=")
-            trid = trid + "_" + motif
+            trid = trid 
             motif_purity = sl[-1].split(":")[-2]
             avg_methylation = sl[-1].split(":")[-1]
 
@@ -66,7 +67,7 @@ if __name__ == "__main__":
         "--vcf_path",
         type=str,
         required=True,
-        help="Path to TRGT VCFs for cases and controls",
+        help="Path to TRGT VCFs",
     )
     parser.add_argument(
         "--output_file",
