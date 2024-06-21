@@ -45,6 +45,7 @@ rule sv_report:
         exon = config["annotation"]["sv_report"]["exon"],
         anno_path = config["annotation"]["sv_report"]["anno_path"],
         inhouse = config["annotation"]["sv_report"]["inhouse"],
+        colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["sv_report"]["c4r"],
     conda:
         "../envs/str_sv.yaml"
@@ -57,10 +58,9 @@ rule sv_report:
         -omim {params.anno_path}/OMIM_hgnc_join_omim_phenos_2024-02-06.tsv \
         -hpo {params.hpo} \
         -exon {params.exon} \
-        -cmh {params.anno_path}/CMH.GRCh38.pbsv.bed \
-        -hprc {params.anno_path}/hprc.GRCh38.pbsv.v.2.6.0-20210417.bed \
         -gnomad {params.anno_path}/gnomad_v2_sv.sites_hg38_liftover_FINAL_drop_cols.bed \
         -inhouse {params.inhouse} \
+        -colorsdb {params.colorsdb} \
         -odd_regions {params.anno_path}/GRCh38.oddRegions.bed \
         -repeats {params.anno_path}/human_GRCh38_no_alt_analysis_set.trgt.bed \
         -c4r {params.c4r} \
