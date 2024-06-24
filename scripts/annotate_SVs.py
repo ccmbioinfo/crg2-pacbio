@@ -607,10 +607,9 @@ def main(
     vcf,
     prefix,
     exon_bed,
-    cmh,
-    hprc,
     gnomad,
     inhouse,
+    colorsdb,
     dark_regions,
     odd_regions,
     repeats,
@@ -686,14 +685,6 @@ def main(
         add_omim(omim, gene)[1] for gene in df_merge["GENE_NAME"].values
     ]
 
-    # add SVs called by pbsv from Children's Mercy Hospital PacBio HiFi data
-    cmh_cols = ["cmh_AF", "cmh_AC"]
-    df_merge = annotate_pop_svs(df_merge, cmh, cmh_cols)
-
-    # add SVs called by pbsv from HPRC PacBio HiFi data
-    hprc_cols = ["hprc_AF", "hprc_AC", "hprc_HOM"]
-    df_merge = annotate_pop_svs(df_merge, hprc, hprc_cols)
-
     # add gnomAD SVs
     gnomad_cols = [
         "gnomad_NAME",
@@ -714,6 +705,12 @@ def main(
     ]
 
     df_merge = annotate_pop_svs(df_merge, inhouse, inhouse_cols)
+
+    # add CoLoRSdb SVs
+    colorsdb_cols = ["CoLoRSdb_SVLEN", "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt"]
+    df_merge = annotate_pop_svs(df_merge, colorsdb, colorsdb_cols)
+    df_merge = df_merge.drop(columns=["CoLoRSdb_SVLEN"])
+    colorsdb_cols = [col for col in colorsdb_cols if col != "CoLoRSdb_SVLEN"]
 
     # add exon counts
     df_merge = get_exon_counts(df_merge, exon_bed)
@@ -794,10 +791,9 @@ def main(
         + dp_cols
         + ps_cols
         + ["Tx", "Frameshift", "EXONS_SPANNED", "Nearest_SS_type", "Dist_nearest_SS"]
-        + cmh_cols
-        + hprc_cols
         + gnomad_cols
         + inhouse_cols
+        + colorsdb_cols
         + [
             "ExAC_delZ",
             "ExAC_dupZ",
@@ -888,18 +884,6 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
-        "-cmh",
-        help="Children's Mercy Hospital SVs in bed format",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "-hprc",
-        help="HPRC SVs in bed format",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
         "-gnomad",
         help="gnomad SVs in bed format",
         type=str,
@@ -908,6 +892,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "-inhouse",
         help="C4R inhouse database",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "-colorsdb",
+        help="CoLoRSdb SVs in bed format",
         type=str,
         required=True,
     )
@@ -1005,10 +995,9 @@ if __name__ == "__main__":
         vcf,
         prefix,
         args.exon,
-        args.cmh,
-        args.hprc,
         args.gnomad,
         args.inhouse,
+        args.colorsdb,
         args.dark_regions,
         args.odd_regions,
         args.repeats,
