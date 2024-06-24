@@ -707,8 +707,10 @@ def main(
     df_merge = annotate_pop_svs(df_merge, inhouse, inhouse_cols)
 
     # add CoLoRSdb SVs
-    colorsdb_cols = ["CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hom", "CoLoRSdb_AC_Het", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt"]
+    colorsdb_cols = ["CoLoRSdb_SVLEN", "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt"]
     df_merge = annotate_pop_svs(df_merge, colorsdb, colorsdb_cols)
+    df_merge = df_merge.drop(columns=["CoLoRSdb_SVLEN"])
+    colorsdb_cols = [col for col in colorsdb_cols if col != "CoLoRSdb_SVLEN"]
 
     # add exon counts
     df_merge = get_exon_counts(df_merge, exon_bed)

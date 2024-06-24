@@ -81,8 +81,6 @@ sQuery="select \
 	    gnomad_male_ac as Gnomad_male_ac,\
         colorsdb_af as CoLoRSdb_AF,\
         colorsdb_ac as CoLoRSdb_AC,\
-        colorsdb_ac_het as CoLoRSdb_AC_Het,\
-        colorsdb_ac_hom as CoLoRSdb_AC_Hom,\
         colorsdb_ac_hemi as CoLoRSdb_AC_Hemi,\
         colorsdb_nhomalt as CoLoRSdb_nhomalt,\
         sift_score as Sift_score,\
