@@ -159,7 +159,8 @@ def add_hpo(hpo, gene):
                 term = term.replace("; ", ";").split(";")
                 term = list(set(term))
                 for t in term:
-                    terms.append(t)
+                    if t not in terms:
+                        terms.append(t)
             except IndexError:
                 pass
     if len(terms) == 0:
