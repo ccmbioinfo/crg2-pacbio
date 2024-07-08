@@ -28,7 +28,7 @@ rule sort_allele_db:
 rule find_repeat_outliers:
     input: 
         alleles_path = "repeat_outliers/allele_db/{family}.alleles.sorted.db.gz",
-        case_ids = config["trgt"]["samples"]
+        control_alleles = config["trgt"]["control_alleles"]
     output:
         out_path =  "repeat_outliers/{family}.repeat.outliers.csv"
     params:
@@ -41,8 +41,8 @@ rule find_repeat_outliers:
     shell: 
         """
         (python3 {params.crg2_pacbio}/scripts/find_repeat_outliers.py --alleles_path {input.alleles_path} \
-            --output_file  {output} \
-            --case_ids {input.case_ids}) > {log} 2>&1
+            --control_alleles {input.control_alleles} \
+            --output_file  {output.out_path}) > {log} 2>&1 
         """
 
 

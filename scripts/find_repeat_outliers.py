@@ -1,96 +1,105 @@
 import argparse
-import gzip
-import itertools
-import os
 import pandas as pd
 import numpy as np
-from collections import namedtuple
-from pathlib import Path
-
-# based on Egor Dolzhenko's code in https://github.com/tandem-repeat-workflows/find-outlier-expansions/blob/main/find-outlier-expansions.ipynb
-
-RepeatRec = namedtuple("RepeatRec", "sample short_allele long_allele")
-
-def get_repeat_recs(path):
-    def parse_alleles(group):
-        alleles = list(line.decode("utf8").split() for line in group)
-        alleles = [(rec[1], rec[2].split(",")) for rec in alleles]
-        return alleles
-    
-    with gzip.open(path, "r") as file:
-        for trid, group in itertools.groupby(file, key=lambda line: line.decode("utf8").split()[0]):
-            alleles = parse_alleles(group)
-            repeat_recs = [(s, [len(a) for a in als]) for s, als in alleles]
-            repeat_recs = [RepeatRec(s, min(als), max(als)) for s, als in repeat_recs]
-            
-            yield trid, repeat_recs
 
 
-def resample_quantiles(counts, num_resamples):
-    """Based on https://github.com/Illumina/ExpansionHunterDenovo/blob/master/scripts/core/common.py"""
-    resamples = np.random.choice(counts, len(counts) * num_resamples)
-    resamples = np.split(resamples, num_resamples)
+def split_alleles(alleles: pd.DataFrame) -> tuple:
+    """
+    Split alleles by comma and return lengths and sequences of shortest and longest alleles.
+    Note that there may be more than two alleles called by TRGT at a locus in an individual (somaticism?)
+    """
+    alleles = alleles.split(",")
+    allele_lens = [len(a) for a in alleles]
+    short_allele_len = min(allele_lens)
+    long_allele_len = max(allele_lens)
+    short_index = alleles.index(min(alleles, key=len))
+    long_index = alleles.index(max(alleles, key=len))
+    short_allele = alleles[short_index]
+    long_allele = alleles[long_index]
 
-    resampled_quantiles = []
-    for resample in resamples:
-        quantile = np.quantile(resample, 0.95)
-        resampled_quantiles.append(quantile)
-
-    return resampled_quantiles
-
-
-def get_counts_with_finite_std(counts):
-    if len(set(counts)) == 1:
-        return counts[:-1] + [counts[-1] + 0.1]
-    return counts
+    return short_allele, short_allele_len, long_allele, long_allele_len
 
 
-def get_cutoff(quantiles):
-    mean = np.mean(quantiles)
-    std = max(1, np.std(quantiles))
-    cutoff = mean + std
-    return cutoff
-
-
-def get_hits(allele_type, repeat_recs, case_ids):
-    assert allele_type in ["long", "short"]
-    allele_index = 2 if allele_type == "long" else 1
-    cases, controls = {}, []
-    for rec in repeat_recs:
-        if rec.sample in case_ids:
-            cases[rec.sample] = rec[allele_index]
+def calc_z_score(allele_type: str, allele_length: int, short_allele_len_mean: float, short_allele_len_std: float, long_allele_len_mean: float, long_allele_len_std: float) -> float:
+    """
+    Calculate z-score for sample allele length compared to control distribution
+    """
+    if allele_type == "short_allele":
+        if short_allele_len_std == 0:
+            std = 0.0001
         else:
-            controls.append(rec[allele_index])
-    if not len(controls) == 0:
-        quantiles = resample_quantiles(controls, 100)
-        quantiles = get_counts_with_finite_std(quantiles)
-        cutoff = get_cutoff(quantiles)
-    
-        for case, allele_len in cases.items():
-            mean_control = np.mean(controls)
-            std_control = np.std(controls)
-            z_score = (allele_len - mean_control) / std_control
-            if allele_len > cutoff:
-                yield case, allele_len, z_score, (min(controls), max(controls))
+            std = short_allele_len_std
+        allele_len_mean = short_allele_len_mean
     else:
-        # no controls carry this TRID
-        for case, allele_len in cases.items():
-            yield case, allele_len, np.nan, np.nan
+        if long_allele_len_std == 0:
+            std = 0.0001
+        else:
+            std = long_allele_len_std
+        allele_len_mean = long_allele_len_mean
+    z_score = (allele_length - allele_len_mean)/std
 
+    return z_score
 
-def main(alleles_path, out_filepath, case_ids):    
-    if not os.path.exists("repeat_outliers"):
-        Path("repeat_outliers").mkdir(exist_ok=True) 
-    alleles_path = Path(alleles_path).resolve(strict=True)
-    HitRec = namedtuple("HitRec", "trid sample allele_type allele_len z_score control_range")
-    hits = []
-    for i, (trid, repeat_recs) in enumerate(get_repeat_recs(alleles_path)):    
-        for hit_type in ["long", "short"]:
-            for case, allele_len, z_score, control_range in get_hits(hit_type, repeat_recs, case_ids):
-                hits.append(HitRec(trid, case, hit_type, allele_len, z_score, control_range))
+def main(cases, dist, output_file):
+    # get length of shortest and longest alleles
+    cases["short_allele"], cases["short_allele_len"], cases["long_allele"], cases["long_allele_len"] = zip(
+        *cases["alleles"].map(lambda x: split_alleles(x))
+    )
 
-    df = pd.DataFrame(hits)
-    df.to_csv(out_filepath, index=False)
+    # drop motif purity and methylation, not needed for now?
+    cases = cases.drop(columns=["motif_purity", "avg_methylation", "alleles"]).copy()
+
+    # convert dataframe from wide to long format 
+    # allele lengths
+    cases_al = pd.melt(cases, id_vars=['trid', 'sample'], value_vars=['short_allele_len', 'long_allele_len'], var_name="allele_length_type", value_name="allele_length")
+    cases_al = cases_al.drop(columns=["trid", "sample"])
+    # allele sequences
+    cases_al_seq =  pd.melt(cases, id_vars=['trid', 'sample'], value_vars=['short_allele', 'long_allele'], var_name="allele_type", value_name="allele_sequence")
+    cases_long = pd.concat([cases_al, cases_al_seq], axis=1)
+
+    # merge case alleles to controls allele length distribution dataframe
+    merged = cases_long.merge(dist, on="trid", how="left")
+    merged = merged.astype({"short_allele_len_mean": float,
+                                            "long_allele_len_mean": float,
+                                            "short_allele_len_std": float,
+                                            "long_allele_len_std": float,
+                                            "cutoff_short": float,
+                                            "cutoff_long": float,
+                                            })
+
+    # calculate z_scores for each case allele compared to controls
+    merged["z_score"] = merged.apply(lambda row: calc_z_score(row["allele_type"],
+                                                            row["allele_length"],
+                                                            row["short_allele_len_mean"],
+                                                            row["short_allele_len_std"],
+                                                            row["long_allele_len_mean"],
+                                                            row["long_allele_len_std"]), axis=1)
+    
+    # split into  two dataframes: short alleles and long alleles
+    merged_short = merged[merged["allele_type"] == "short_allele"][["trid", "sample", "allele_type", "allele_length", "cutoff_short", "z_score", "range_short"]]
+    merged_long = merged[merged["allele_type"] == "long_allele"][["trid", "sample", "allele_type", "allele_length", "cutoff_long", "z_score", "range_long"]]
+
+    # filter out non-outliers
+    merged_short = merged_short[merged_short["allele_length"] > merged_short["cutoff_short"]]
+    merged_long = merged_long[merged_long["allele_length"] > merged_long["cutoff_long"]]
+
+    # cat short and long alleles into one dataframe
+    merged_short.rename({'range_short': "control_range"}, inplace=True, axis=1)
+    merged_long.rename({'range_long': "control_range"}, inplace=True, axis=1)
+    merged_cat = pd.concat([merged_short, merged_long], axis=0)
+
+    # remove unnecessary columns
+    merged_cat = merged_cat[["trid", "sample", "allele_type", "allele_length", "z_score", "control_range"]]
+    merged_cat.rename({"allele_length": "allele_len"}, axis=1, inplace=True)
+    
+    # sort by z_score
+    merged_cat = merged_cat.sort_values(by="z_score", ascending=False)
+
+    # replace infinite z scores (std of zero in controls) with fixed value to facilitate filtering
+    merged_cat.replace({np.inf: 10}, inplace=True)
+
+    # export
+    merged_cat.to_csv(output_file, index=False)
 
 
 if __name__ == "__main__":
@@ -101,7 +110,13 @@ if __name__ == "__main__":
         "--alleles_path",
         type=str,
         required=True,
-        help="Alleles from generate_allele_db",
+        help="Repeat alleles for cases",
+    )
+    parser.add_argument(
+        "--control_alleles",
+        type=str,
+        required=True,
+        help="Control allele length distribution CSV",
     )
     parser.add_argument(
         "--output_file",
@@ -109,15 +124,10 @@ if __name__ == "__main__":
         required=True,
         help="Output filepath",
     )
-    parser.add_argument(
-        "--case_ids",
-        type=str,
-        required=True,
-        help="Path to Ensembl gene GTF",
-    )
 
     args = parser.parse_args()
+    cases = pd.read_csv(args.alleles_path, sep=" ", compression="gzip",
+                    header=None, names=["trid", "sample", "motif_purity", "avg_methylation", "alleles"])
+    dist = pd.read_csv(args.control_alleles, sep="\t")
     print("Determining outlier repeats")
-    case_ids = args.case_ids
-    case_ids = pd.read_table(case_ids)["sample"].to_list()
-    main(args.alleles_path, args.output_file, case_ids)
+    main(cases, dist, args.output_file)
