@@ -5,6 +5,7 @@ from pathlib import Path, PosixPath
 import gzip
 
 # https://github.com/egor-dolzhenko/discover-expansions/blob/main/discover-expansions.ipynb
+# MC: added motif purity and methylation
 
 def skip_header(file_handle: gzip.GzipFile, prefix: bytes = b'#') -> None:
     last_pos = file_handle.tell()
@@ -14,12 +15,12 @@ def skip_header(file_handle: gzip.GzipFile, prefix: bytes = b'#') -> None:
 
 def get_alleles(path: PosixPath):    
     gt_actions = {
-        "0/0": lambda: (trid, [ref, ref]),
-        "0/1": lambda: (trid, [ref, alt]),
-        "1/2": lambda: (trid, alt.split(",")),
-        "1/1": lambda: (trid, [alt, alt]),
-        "1": lambda: (trid, [alt]),
-        "0": lambda: (trid, [ref])
+        "0/0": lambda: (trid, motif_purity, avg_methylation, [ref, ref]),
+        "0/1": lambda: (trid, motif_purity, avg_methylation, [ref, alt]),
+        "1/2": lambda: (trid, motif_purity, avg_methylation, alt.split(",")),
+        "1/1": lambda: (trid, motif_purity, avg_methylation, [alt, alt]),
+        "1": lambda: (trid, motif_purity, avg_methylation, [alt]),
+        "0": lambda: (trid, motif_purity, avg_methylation, [ref])
     }
     
     with gzip.open(path, 'r') as f_in:
@@ -37,8 +38,12 @@ def get_alleles(path: PosixPath):
             
             ref, alt = sl[3], sl[4]               
             trid = sl[-3].split(";")[0].lstrip("TRID=")
+            motif = sl[-3].split(";")[2].lstrip("MOTIFS=")
+            trid = trid 
+            motif_purity = sl[-1].split(":")[-2]
+            avg_methylation = sl[-1].split(":")[-1]
 
-            yield gt_actions[gt]()        
+            yield gt_actions[gt]()          
 
 def main(vcf_path, out_filepath):     
     if not os.path.exists("repeat_outliers"):
@@ -49,9 +54,9 @@ def main(vcf_path, out_filepath):
     with gzip.open(out_filepath, "w", compresslevel=6) as f_out:
         for index, path in enumerate(vcf_path.glob("*.vcf.gz")):    
             sample = path.name.rstrip(".vcf.gz")
-            for (trid, alleles) in get_alleles(path):        
+            for (trid, motif_purity, avg_methylation, alleles) in get_alleles(path):        
                 alleles = ",".join(alleles)
-                f_out.write(f"{trid} {sample} {alleles}\n".encode())  
+                f_out.write(f"{trid} {sample} {motif_purity} {avg_methylation} {alleles}\n".encode())  
 
 
 if __name__ == "__main__":
@@ -62,7 +67,7 @@ if __name__ == "__main__":
         "--vcf_path",
         type=str,
         required=True,
-        help="Path to TRGT VCFs for cases and controls",
+        help="Path to TRGT VCFs",
     )
     parser.add_argument(
         "--output_file",

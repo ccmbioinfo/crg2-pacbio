@@ -6,7 +6,7 @@ rule generate_allele_db:
         family = config["run"]["project"]
     log: "logs/repeat_outliers/{family}_allele_db.log"
     resources:
-        mem_mb = 10000
+        mem_mb = 80000
     conda:
         "../envs/str_sv.yaml"
     shell: 
@@ -20,6 +20,8 @@ rule sort_allele_db:
         input_file = "repeat_outliers/allele_db/{family}.alleles.db.gz"
     output: "repeat_outliers/allele_db/{family}.alleles.sorted.db.gz"
     log: "logs/repeat_outliers/{family}.allele.sorted.db.log"
+    resources:
+        mem_mb = 80000
     shell:
         """
         (zcat < {input.input_file} | sort -T . -k 1,1 | gzip > {output}) > {log} 2>&1
@@ -35,7 +37,7 @@ rule find_repeat_outliers:
         crg2_pacbio = config["tools"]["crg2_pacbio"]
     log:  "logs/repeat_outliers/{family}.repeat.outliers.log"
     resources:
-        mem_mb = 20000
+        mem_mb = 40000
     conda: 
         "../envs/str_sv.yaml"
     shell: 
