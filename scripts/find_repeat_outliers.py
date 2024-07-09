@@ -68,6 +68,7 @@ def main(cases, dist, output_file):
                                             })
 
     # calculate z_scores for each case allele compared to controls
+    print("Calculating z scores")
     merged["z_score"] = merged.apply(lambda row: calc_z_score(row["allele_type"],
                                                             row["allele_length"],
                                                             row["short_allele_len_mean"],
@@ -80,6 +81,7 @@ def main(cases, dist, output_file):
     merged_long = merged[merged["allele_type"] == "long_allele"][["trid", "sample", "allele_type", "allele_length", "cutoff_long", "z_score", "range_long"]]
 
     # filter out non-outliers
+    print("Calculating z scores")
     merged_short = merged_short[merged_short["allele_length"] > merged_short["cutoff_short"]]
     merged_long = merged_long[merged_long["allele_length"] > merged_long["cutoff_long"]]
 
