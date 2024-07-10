@@ -185,29 +185,18 @@ def gene_set(genes: str) -> str:
     genes = ";".join(list(set(genes.split(";"))))
     return genes
 
-def add_hpo(hpo: pd.DataFrame, gene: str) -> list:
+def add_hpo(hpo: pd.DataFrame, loci_ensembl: pd.DataFrame) -> list:
     """
     Add gene-based HPO terms
     """
-    try:
-        genes = gene.split(";")
-    except AttributeError:
-        return np.nan
-    terms = []
-    for gene in genes:
-        try:
-            term = str(hpo[hpo["ensembl_gene_id"] == gene]["Features"].values[0])
-            term = term.replace("; ", ";").split(";")
-            term = list(set(term))
-            for t in term:
-                terms.append(t)
-        except IndexError:
-            pass
-    if len(terms) == 0:
-        return np.nan
-    else:
-        terms = ",".join(terms)
-        return terms
+    hpo = hpo[["Gene ID", "Features"]].copy()
+    hpo.rename({"Gene ID": "gene_id", "Features": "HPO"}, axis=1, inplace=True)
+    loci_ensembl_hpo = loci_ensembl.merge(hpo, how="left", on="gene_id")
+    loci_ensembl_hpo["HPO"] = loci_ensembl_hpo["HPO"].fillna(
+        "-1"
+    )
+
+    return loci_ensembl_hpo
 
 
 def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim: str, hpo: Optional[str] = None) -> None:
@@ -232,9 +221,6 @@ def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim:
     constraint = pd.read_csv(constraint, sep="\t")[constraint_cols].dropna()
     hits_gene = add_constraint(constraint, hits_gene)
 
-    # group and aggregate gene columns
-    hits_gene = group_by_gene(hits_gene)
-
     # annotate with OMIM
     print("Add OMIM phenotype")
     omim = prepare_OMIM(f"{omim}/mim2gene.txt", f"{omim}/morbidmap.txt")
@@ -247,9 +233,14 @@ def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim:
     else:
         print("Add HPO terms")
         hpo = pd.read_csv(hpo, sep="\t")
-        hits_gene_omim["HPO"] = [
-                add_hpo(hpo, gene) for gene in hits_gene_omim["gene_id"].values
-            ]
+        hits_gene_omim = add_hpo(hpo, hits_gene_omim)
+
+    # group and aggregate gene columns
+    hits_gene_omim = group_by_gene(hits_gene_omim)
+
+    # column cleanup
+    for col in ["gene_name", "gene_id", "gene_biotype", "Feature"]:
+        hits_gene_omim[col] = hits_gene_omim[col].apply(lambda genes: gene_set(genes))
 
     # make a column with maximum z score across samples
     print("Format dataframe")
@@ -264,10 +255,6 @@ def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim:
     # make a column that sums the number of individuals carrying a particular repeat expansion
     al_cols = [col for col in hits_gene_omim.columns if '_allele_len' in col]
     hits_gene_omim['num_samples'] = hits_gene_omim[al_cols].notna().sum(axis=1)
-
-    # column cleanup
-    for col in ["gene_name", "gene_id", "gene_biotype", "Feature"]:
-        hits_gene_omim[col] = hits_gene_omim[col].apply(lambda genes: gene_set(genes))
 
     hits_gene_omim = hits_gene_omim[
         [

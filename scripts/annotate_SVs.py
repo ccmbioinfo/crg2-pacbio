@@ -159,7 +159,8 @@ def add_hpo(hpo, gene):
                 term = term.replace("; ", ";").split(";")
                 term = list(set(term))
                 for t in term:
-                    terms.append(t)
+                    if t not in terms:
+                        terms.append(t)
             except IndexError:
                 pass
     if len(terms) == 0:
@@ -271,6 +272,9 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols):
     # intersect annotsv and population SV bed file
     annotsv_bed = annotsv_df_to_bed(annotsv_df)
     pop_svs = pd.read_csv(pop_svs, sep="\t")
+    # pad population SV insertion calls to account for uncertainty in position
+    pop_svs.loc[pop_svs['SVTYPE'] == 'INS', 'POS'] -= 1 
+    pop_svs.loc[pop_svs['SVTYPE'] == 'INS', 'END'] += 1    
     pop_svs_bed = BedTool.from_dataframe(pop_svs)
     intersect = annotsv_bed.intersect(
         pop_svs_bed, wa=True, wb=True, F=0.5, f=0.5
