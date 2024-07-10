@@ -28,21 +28,20 @@ rule sort_allele_db:
 rule find_repeat_outliers:
     input: 
         alleles_path = "repeat_outliers/allele_db/{family}.alleles.sorted.db.gz",
-        case_ids = config["trgt"]["samples"]
-    output:
-        out_path =  "repeat_outliers/{family}.repeat.outliers.csv"
+        control_alleles = config["trgt"]["control_alleles"]
+    output: "repeat_outliers/{family}.repeat.outliers.csv"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"]
     log:  "logs/repeat_outliers/{family}.repeat.outliers.log"
     resources:
-        mem_mb = 20000
+        mem_mb = 40000
     conda: 
         "../envs/str_sv.yaml"
     shell: 
         """
         (python3 {params.crg2_pacbio}/scripts/find_repeat_outliers.py --alleles_path {input.alleles_path} \
-            --output_file  {output} \
-            --case_ids {input.case_ids}) > {log} 2>&1
+            --control_alleles {input.control_alleles} \
+            --output_file  {output}) > {log} 2>&1 
         """
 
 
