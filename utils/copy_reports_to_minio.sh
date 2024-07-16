@@ -21,4 +21,7 @@ $mc cp ${family}/*/sv/${family}.pbsv.2*.csv minio/results-c4r/long_read_seq/repo
 # pathogenic REs
 $mc cp ${family}/*/pathogenic_repeats/${family}.known.path.str.loci.2*.csv minio/results-c4r/long_read_seq/reports_2024/${family}
 
+# TCAG CNVs
+$mc cp ${family}/*/cnv/${family}*cnv.tsv  minio/results-c4r/long_read_seq/reports_2024/${family}
+
 # TO DO: genome-wide repeats
