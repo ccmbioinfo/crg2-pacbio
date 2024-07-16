@@ -109,7 +109,7 @@ class CNVGrouper:
         row["%s_SV_DETAILS" % samp_name].append('{}:{}-{}:{}'.format(samp_chr, samp_start, samp_end, samp_svtype))
     
     def write(self, outfile_name):
-        self.df.to_csv(outfile_name, sep='\t', encoding='utf-8')
+        self.df.to_csv(outfile_name, encoding='utf-8')
 
     def make_ref_bedtool(self):
         return BedTool(list(self.df.index.values))
@@ -117,7 +117,7 @@ class CNVGrouper:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Merges CNV reports from TCAG to a single family report')
     parser.add_argument('-i', type=str, nargs='+', help='Report files containing CNV coordinates and annotations', required=True)
-    parser.add_argument('-o', help='Output file name e.g. -o 180.sv.family.tsv', required=True, type=str)
+    parser.add_argument('-o', help='Output file name e.g. -o 180.sv.family.csv', required=True, type=str)
     args = parser.parse_args()
   
 
