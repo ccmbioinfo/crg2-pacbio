@@ -11,7 +11,7 @@ module load python/3.7.1
 
 PROJECT=$1
 TODAY=`date +%Y-%m-%d`
-OUT="${PROJECT}.${TODAY}.cnv.csv"
+OUT="${PROJECT}.cnv.${TODAY}.csv"
 
 if [[ -z "$PROJECT" ]]; then
 	PROJECT="PROJECT";
