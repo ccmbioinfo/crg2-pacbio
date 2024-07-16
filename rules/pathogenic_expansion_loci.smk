@@ -56,7 +56,7 @@ rule merge_vcfs:
     shell: 
         """
         # determine if there is one TRGT VCF or multiple
-        vcfs={input.vcfs} 
+        vcfs=({input.vcfs}) 
         count=0
         for file in ${{vcfs[@]}} ; do
         if [[ -f "$file" ]]; then
