@@ -432,9 +432,11 @@ select_and_write2 <- function(variants, samples, prefix, type)
     print(colnames(variants))
     if (type == 'wgs' || type == 'denovo'){
         noncoding_cols <- c("DNaseI_hypersensitive_site", "CTCF_binding_site", "ENH_cellline_tissue", "TF_binding_sites")
+        noncoding_scores <- c("ncER_score", "ReMM_score", "LINSIGHT_score")
         }
     else {
         noncoding_cols <- c()
+        noncoding_scores <- c()
         wgs_counts <- c()
         }
     variants <- variants[c(c("Position", "UCSC_Link", "GNOMAD_Link", "Ref", "Alt"),
@@ -451,8 +453,9 @@ select_and_write2 <- function(variants, samples, prefix, type)
                             "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt",
                             "Ensembl_transcript_id", "AA_position", "Exon", "Protein_domains", "rsIDs",
                             "Gnomad_oe_lof_score", "Gnomad_oe_mis_score", "Exac_pli_score", "Exac_prec_score", "Exac_pnull_score",
-                            "Conserved_in_30_mammals", "SpliceAI_impact", "SpliceAI_score", "Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score", "Gerp_score",
-                            "Imprinting_status", "Imprinting_expressed_allele", "Pseudoautosomal",
+                            "Conserved_in_30_mammals", "SpliceAI_impact", "SpliceAI_score", "Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score", "Gerp_score", "AlphaMissense"),
+                            noncoding_scores,
+                            c("Imprinting_status", "Imprinting_expressed_allele", "Pseudoautosomal",
                             "Old_multiallelic", "UCE_100bp", "UCE_200bp", "Dark_genes"), noncoding_cols)]
   
     variants <- variants[order(variants$Position),]
