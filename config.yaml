@@ -5,6 +5,7 @@ run:
   pipeline: "pacbio"
   hpo: "" # proband-specific HPO terms
   ped: ""
+  flank: 100000
 
 genes:
   ensembl: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/ensembl_genes_hg38_gtf.csv"
