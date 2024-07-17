@@ -8,9 +8,9 @@ run:
   flank: 100000
 
 genes:
-  ensembl: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/ensembl_genes_hg38_gtf.csv"
-  refseq: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation/GRCh37_latest_genomic.gff_subset.csv" 
-  hgnc: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation/HGNC_20210617.txt"
+  ensembl: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/Homo_sapiens.GRCh38.112.gtf_subset.csv"
+  refseq: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/GRCh38_latest_genomic.gff_subset.csv"
+  hgnc: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/HGNC_20240717.txt"
 
 tools:
   cre: "~/crg2-pacbio/scripts/cre"

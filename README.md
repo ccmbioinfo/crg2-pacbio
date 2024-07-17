@@ -10,7 +10,18 @@ crg2-pacbio takes as input the following VCFs output by [PacBio's WGS pipeline](
 Small variant annotation and report
 - annotate variants with [VEP](https://useast.ensembl.org/info/docs/tools/vep/index.html) and [vcfanno](https://github.com/brentp/vcfanno)
 - generate a [gemini](https://github.com/arq5x/gemini) variant database
-- generate a rare (less than 1% maximum gnomAD population AF) variant report with medium to high impact variants. Report generation scripts are derived from [cre](https://github.com/ccmbioinfo/cre), but copied to this repo for convenience. Report details are described [here](https://sickkidsca.sharepoint.com/:w:/r/sites/thecenterforcomputationalmedicineworkspace/_layouts/15/Doc.aspx?sourcedoc=%7B7E4D3F4D-D83F-474C-A9CB-F59C2EB05C8A%7D&file=SNV_indel_report_November_2021.docx&action=default&mobileredirect=true); additional columns included are allele frequencies and counts from the [Children's Mercy Hospital (CMH, 502 genomes) cohort](https://github.com/ChildrensMercyResearchInstitute/GA4K/tree/main/pacbio_sv_vcf) and the [Human Pangenome Reference Consortium](https://humanpangenome.org/) (HPRC, 40 genomes).
+- generate a rare (less than 1% maximum gnomAD population AF) variant report with medium to high impact variants. Report generation scripts are derived from [cre](https://github.com/ccmbioinfo/cre), but copied to this repo for convenience. Report details are described [here](https://sickkidsca.sharepoint.com/:w:/r/sites/thecenterforcomputationalmedicineworkspace/_layouts/15/Doc.aspx?sourcedoc=%7B7E4D3F4D-D83F-474C-A9CB-F59C2EB05C8A%7D&file=SNV_indel_report_November_2021.docx&action=default&mobileredirect=true); additional columns included are allele frequencies and counts from the [CoLoRSDB cohort](https://zenodo.org/records/11511513).
+
+Small variant panel report
+- The annotation pipeline is the same as above, but only variants in a gene panel are considered. The panel report includes variants of any impact (i.e. it includes non-coding variants and intronic variants).
+- To generate a gene panel from an HPO text file exported from PhenomeCentral or G4RD, add the HPO filepath to `config["run"]["hpo"]`.
+- The first time you run the pipeline, you will also need to generate Ensembl and RefSeq gene files as well as an HGNC gene mapping file.
+- Download and unzip Ensembl gtf: ```wget -qO- https://ftp.ensembl.org/pub/release-112/gtf/homo_sapiens/Homo_sapiens.GRCh38.112.gtf.gz  | gunzip -c > Homo_sapiens.GRCh38.112.gtf```
+- Download and unzip RefSeq gff: ```wget https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh38_latest/refseq_identifiers/GRCh38_latest_genomic.gff.gz | gunzip -c > GRCh38_latest_genomic.gff```
+- Download RefSeq chromosome mapping file: ```wget https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh38_latest/refseq_identifiers/GRCh38_latest_assembly_report.txt```
+- Run script to parse the above files: ```python scripts/clean_gtf.py --ensembl_gtf /path/to/Homo_sapiens.GRCh38.112.gtf --refseq_gff3 /path/to/GRCh38_latest_genomic.gff --refseq_assembly /path/to/GRCh38_latest_assembly_report.txt```
+- Add the paths to the output files, Homo_sapiens.GRCh38.112.gtf_subset.csv and GRCh38_latest_genomic.gff_subset.csv, to the `config["gene"]["ensembl"]` and `config["gene"]["refseq"]` fields.
+- You will also need the HGNC alias file: download this from https://www.genenames.org/download/custom/ using the default fields. Add the path this file to `config["gene"]["hgnc"]`.
 
 Structural variant annotation and report
 - annotate variants using [SnpEFF](https://github.com/pcingola/SnpEff) and [AnnotSV](https://github.com/lgmgeo/AnnotSV)
