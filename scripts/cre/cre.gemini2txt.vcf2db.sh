@@ -49,11 +49,11 @@ then
             dnasei_hypersensitive_site as DNaseI_hypersensitive_site,
             ctcf_binding_site as CTCF_binding_site, 
             enh_cellline_tissue as ENH_cellline_tissue,
-            tf_binding_sites as TF_binding_sites,
-            c4r_wgs_counts as C4R_WGS_counts,
-            c4r_wgs_samples as C4R_WGS_samples"
+            tf_binding_sites as TF_binding_sites"
+    noncoding_scores="ncER as ncER_score, ReMM as ReMM_score, LinSight_Score as LINSIGHT_score"
 else
     noncoding_anno="00 as noncoding"
+    noncoding_scores="00 as noncoding_scores"
 fi
 
 sQuery="select \
@@ -89,6 +89,8 @@ sQuery="select \
         vest4_score as Vest4_score,\
         revel_score as Revel_score,\
         gerp_score as Gerp_score,\
+        AlphaMissense as AlphaMissense,\
+        $noncoding_scores, \
         aa_change as AA_change,\
         hgvsc as Codon_change,\
         "$callers" as Callers,\

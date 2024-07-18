@@ -6,13 +6,14 @@ def get_filt_vcf(wildcards):
     else:
         return "filtered/{p}/{family}.{p}.vcf.gz".format(p=wildcards.p,family=project)
 
+
 rule input_prep:
     input:
         units=config["run"]["units"]
     params:
         outdir= "filtered"
     output:
-        "filtered/{family}.vcf.gz"
+        "filtered/{family, \d+}.vcf.gz"
     log:
         "logs/input_prep/{family}.log"
     threads:
