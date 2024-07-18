@@ -2,7 +2,7 @@
 
 analyses=$1 # path to Stager analyses_report.csv
 TCAG_SHARED="/hpf/largeprojects/ccmbio/ccmmarvin_tcag_shared/PacBio"
-ANALYSIS_DIR="/hpf/largeprojects/ccmbio/mcouse/pacbio_report_dev/results/test_setup"
+ANALYSIS_DIR="/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/analyses/"
 CRG2_PACBIO=~/crg2-pacbio
 
 module load python/3.7.1
