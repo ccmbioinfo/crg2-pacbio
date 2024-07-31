@@ -58,6 +58,9 @@ def main(cases, dist, output_file):
     cases_long = pd.concat([cases_al, cases_al_seq], axis=1)
 
     # merge case alleles to controls allele length distribution dataframe
+    cases_long["case_trid"] = cases_long["trid"]
+    cases_long["trid"] = cases_long["case_trid"].apply(lambda x: x.rsplit('_', 1)[0])
+    dist["trid"] = dist["trid"].apply(lambda x: x.rsplit('_', 1)[0])
     merged = cases_long.merge(dist, on="trid", how="left")
     merged = merged.astype({"short_allele_len_mean": float,
                                             "long_allele_len_mean": float,
@@ -66,7 +69,7 @@ def main(cases, dist, output_file):
                                             "cutoff_short": float,
                                             "cutoff_long": float,
                                             })
-
+    print(len(merged))
     # calculate z_scores for each case allele compared to controls
     print("Calculating z scores")
     merged["z_score"] = merged.apply(lambda row: calc_z_score(row["allele_type"],
@@ -77,21 +80,16 @@ def main(cases, dist, output_file):
                                                             row["long_allele_len_std"]), axis=1)
     
     # split into  two dataframes: short alleles and long alleles
-    merged_short = merged[merged["allele_type"] == "short_allele"][["trid", "sample", "allele_type", "allele_length", "cutoff_short", "z_score", "range_short"]]
-    merged_long = merged[merged["allele_type"] == "long_allele"][["trid", "sample", "allele_type", "allele_length", "cutoff_long", "z_score", "range_long"]]
-
-    # filter out non-outliers
-    print("Calculating z scores")
-    merged_short = merged_short[merged_short["allele_length"] > merged_short["cutoff_short"]]
-    merged_long = merged_long[merged_long["allele_length"] > merged_long["cutoff_long"]]
+    merged_short = merged[merged["allele_type"] == "short_allele"][["case_trid", "sample", "allele_type", "allele_length", "cutoff_short", "z_score", "range_short"]]
+    merged_long = merged[merged["allele_type"] == "long_allele"][["case_trid", "sample", "allele_type", "allele_length", "cutoff_long", "z_score", "range_long"]]
 
     # cat short and long alleles into one dataframe
-    merged_short.rename({'range_short': "control_range"}, inplace=True, axis=1)
-    merged_long.rename({'range_long': "control_range"}, inplace=True, axis=1)
+    merged_short.rename({'range_short': "control_range", "cutoff_short": "cutoff"}, inplace=True, axis=1)
+    merged_long.rename({'range_long': "control_range", "cutoff_long": "cutoff"}, inplace=True, axis=1)
     merged_cat = pd.concat([merged_short, merged_long], axis=0)
 
     # remove unnecessary columns
-    merged_cat = merged_cat[["trid", "sample", "allele_type", "allele_length", "z_score", "control_range"]]
+    merged_cat = merged_cat[["case_trid", "sample", "allele_type", "allele_length", "z_score", "control_range", "cutoff"]]
     merged_cat.rename({"allele_length": "allele_len"}, axis=1, inplace=True)
     
     # sort by z_score
