@@ -14,7 +14,7 @@ def pivot_hits(df: pd.DataFrame) -> pd.DataFrame:
     hits["trid"] = hits["trid"] + "_" + hits["allele_type"]
     hits = hits.drop("allele_type", axis=1)
     hit_pivot = hits.pivot(
-        index=["trid", "control_range"],
+        index=["trid", "control_range", "cutoff"],
         columns="sample",
         values=["allele_len", "z_score"],
     ).reset_index()
@@ -25,7 +25,7 @@ def pivot_hits(df: pd.DataFrame) -> pd.DataFrame:
         + hit_pivot.columns.get_level_values(0)
     )
     hit_pivot = hit_pivot.rename(
-        columns={"_trid": "trid", "_control_range": "control_range"}
+        columns={"_trid": "trid", "_control_range": "control_range", "_cutoff": "cutoff"}
     )
 
     return hit_pivot
@@ -185,6 +185,7 @@ def gene_set(genes: str) -> str:
     genes = ";".join(list(set(genes.split(";"))))
     return genes
 
+
 def add_hpo(hpo: pd.DataFrame, loci_ensembl: pd.DataFrame) -> list:
     """
     Add gene-based HPO terms
@@ -199,11 +200,56 @@ def add_hpo(hpo: pd.DataFrame, loci_ensembl: pd.DataFrame) -> list:
     return loci_ensembl_hpo
 
 
+def filter_outliers(row: pd.Series, allele_len_cols: list) -> bool:
+    """
+    Filter out non-outliers (not expanded in any individual)
+    """
+    allele_lens = [float(row[allele_len]) if not pd.isna(row[allele_len])  else 0 for allele_len in allele_len_cols]
+    cutoff = row["cutoff"]
+    if max(allele_lens) < cutoff:
+        return False
+    else:
+        return True
+    
+
+def num_expanded(row: pd.Series, allele_len_cols: list) -> bool:
+    """
+    Sum number of individuals in whom repeat is expanded (i.e. allele length > cutoff)
+    """
+    allele_lens = [row[allele_len] for allele_len in allele_len_cols]
+    cutoff = row["cutoff"] if not pd.isna(row["cutoff"]) else 0
+    greater_than = sum([allele_len >= cutoff for allele_len in allele_lens])
+    
+    return greater_than
+
+
 def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim: str, hpo: Optional[str] = None) -> None:
     # convert hits dataframe from long to wide format
     hits = pd.read_csv(hits)
+    hits.rename({"case_trid": "trid"}, axis=1, inplace=True)
     hits_pivot = pivot_hits(hits)
+
+    # make a column with maximum z score across samples
+    z_score_cols = [col for col in hits_pivot.columns if "z_score" in col]
+    for col in z_score_cols:
+        hits_pivot[col] = [
+            round(score, 3) if not pd.isnull(score) else None
+            for score in hits_pivot[col]
+        ]
+    hits_pivot["max_z_score"] = hits_pivot[z_score_cols].max(axis=1)
+
+    # filter out non-outliers
+    print("Filter outliers")
+    al_cols = [col for col in hits_pivot.columns if '_allele_len' in col]
+    hits_pivot["outlier"] = hits_pivot.apply(lambda row: filter_outliers(row, al_cols), axis=1)
+    hits_pivot = hits_pivot[hits_pivot["outlier"]]
+
+    # make a column that sums the number of individuals carrying a particular repeat expansion
+    hits_pivot['num_samples'] = hits_pivot.apply(lambda row: num_expanded(row, al_cols), axis=1)
+
+    # convert hits to PyRanges object
     hits_pr = hits_to_pr(hits_pivot)
+
     # prep Ensembl gene GTF
     print("Prep Ensembl GTF")
     cols = ["gene_name", "gene_id", "gene_biotype", "Feature"]
@@ -242,20 +288,25 @@ def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim:
     for col in ["gene_name", "gene_id", "gene_biotype", "Feature"]:
         hits_gene_omim[col] = hits_gene_omim[col].apply(lambda genes: gene_set(genes))
 
-    # make a column with maximum z score across samples
-    print("Format dataframe")
-    z_score_cols = [col for col in hits_gene_omim.columns if "z_score" in col]
-    for col in z_score_cols:
-        hits_gene_omim[col] = [
-            round(score, 3) if not pd.isnull(score) else None
-            for score in hits_gene_omim[col]
-        ]
-    hits_gene_omim["max_z_score"] = hits_gene_omim[z_score_cols].max(axis=1)
-
-    # make a column that sums the number of individuals carrying a particular repeat expansion
-    al_cols = [col for col in hits_gene_omim.columns if '_allele_len' in col]
-    hits_gene_omim['num_samples'] = hits_gene_omim[al_cols].notna().sum(axis=1)
-
+    # shorten sample names (e.g. remove .m84090_240207_191948_s1.hifi_reads.bc2013.KL.GRCh38.aligned.haplotagged.trgt.sorted)
+    if 'haplotagged' in al_cols[0]:
+        new_al_cols = []
+        for col in al_cols:
+            new_col = col.split('.')[0]
+            new_col = new_col + "_allele_len"
+            new_al_cols.append(new_col)
+            hits_gene_omim.rename({col: new_col}, inplace=True, axis=1)
+        
+        new_z_score_cols = []
+        for col in z_score_cols:
+            new_col = col.split('.')[0]
+            new_col = new_col + "_z_score"
+            new_z_score_cols.append(new_col)
+            hits_gene_omim.rename({col: new_col}, inplace=True, axis=1)
+    else:
+        new_al_cols = al_cols
+        new_z_score_cols = z_score_cols
+    
     hits_gene_omim = hits_gene_omim[
         [
             "Chromosome",
@@ -269,19 +320,20 @@ def main(hits: pd.DataFrame, out_file: str, ensembl: str, constraint: str, omim:
             + [
             "Feature",
             "control_range",
+            "cutoff",
             "max_z_score",
             "num_samples"
         ]
-        + al_cols
-        + z_score_cols
+        + new_al_cols
+        + new_z_score_cols
         + ["OMIM_phenotype", "HPO"]
     ]
     hits_gene_omim = hits_gene_omim.rename(
-        columns={"Feature": "feature", "Chromosome": "chr", "Start": "start", "End": "end", "gene": "gnomad_constraint_gene"}
+        columns={"Feature": "feature", "Chromosome": "CHROM", "Start": "POS", "End": "END", "trid": "TRID", "gene": "gnomad_constraint_gene"}
     )
 
     # recode missing values
-    hits_gene_omim["chr"] = hits_gene_omim["chr"].astype(str)
+    hits_gene_omim["CHROM"] = hits_gene_omim["CHROM"].astype(str)
     hits_gene_omim.fillna(".", inplace=True)
     hits_gene_omim.replace({"-1": "."}, inplace=True)
 
