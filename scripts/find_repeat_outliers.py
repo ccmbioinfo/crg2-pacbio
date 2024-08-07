@@ -32,25 +32,37 @@ def split_meth_mp(meth_mp: pd.Series, short_index: pd.Series, long_index: pd.Ser
     return meth_mp_short, meth_mp_long
 
 
-def calc_z_score(allele_type: str, allele_length: int, short_allele_len_mean: float, short_allele_len_std: float, long_allele_len_mean: float, long_allele_len_std: float) -> float:
+def calc_z_score(allele_type: str, allele_length: int,
+                short_allele_len_mean: float, short_allele_len_std: float, long_allele_len_mean: float, long_allele_len_std: float,
+                am: float, AM_mean: float, AM_std: float, 
+                mp: float, MP_mean: float, MP_std: float) -> tuple:
     """
-    Calculate z-score for sample allele length compared to control distribution
+    Calculate z-score for sample allele length, methylation, and motif purity compared to control distribution
     """
-    if allele_type == "short_allele":
-        if short_allele_len_std == 0:
-            std = 0.0001
-        else:
-            std = short_allele_len_std
-        allele_len_mean = short_allele_len_mean
-    else:
-        if long_allele_len_std == 0:
-            std = 0.0001
-        else:
-            std = long_allele_len_std
-        allele_len_mean = long_allele_len_mean
-    z_score = (allele_length - allele_len_mean)/std
 
-    return z_score
+    means =  {"long_allele_len_mean": long_allele_len_mean, "short_allele_len_mean": short_allele_len_mean, "AM_mean": AM_mean, "MP_mean": MP_mean}
+    stds = {"long_allele_len_std": long_allele_len_std, "short_allele_len_std": short_allele_len_std, "AM_std": AM_std, "MP_std": MP_std}
+
+    def calculate_z_score(value, mean, std):
+        try:
+            z_score = (value - mean) / std
+        except ZeroDivisionError:
+            z_score =  (value - mean) / 0.0001 # handle division by zero
+        return z_score
+
+
+    z_score_len = calculate_z_score(allele_length, means[f"{allele_type}_len_mean"], stds[f"{allele_type}_len_std"])
+    try:
+        z_score_am = calculate_z_score(float(am), means["AM_mean"], stds["AM_std"]) 
+    except:
+        z_score_am = '.'
+    try:
+        z_score_mp = calculate_z_score(float(mp), means["MP_mean"], stds["MP_std"])
+    except:
+        z_score_mp = '.'
+
+    return z_score_len, z_score_am, z_score_mp
+
 
 def main(cases, dist, output_file):
     # get length of shortest and longest alleles
@@ -111,16 +123,22 @@ def main(cases, dist, output_file):
 
     # calculate z_scores for each case allele compared to controls
     print("Calculating z scores")
-    merged["z_score"] = merged.apply(lambda row: calc_z_score(row["allele_type"],
+    merged["z_score_len"], merged["z_score_AM"], merged["z_score_MP"] = zip(*merged.apply(lambda row: calc_z_score(row["allele_type"],
                                                             row["allele_length"],
                                                             row["short_allele_len_mean"],
                                                             row["short_allele_len_std"],
                                                             row["long_allele_len_mean"],
-                                                            row["long_allele_len_std"]), axis=1)
+                                                            row["long_allele_len_std"],
+                                                            row["AM"],
+                                                            row["AM_mean"], 
+                                                            row["AM_std"],
+                                                            row["MP"],
+                                                            row["MP_mean"],
+                                                            row["MP_std"]), axis=1))
     
     # split into  two dataframes: short alleles and long alleles
-    merged_short = merged[merged["allele_type"] == "short_allele"][["case_trid", "sample", "allele_type", "allele_length", "cutoff_short", "z_score", "range_short", "AM", "MP", "AM_mean", "AM_std", "MP_mean", "MP_std"]]
-    merged_long = merged[merged["allele_type"] == "long_allele"][["case_trid", "sample", "allele_type", "allele_length", "cutoff_long", "z_score", "range_long", "AM", "MP", "AM_mean", "AM_std", "MP_mean", "MP_std"]]
+    merged_short = merged[merged["allele_type"] == "short_allele"][["case_trid", "sample", "allele_type", "allele_length", "cutoff_short", "z_score_len", "range_short", "AM", "AM_mean", "AM_std", "z_score_AM", "MP", "MP_mean", "MP_std", "z_score_MP"]]
+    merged_long = merged[merged["allele_type"] == "long_allele"][["case_trid", "sample", "allele_type", "allele_length", "cutoff_long", "z_score_len", "range_long", "AM", "AM_mean", "AM_std", "z_score_AM", "MP", "MP_mean", "MP_std", "z_score_MP"]]
 
 
     # cat short and long alleles into one dataframe
@@ -130,11 +148,11 @@ def main(cases, dist, output_file):
     merged_cat = pd.concat([merged_short, merged_long], axis=0)
 
     # remove unnecessary columns
-    merged_cat = merged_cat[["case_trid", "sample", "allele_type", "allele_length", "z_score", "control_range", "cutoff", "AM", "MP", "AM_mean", "AM_std", "MP_mean", "MP_std"]]
+    merged_cat = merged_cat[["case_trid", "sample", "allele_type", "allele_length", "z_score_len", "control_range", "cutoff", "AM", "AM_mean", "AM_std", "z_score_AM", "MP", "MP_mean", "MP_std", "z_score_MP"]]
     merged_cat.rename({"allele_length": "allele_len"}, axis=1, inplace=True)
     
     # sort by z_score
-    merged_cat = merged_cat.sort_values(by="z_score", ascending=False)
+    merged_cat = merged_cat.sort_values(by="z_score_len", ascending=False)
 
     # round
     merged_cat.round(2)
