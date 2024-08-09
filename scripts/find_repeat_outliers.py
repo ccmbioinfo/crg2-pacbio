@@ -48,12 +48,12 @@ def calc_z_score(allele_type: str, allele_length: int,
             z_score = (value - mean) / std
         except ZeroDivisionError:
             z_score =  (value - mean) / 0.0001 # handle division by zero
-        return z_score
+        return round(z_score, 3)
 
 
     z_score_len = calculate_z_score(allele_length, means[f"{allele_type}_len_mean"], stds[f"{allele_type}_len_std"])
     try:
-        z_score_am = calculate_z_score(float(am), means["AM_mean"], stds["AM_std"]) 
+        z_score_am = calculate_z_score(float(am), means["AM_mean"]/255, stds["AM_std"]/255) # CMH TRGT VCFs called with v0.4.0, AM a value between 0 and 255
     except:
         z_score_am = '.'
     try:
