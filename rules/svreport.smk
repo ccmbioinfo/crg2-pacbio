@@ -20,7 +20,7 @@ rule annotsv:
     params:
         annotsv_path = config["tools"]["annotSV"]
     conda:
-        "../envs/bedtools.yaml"
+        "../envs/common.yaml"
     shell:
         """
         (export ANNOTSV={params.annotsv_path}; 
