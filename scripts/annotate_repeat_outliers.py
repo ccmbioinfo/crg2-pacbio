@@ -18,7 +18,7 @@ def pivot_hits(df: pd.DataFrame) -> pd.DataFrame:
     hit_pivot = hits.pivot(
         index=["trid", "control_range", "cutoff"],
         columns="sample",
-        values=["allele_len", "z_score"],
+        values=["allele_len", "z_score_len", "AM", "z_score_AM", "MP", "z_score_MP"],
     ).reset_index()
 
     hit_pivot.columns = (
@@ -31,6 +31,10 @@ def pivot_hits(df: pd.DataFrame) -> pd.DataFrame:
             "_trid": "trid",
             "_control_range": "control_range",
             "_cutoff": "cutoff",
+            "_AM": "AM",
+            "_z_score_AM": "z_score_AM",
+            "_MP": "MP",
+            "_z_score_MP": "z_score_MP",
         }
     )
 
@@ -333,14 +337,14 @@ def main(
     hits.rename({"case_trid": "trid"}, axis=1, inplace=True)
     hits_pivot = pivot_hits(hits)
 
-    # make a column with maximum z score across samples
-    z_score_cols = [col for col in hits_pivot.columns if "z_score" in col]
+    # make a column with maximum z score for allele length across samples
+    z_score_cols = [col for col in hits_pivot.columns if "z_score_len" in col]
     for col in z_score_cols:
         hits_pivot[col] = [
             round(score, 3) if not pd.isnull(score) else None
             for score in hits_pivot[col]
         ]
-    hits_pivot["max_z_score"] = hits_pivot[z_score_cols].max(axis=1)
+    hits_pivot["max_z_score_len"] = hits_pivot[z_score_cols].max(axis=1)
 
     # filter out non-outliers
     print("Filter outliers")
@@ -406,20 +410,25 @@ def main(
         new_z_score_cols = []
         for col in z_score_cols:
             new_col = col.split(".")[0]
-            new_col = new_col + "_z_score"
+            new_col = new_col + "_z_score_len"
             new_z_score_cols.append(new_col)
             hits_gene_omim.rename({col: new_col}, inplace=True, axis=1)
     else:
         new_al_cols = al_cols
         new_z_score_cols = z_score_cols
 
+    am_cols = [col for col in hits_gene_omim.columns if "AM" in col]
+    mp_cols = [col for col in hits_gene_omim.columns if "MP" in col]
+
     hits_gene_omim = hits_gene_omim[
         ["Chromosome", "Start", "End", "trid", "gene_name", "gene_id", "gene_biotype"]
-        + ["omim_phenotype", "omim_inheritance", "HPO"]
+        + ["OMIM_phenotype", "HPO"]
         + constraint_cols
-        + ["Feature", "control_range", "cutoff", "max_z_score", "num_samples"]
+        + ["Feature", "control_range", "cutoff", "max_z_score_len", "num_samples"]
         + new_al_cols
         + new_z_score_cols
+        + am_cols
+        + mp_cols
     ]
     hits_gene_omim = hits_gene_omim.rename(
         columns={

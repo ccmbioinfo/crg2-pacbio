@@ -34,7 +34,7 @@ rule find_repeat_outliers:
         crg2_pacbio = config["tools"]["crg2_pacbio"]
     log:  "logs/repeat_outliers/{family}.repeat.outliers.log"
     resources:
-        mem_mb = 40000
+        mem_mb = 100000
     conda: 
         "../envs/str_sv.yaml"
     shell: 
