@@ -268,6 +268,9 @@ def main(cases, dist, output_file):
         {"range_long": "control_range", "cutoff_long": "cutoff"}, inplace=True, axis=1
     )
     merged_cat = pd.concat([merged_short, merged_long], axis=0)
+    
+    # shorten sample names (e.g. remove .m84090_240207_191948_s1.hifi_reads.bc2013.KL.GRCh38.aligned.haplotagged.trgt.sorted)
+    merged_cat["sample"] = merged_cat["sample"].apply(lambda x: x.split('.')[0])
 
     # remove unnecessary columns
     merged_cat = merged_cat[

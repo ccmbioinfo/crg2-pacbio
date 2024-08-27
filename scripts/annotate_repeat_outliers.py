@@ -398,35 +398,16 @@ def main(
     for col in ["gene_name", "gene_id", "gene_biotype", "Feature"]:
         hits_gene_omim[col] = hits_gene_omim[col].apply(lambda genes: gene_set(genes))
 
-    # shorten sample names (e.g. remove .m84090_240207_191948_s1.hifi_reads.bc2013.KL.GRCh38.aligned.haplotagged.trgt.sorted)
-    if "haplotagged" in al_cols[0]:
-        new_al_cols = []
-        for col in al_cols:
-            new_col = col.split(".")[0]
-            new_col = new_col + "_allele_len"
-            new_al_cols.append(new_col)
-            hits_gene_omim.rename({col: new_col}, inplace=True, axis=1)
-
-        new_z_score_cols = []
-        for col in z_score_cols:
-            new_col = col.split(".")[0]
-            new_col = new_col + "_z_score_len"
-            new_z_score_cols.append(new_col)
-            hits_gene_omim.rename({col: new_col}, inplace=True, axis=1)
-    else:
-        new_al_cols = al_cols
-        new_z_score_cols = z_score_cols
-
     am_cols = [col for col in hits_gene_omim.columns if "AM" in col]
     mp_cols = [col for col in hits_gene_omim.columns if "MP" in col]
 
     hits_gene_omim = hits_gene_omim[
         ["Chromosome", "Start", "End", "trid", "gene_name", "gene_id", "gene_biotype"]
-        + ["OMIM_phenotype", "HPO"]
+        + ["omim_phenotype","omim_inheritance", "HPO"]
         + constraint_cols
         + ["Feature", "control_range", "cutoff", "max_z_score_len", "num_samples"]
-        + new_al_cols
-        + new_z_score_cols
+        + al_cols
+        + z_score_cols
         + am_cols
         + mp_cols
     ]
