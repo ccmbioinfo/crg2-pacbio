@@ -3,6 +3,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 import pyranges as pr
+import re
 from typing import Optional
 
 
@@ -135,53 +136,134 @@ def group_by_gene(hits_gene: pd.DataFrame) -> pd.DataFrame:
     return hits_gene_merged_dedup
 
 
-def prepare_OMIM(mim2gene_path: str, morbidmap_path: str) -> pd.DataFrame:
+def prepare_OMIM(genemap2_path: str) -> pd.DataFrame:
     """
     Merge OMIM mim2gene table with morbidmap table to associate phenotypes to genes.
     See omim.org/downloads for download access to these files.
     """
-    mim2gene = pd.read_csv(
-        mim2gene_path,
+    genemap2 = pd.read_csv(
+        genemap2_path,
         sep="\t",
         comment="#",
         names=[
+            "Chrom",
+            "Start",
+            "End",
+            "Cyto",
+            "Computed_Cyto",
             "MIM_Number",
-            "MIM_Entry_Type",
-            "Entrez_Gene_ID",
-            "HGNC_symbol",
-            "Ensembl_gene_ID",
-        ],
-    ).set_index("MIM_Number")
-    morbidmap = pd.read_csv(
-        morbidmap_path,
-        sep="\t",
-        comment="#",
-        names=["Phenotype", "Gene_Symbols", "MIM_Number", "Cyto_Location"],
-    ).set_index("MIM_Number")
-
-    gene2mim = morbidmap.join(mim2gene, how="left")
-    gene2mim = gene2mim[gene2mim["MIM_Entry_Type"].str.contains("gene")].drop(
-        [
             "Gene_Symbols",
-            "Cyto_Location",
-            "MIM_Entry_Type",
+            "Gene_Name",
+            "Approved_Gene_Symbol",
             "Entrez_Gene_ID",
-            "HGNC_symbol",
+            "Ensembl_Gene_ID",
+            "Comments",
+            "Phenotypes",
+            "Mouse Gene Symbol/ID",
         ],
-        axis=1,
-    )
+    ).set_index("MIM_Number")
+
     # remove genes that are not associated with any phenotype and rename columns
-    gene2mim = gene2mim[gene2mim["Phenotype"].notna()].rename(
-        {"Phenotype": "OMIM_phenotype", "Ensembl_gene_ID": "gene_id"}, axis=1
+    genemap2 = genemap2[genemap2["Phenotypes"].notna()].rename(
+        {"Ensembl_Gene_ID": "gene_id"}, axis=1
     )
-    # group phenotypes by gene and aggregate phenotypes so that there is one row per gene:
-    gene2mim = (
-        gene2mim.groupby("gene_id")[["OMIM_phenotype"]]
-        .agg({"OMIM_phenotype": (";").join})
-        .reset_index()
+    # extract parsed phenotypes and inheritances
+    genemap2_parsed = parse_OMIM_phenotypes(genemap2)
+    # subset columns
+    genemap2_parsed = genemap2_parsed[["gene_id", "omim_phenotype", "omim_inheritance"]]
+
+    return genemap2_parsed
+
+
+def parse_OMIM_phenotypes(genemap2: pd.DataFrame) -> pd.DataFrame:
+    """
+    Parse 'Phenotypes' column in genemap2 to extract two new columns, 'omim_phenotype' and 'omim_inheritance'.
+    Adapted from https://github.com/OMIM-org/genemap2-parser/blob/master/parseGeneMap2.py.
+    """
+    phenotypes = genemap2["Phenotypes"].tolist()
+    phenotypes_parsed = []
+    inheritances_parsed = []
+    inheritance_dict = {
+        "Autosomal dominant": "AD",
+        "Autosomal recessive": "AR",
+        "X-linked": "XL",
+        "X-linked dominant": "XLD",
+        "X-linked recessive": "XLR",
+    }
+
+    # Parse the phenotypes
+    for phenotype in phenotypes:
+        if not pd.isna(phenotype):
+            phenotype_parsed = []
+            inheritance_parsed = []
+            for phenotype in phenotype.split(";"):
+                inheritance = ""
+                # Clean the phenotype
+                phenotype = phenotype.strip()
+
+                # Long phenotype
+                matcher = re.match(r"^(.*),\s(\d{6})\s\((\d)\)(|, (.*))$", phenotype)
+                if matcher:
+                    # Get the fields
+                    phenotype = matcher.group(1)
+                    phenotype_parsed.append(phenotype)
+                    inheritances = matcher.group(5)
+
+                    # Get the inheritances, may or may not be there
+                    if inheritances:
+                        inheritance_parsed = []
+                        for inheritance in inheritances.split(","):
+                            inheritance = inheritance.strip()
+                            try:
+                                inheritance_abbrev = inheritance_dict[inheritance]
+                            except KeyError:
+                                inheritance_abbrev = inheritance
+                            inheritance_parsed.append(inheritance_abbrev)
+                    else:
+                        inheritance_parsed.append(inheritance)
+
+                # Short phenotype
+                else:
+                    # Short phenotype
+                    matcher = re.match(r"^(.*)\((\d)\)(|, (.*))$", phenotype)
+                    if matcher:
+                        # Get the fields
+                        phenotype = matcher.group(1)
+                        phenotype_parsed.append(phenotype)
+                        phenotypeMappingKey = matcher.group(2)
+                        inheritances = matcher.group(3)
+
+                        # Get the inheritances, may or may not be there
+                        if inheritances:
+                            inheritance_parsed = []
+                            for inheritance in inheritances.split(","):
+                                inheritance = inheritance.strip()
+                                try:
+                                    inheritance_abbrev = inheritance_dict[inheritance]
+                                except KeyError:
+                                    inheritance_abbrev = inheritance
+                                inheritance_parsed.append(inheritance_abbrev)
+                        else:
+                            inheritance_parsed.append(inheritance)
+            phenotypes_parsed.append((",").join(phenotype_parsed))
+            inheritances_parsed.append((",").join(inheritance_parsed))
+        else:
+            phenotypes_parsed.append("")
+            inheritances_parsed.append("")
+
+    genemap2["omim_phenotype"] = phenotypes_parsed
+    genemap2["omim_inheritance"] = inheritances_parsed
+    genemap2["omim_inheritance"] = genemap2["omim_inheritance"].replace(
+        {
+            "Autosomal dominant": "AD",
+            "Autosomal recessive": "AR",
+            "X-linked": "XL",
+            "X-linked dominant": "XLD",
+            "X-linked recessive": "XLR",
+        }
     )
 
-    return gene2mim
+    return genemap2
 
 
 def annotate_OMIM(loci_ensembl: pd.DataFrame, omim: pd.DataFrame) -> pd.DataFrame:
@@ -189,7 +271,7 @@ def annotate_OMIM(loci_ensembl: pd.DataFrame, omim: pd.DataFrame) -> pd.DataFram
     Annotate loci against OMIM phenotypes. Loci must already be annotated against Ensembl genes.
     """
     loci_ensembl_omim = loci_ensembl.merge(omim, how="left", on="gene_id")
-    loci_ensembl_omim["OMIM_phenotype"] = loci_ensembl_omim["OMIM_phenotype"].fillna(
+    loci_ensembl_omim["omim_phenotype"] = loci_ensembl_omim["omim_phenotype"].fillna(
         "-1"
     )
 
@@ -297,7 +379,7 @@ def main(
 
     # annotate with OMIM
     print("Add OMIM phenotype")
-    omim = prepare_OMIM(f"{omim}/mim2gene.txt", f"{omim}/morbidmap.txt")
+    omim = prepare_OMIM(f"{omim}/genemap2.txt")
     hits_gene_omim = annotate_OMIM(hits_gene, omim)
 
     # annotate with HPO terms
@@ -340,13 +422,13 @@ def main(
 
     hits_gene_omim = hits_gene_omim[
         ["Chromosome", "Start", "End", "trid", "gene_name", "gene_id", "gene_biotype"]
+        + ["OMIM_phenotype", "HPO"]
         + constraint_cols
         + ["Feature", "control_range", "cutoff", "max_z_score_len", "num_samples"]
         + new_al_cols
         + new_z_score_cols
         + am_cols
         + mp_cols
-        + ["OMIM_phenotype", "HPO"]
     ]
     hits_gene_omim = hits_gene_omim.rename(
         columns={

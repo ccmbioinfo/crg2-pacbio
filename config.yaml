@@ -45,7 +45,7 @@ annotation:
       inhouse: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/SV_database/pbsv.allsamples.counts.2022-04-19.bed"
       c4r: True # if samples belong to C4R, annotate against C4R pbsv SV database
       anno_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/annotations/"
-      colorsdb: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/data/CoLoRSdb/v1.0.0/CoLoRSdb.GRCh38.v1.0.0.pbsv.jasmine.bed"
+      colorsdb: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/data/CoLoRSdb/v1.1.0/CoLoRSdb.GRCh38.v1.1.0.pbsv.jasmine.bed"
   pathogenic_repeats:
       trgt_catalog: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/TRGTv1.0.0/repeats/pathogenic_repeats.hg38.bed"
       disease_thresholds: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation/ExpansionHunter/tandem_repeat_disease_loci_v1.1.tsv"
