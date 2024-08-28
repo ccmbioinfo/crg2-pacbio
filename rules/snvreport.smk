@@ -61,6 +61,8 @@ if config["run"]["hpo"]:
             cre=config["tools"]["cre"]
         output: 
             genes="genes/{family}.bed"
+        wildcard_constraints:
+            family = "(?!.*panel|.*coding).*"
         conda: "../envs/hpo_to_panel.yaml"
         log: "logs/hpo_to_panel/{family}.log"
         script:
