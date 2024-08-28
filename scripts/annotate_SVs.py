@@ -640,6 +640,12 @@ def main(
         # C4R IDs
         regexp = re.compile("\d+[A-Z]*_[A-Z]*\d+")
         sample_cols = [col for col in df.columns if re.match(regexp, col)]
+    if len(sample_cols) == 0:
+        # DECODER IDs
+        sample_cols = [col for col in df.columns if "SK" in col]
+    if len(sample_cols) == 0:
+        print("no sample cols identified")
+        sys.exit(1)
                      
     # extract genotype and alt allele depth
     for sample in sample_cols:
