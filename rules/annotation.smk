@@ -13,7 +13,9 @@ rule input_prep:
     params:
         outdir= "filtered"
     output:
-        "filtered/{family, \d+}.vcf.gz"
+        "filtered/{family}.vcf.gz"
+    wildcard_constraints:
+        family = "(?!.*panel|.*coding).*"
     log:
         "logs/input_prep/{family}.log"
     threads:
@@ -135,6 +137,8 @@ rule bgzip:
         "{prefix}.vcf"
     output:
         "{prefix}.vcf.gz"
+    wildcard_constraints:
+        prefix = "(?!.*trgt).*"
     conda:
         "../envs/common.yaml"
 
