@@ -3,18 +3,16 @@ import os
 import pandas as pd
 import numpy as np
 
+# https://github.com/tandem-repeat-workflows/find-outlier-expansions/blob/main/find-outlier-expansions.ipynb
+# MC: added motif purity and methylation, pandas grouping, and output to TSV
 
 def resample_quantiles(counts: pd.Series, num_resamples: int) -> list:
     """Based on https://github.com/Illumina/ExpansionHunterDenovo/blob/master/scripts/core/common.py"""
     resamples = np.random.choice(counts, len(counts) * num_resamples)
     resamples = np.split(resamples, num_resamples)
+    resampled_quantiles = np.quantile(resamples, 0.95, axis=1)
 
-    resampled_quantiles = []
-    for resample in resamples:
-        quantile = np.quantile(resample, 0.95)
-        resampled_quantiles.append(quantile)
-
-    return resampled_quantiles
+    return resampled_quantiles.tolist()
 
 
 def get_counts_with_finite_std(counts: pd.Series) -> pd.Series:
@@ -161,3 +159,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(args.alleles_path)
+
+
+
+
