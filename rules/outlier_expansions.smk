@@ -54,7 +54,8 @@ rule annotate_repeat_outliers:
       genes = config["trgt"]["ensembl_gtf"],
       OMIM = config["trgt"]["omim_path"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
-      constraint = config["trgt"]["gnomad_constraint"]
+      constraint = config["trgt"]["gnomad_constraint"],
+      c4r_outliers = config["trgt"]["C4R_outliers"]
     resources:
         mem_mb = 20000
     conda: 
@@ -74,7 +75,8 @@ rule annotate_repeat_outliers:
                 --ensembl_gtf {params.genes} \
                 --gnomad_constraint {params.constraint} \
                 --OMIM_path {params.OMIM} \
-                --hpo {params.HPO}) > {log} 2>&1
+                --hpo {params.HPO} \
+                --c4r_outliers {params.c4r_outliers}) > {log} 2>&1
         fi
         """
           

@@ -331,6 +331,7 @@ def main(
     constraint: str,
     omim: str,
     hpo: Optional[str] = None,
+    c4r: Optional[str] = None
 ) -> None:
     # convert hits dataframe from long to wide format
     hits = pd.read_csv(hits)
@@ -394,18 +395,34 @@ def main(
     # group and aggregate gene columns
     hits_gene_omim = group_by_gene(hits_gene_omim)
 
+    # annotate with C4R outlier counts
+    print("Adding inhouse outlier counts")
+     
+    try: 
+        c4r_counts = pd.read_csv(c4r)
+        hits_gene_omim = hits_gene_omim.merge(c4r_counts, left_on="trid", right_on="TRID", how="left")
+        hits_gene_omim["count"] = hits_gene_omim["count"].replace(np.nan, 0)
+        hits_gene_omim = hits_gene_omim.rename({"count": "C4R_outlier_count", "samples": "C4R_outlier_samples"}, axis=1)
+        c4r_col = ["C4R_outlier_count", "C4R_outlier_samples"]
+    except: 
+        c4r_col = []
+
+
     # column cleanup
     for col in ["gene_name", "gene_id", "gene_biotype", "Feature"]:
         hits_gene_omim[col] = hits_gene_omim[col].apply(lambda genes: gene_set(genes))
 
     am_cols = [col for col in hits_gene_omim.columns if "AM" in col]
     mp_cols = [col for col in hits_gene_omim.columns if "MP" in col]
+    
 
     hits_gene_omim = hits_gene_omim[
         ["Chromosome", "Start", "End", "trid", "gene_name", "gene_id", "gene_biotype"]
         + ["omim_phenotype","omim_inheritance", "HPO"]
         + constraint_cols
-        + ["Feature", "control_range", "cutoff", "max_z_score_len", "num_samples"]
+        + ["Feature", "control_range", "cutoff"]
+        + c4r_col
+        + ["max_z_score_len", "num_samples"]
         + al_cols
         + z_score_cols
         + am_cols
@@ -422,8 +439,9 @@ def main(
         }
     )
 
-    # recode missing values
+    # recode dtypes and missing values
     hits_gene_omim["CHROM"] = hits_gene_omim["CHROM"].astype(str)
+    hits_gene_omim["C4R_outlier_count"] = hits_gene_omim["C4R_outlier_count"].astype(int)
     hits_gene_omim.fillna(".", inplace=True)
     hits_gene_omim.replace({"-1": "."}, inplace=True)
 
@@ -474,6 +492,11 @@ if __name__ == "__main__":
         type=str,
         help="Path to HPO terms file",
     )
+    parser.add_argument(
+        "--c4r_outliers",
+        type=str,
+        help="Path to C4R tandem repeat outlier count",
+    )
 
     args = parser.parse_args()
     print("Annotating repeats...")
@@ -484,4 +507,5 @@ if __name__ == "__main__":
         args.gnomad_constraint,
         args.OMIM_path,
         args.hpo,
+        args.c4r_outliers
     )
