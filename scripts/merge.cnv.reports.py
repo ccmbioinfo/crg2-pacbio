@@ -22,7 +22,7 @@ class CNVGrouper:
         columns.extend(["%s_SV_DETAILS" % s for s in sample_list])
 
         self.sample_list = sample_list
-        self.df = pd.DataFrame(columns=columns, dtype=object).set_index(keys=['CHROM', 'START', 'END', 'SVTYPE'])
+        self.df = pd.DataFrame(columns=columns, dtype=object)
         self._group_sv(all_sv)
         self.bedtool = self.make_ref_bedtool()
 
@@ -30,7 +30,13 @@ class CNVGrouper:
             self.df["%s_SV_DETAILS" % name] = list2string(self.df["%s_SV_DETAILS" % name])
 
         # append annotation fields to final df
+        print(ann_df.head())
+        print(self.df.head())
+        ann_df = ann_df.set_index(keys=["CHROM", "START", "END", "SVTYPE"])
         self.df = self.df.join(ann_df, how='left')
+
+        # retrieve genotype and CN fields (won't appear in joined dataframe for all samples if CNV coordinates are different between samples)
+
 
     def _parse_reports(self, report_paths):
         '''
@@ -44,12 +50,13 @@ class CNVGrouper:
         sample_names = []
         ann_dfs = []
 
-        sample_sv_fields = self.index_cols + ['samples']
+        sample_sv_fields =['CHROM', 'START', 'END', 'SVTYPE', 'samples', 'GT', 'CN']
 
         for report_path in report_paths:
             df = pd.read_csv(report_path, sep="\t") #use read_vcf because genotype field is not picked up with vcf_to_dataframe
-
             gt_col = [col for col in df.columns if '|GT' in col][0]
+            cn_col = [col for col in df.columns if '|CN' in col][0]
+            df.rename({gt_col: "GT", cn_col: "CN"}, axis=1, inplace=True)
             name = gt_col.split("|")[0]
             sample_names.append(name)
             df['samples'] = name
@@ -57,8 +64,8 @@ class CNVGrouper:
             intervals.extend(df[sample_sv_fields].itertuples(index=False))
             ann_dfs.append(df)
 
-        ann_df = pd.concat(ann_dfs).astype(str).set_index(self.index_cols)
-        ann_df = ann_df[~ann_df.index.duplicated(keep='first')] #annotations for the same SV in a vcf can have slighly differing fields (ex. SVSCORE_MEAN)
+        ann_df = pd.concat(ann_dfs).astype(str)
+        ann_df = ann_df.drop_duplicates(keep='first') #annotations for the same SV in a vcf can have slighly differing fields (ex. SVSCORE_MEAN)
 
         return BedTool(intervals), ann_df, sample_names
 
@@ -67,33 +74,37 @@ class CNVGrouper:
 
         for l in bedtool.intersect(bedtool, wa=True, wb=True, F=reciprocal_overlap, f=reciprocal_overlap):
 
-            ref_chr, ref_start, ref_end, ref_svtype, ref_name, \
-            samp_chr, samp_start, samp_end, samp_svtype, samp_name = l
+            ref_chr, ref_start, ref_end, ref_svtype, ref_name, ref_gt, ref_cn, \
+            samp_chr, samp_start, samp_end, samp_svtype, samp_name, samp_gt, samp_cn = l
 
             ref_interval = (ref_chr, ref_start, ref_end, ref_svtype)
-            samp_interval = (samp_chr, samp_start, samp_end, samp_svtype, samp_name)
+            samp_interval = (samp_chr, samp_start, samp_end, samp_svtype, samp_name, samp_gt, samp_cn)
 
             if (samp_interval not in already_grouped_intervals) and (ref_svtype == samp_svtype):
                 self._add_interval(ref_interval, samp_interval)
                 already_grouped_intervals.add(samp_interval)
         
-        self.df.sort_index(inplace=True)
 
     def _add_interval(self, ref_interval, samp_interval):
-        samp_chr, samp_start, samp_end, samp_svtype, samp_name = samp_interval
+        samp_chr, samp_start, samp_end, samp_svtype, samp_name, samp_gt, samp_cn = samp_interval
 
         #Get reference to row
-        if ref_interval not in self.df.index:
+        ref_interval_short = ref_interval[0:4]
+        try:
+            self.df = self.df.set_index(keys=["CHROM", "START", "END", "SVTYPE"])
+        except: 
+            pass
+        if ref_interval_short not in self.df.index:
             #make new row
-            self.df.loc[ref_interval, :] = np.nan
-            row = self.df.loc[ref_interval, :]
+            self.df.loc[ref_interval_short, :] = np.nan
+            row = self.df.loc[ref_interval_short, :]
             row['N_SAMPLES'] = 0
 
             for name in self.sample_list:
                 row[name] = 0
                 row["%s_SV_DETAILS" % name] = []
         else:
-            row = self.df.loc[ref_interval, :]
+            row = self.df.loc[ref_interval_short, :]
 
         #Set values for row
         try:
@@ -106,7 +117,9 @@ class CNVGrouper:
                 row['N_SAMPLES'] += 1
                 row[samp_name] = 1
 
-        row["%s_SV_DETAILS" % samp_name].append('{}:{}-{}:{}'.format(samp_chr, samp_start, samp_end, samp_svtype))
+        print("adding interval")
+        print(samp_gt, samp_cn)
+        row["%s_SV_DETAILS" % samp_name].append('{}:{}-{}:{}:{}:{}'.format(samp_chr, samp_start, samp_end, samp_svtype, samp_gt, samp_cn))
     
     def write(self, outfile_name):
         self.df.to_csv(outfile_name, encoding='utf-8')
@@ -122,6 +135,7 @@ if __name__ == "__main__":
   
 
     cnvs = CNVGrouper(args.i)
+    cnvs.df = cnvs.df.drop(['GT', 'CN'], axis=1)
     EXCEL_MAX = 32000
     for col in cnvs.df.columns:
         cnvs.df[col] = cnvs.df[col].apply(lambda x: str(x)[:EXCEL_MAX-1]) # truncate column contents
