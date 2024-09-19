@@ -68,7 +68,8 @@ rule annotate_repeat_outliers:
                 --output_file  {output} \
                 --ensembl_gtf {params.genes} \
                 --gnomad_constraint {params.constraint} \
-                --OMIM_path {params.OMIM}) > {log} 2>&1
+                --OMIM_path {params.OMIM} \
+		--c4r_outliers {params.c4r_outliers}) > {log} 2>&1
         else
             (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input} \
                 --output_file  {output} \

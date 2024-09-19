@@ -60,5 +60,5 @@ trgt:
   gnomad_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/gnomad.v4.0.constraint_metrics.tsv"
   omim_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations"
   control_alleles: "/hpf/largeprojects/ccmbio/mcouse/pacbio_report_dev/results/create_cmh_allele_db/repeat_outliers/allele_db/CMH.trgt.v0.5.0.alleles.1436.samples.20240624.tsv"
-  C4R_outliers: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/C4R_all_outliers_batch/outliers/aggregated_outliers_2024-09-11.csv"
+  C4R_outliers: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/C4R_all_outliers_batch/outliers/aggregated_outliers_2024-09-13.csv"
 

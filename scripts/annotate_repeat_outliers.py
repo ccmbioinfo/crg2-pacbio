@@ -404,7 +404,8 @@ def main(
         hits_gene_omim["count"] = hits_gene_omim["count"].replace(np.nan, 0)
         hits_gene_omim = hits_gene_omim.rename({"count": "C4R_outlier_count", "samples": "C4R_outlier_samples"}, axis=1)
         c4r_col = ["C4R_outlier_count", "C4R_outlier_samples"]
-    except: 
+    except:
+        print("Failed to add C4R counts") 
         c4r_col = []
 
 
@@ -441,7 +442,10 @@ def main(
 
     # recode dtypes and missing values
     hits_gene_omim["CHROM"] = hits_gene_omim["CHROM"].astype(str)
-    hits_gene_omim["C4R_outlier_count"] = hits_gene_omim["C4R_outlier_count"].astype(int)
+    try:
+    	hits_gene_omim["C4R_outlier_count"] = hits_gene_omim["C4R_outlier_count"].astype(int)
+    except KeyError:
+        pass 
     hits_gene_omim.fillna(".", inplace=True)
     hits_gene_omim.replace({"-1": "."}, inplace=True)
 
