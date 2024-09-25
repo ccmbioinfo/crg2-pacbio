@@ -635,7 +635,7 @@ def main(
         sample_cols = [col for col in df.columns if re.match(regexp, col)]
     if len(sample_cols) == 0:
         # C4R TCAG IDs
-        sample_cols = [col for col in df.columns if "RLGS" in col]
+        sample_cols = [col for col in df.columns if "RLG" in col]
     if len(sample_cols) == 0:
         # C4R IDs
         regexp = re.compile("\d+[A-Z]*_[A-Z]*\d+")
