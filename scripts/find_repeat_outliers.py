@@ -37,9 +37,12 @@ def split_meth_mp(
     """
     Split methylation or motify purity and return value for shortest and longest allele
     """
-    meth_mp_short = meth_mp.split(",")[short_index]
-    meth_mp_long = meth_mp.split(",")[long_index]
-
+    try:
+        meth_mp_short = meth_mp.split(",")[short_index]
+        meth_mp_long = meth_mp.split(",")[long_index]
+    except AttributeError:
+        meth_mp_short = np.nan
+        meth_mp_long = np.nan
     return meth_mp_short, meth_mp_long
 
 
