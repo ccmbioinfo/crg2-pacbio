@@ -5,7 +5,7 @@ import numpy as np
 
 def resample_quantiles(counts, num_resamples=100):
     resamples = np.random.choice(counts, len(counts) * num_resamples).reshape(num_resamples, -1)
-    return np.quantile(resamples, 0.95, axis=1)
+    return list(np.quantile(resamples, 0.95, axis=1))
 
 def get_counts_with_finite_std(counts):
     return counts[:-1] + [counts[-1] + 0.1] if len(set(counts)) == 1 else counts
