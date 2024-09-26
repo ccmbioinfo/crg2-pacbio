@@ -6,6 +6,7 @@ include: "rules/snvreport.smk"
 include: "rules/svreport.smk"
 include: "rules/outlier_expansions.smk"
 include: "rules/pathogenic_expansion_loci.smk"
+include: "rules/denovo_TR.smk"
 
 samples = pd.read_table(config["run"]["samples"], dtype=str).set_index("sample", drop=False)
 
