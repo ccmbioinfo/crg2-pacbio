@@ -60,13 +60,9 @@ def main(
     # convert hits to PyRanges object
     hits_pr = hits_to_pr(hits_pivot)
 
-    # prep Ensembl gene GTF
-    print("Prep Ensembl GTF")
-    cols = ["gene_name", "gene_id", "gene_biotype", "Feature"]
-    gene_gr = prepare_Ensembl_GTF(ensembl, cols=cols)
-
     # annotate hits with Ensembl genes
     print("Annotate against Ensembl genes")
+    gene_gr = pd.read_csv(ensembl)
     hits_gene = annotate_genes(hits_pr, pr.PyRanges(gene_gr))
 
     # annotate with gene constraint

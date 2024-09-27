@@ -32,11 +32,13 @@ rule trgt_denovo:
         trgt_denovo = config["tools"]["trgt-denovo"],
         ref = config["ref"]["genome"],
         bed = config["trgt"]["adotto_repeats"]
-    output: "TRGT_denovo/{family}_TRGT_denovo.tsv"
+    output: "TRGT_denovo/{family}.TRGT.denovo.tsv"
+    log:  "logs/denovo_TRs/{family}.TRGT-denovo.log"
     resources:
         threads = 8
     shell:
         """
+        # TO DO: account for family structure with multiple children
         # map family member label (e.g. child) to sample ID
         while IFS=$'\t' read -r family_member sample_ID
         do
@@ -64,3 +66,42 @@ rule trgt_denovo:
                                                             
         """    
 
+rule annotate_trgt_denovo:
+    input: "TRGT_denovo/{family}.TRGT.denovo.tsv"
+    output: "TRGT_denovo/{family}.TRGT.denovo.annotated.csv"
+    params:
+      crg2_pacbio = config["tools"]["crg2_pacbio"],
+      genes = config["trgt"]["ensembl"],
+      constraint = config["trgt"]["gnomad_constraint"],
+      OMIM = config["trgt"]["omim_path"],
+      segdup = config["trgt"]["segdup"],
+      controls = config["trgt"]["control_alleles"],
+      HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
+      c4r_outliers = config["trgt"]["C4R_outliers"]
+    log:  "logs/denovo_TRs/{family}.annotate.TRGT.denovo.log"
+    conda: 
+        "../envs/str_sv.yaml"
+    shell:
+        """
+        if [[ {params.HPO} == "none" ]]
+        then
+            (python3 {params.crg2_pacbio}/scripts/annotate_denovo_TRs.py --repeats {input} \
+                --output_file  {output} \
+                --ensembl {params.genes} \
+                --gnomad_constraint {params.constraint} \
+                --OMIM_path {params.OMIM} \
+                --segdup {params.segdup} \
+                --controls {params.controls} \
+		        --c4r_outliers {params.c4r_outliers}) > {log} 2>&1
+        else
+            (python3 {params.crg2_pacbio}/scripts/annotate_denovo_TRs.py --repeats {input} \
+                --output_file  {output} \
+                --ensembl {params.genes} \
+                --gnomad_constraint {params.constraint} \
+                --OMIM_path {params.OMIM} \
+                --segdup {params.segdup} \
+                --controls {params.controls} \
+                --hpo {params.HPO} \
+		        --c4r_outliers {params.c4r_outliers}) > {log} 2>&1
+        fi
+        """

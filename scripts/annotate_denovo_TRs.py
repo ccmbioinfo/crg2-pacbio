@@ -17,7 +17,8 @@ from annotation.annotate import (
     add_hpo,
     group_by_gene, 
     compare_to_controls,
-    get_denovo_al
+    get_denovo_al,
+    annotate_segdup
 )
 
 
@@ -29,6 +30,7 @@ def main(
     constraint: str,
     omim: str,
     controls: str,
+    segdup: str,
     hpo: Optional[str] = None,
     c4r: Optional[str] = None
 ) -> None:
@@ -40,13 +42,9 @@ def main(
     # convert hits to PyRanges object
     hits_pr = hits_to_pr(hits)
 
-    # prep Ensembl gene GTF
-    print("Prep Ensembl GTF")
-    cols = ["gene_name", "gene_id", "gene_biotype", "Feature"]
-    gene_gr = pd.read_csv(ensembl)
-
     # annotate hits with Ensembl genes
     print("Annotate against Ensembl genes")
+    gene_gr = pd.read_csv(ensembl)
     hits_gene = annotate_genes(hits_pr, pr.PyRanges(gene_gr))
 
     # annotate with gene constraint
@@ -69,6 +67,8 @@ def main(
         hpo = pd.read_csv(hpo, sep="\t")
         hits_gene_omim = add_hpo(hpo, hits_gene_omim)
 
+    # annotate with segmental duplications
+    #segdup = 
     # group and aggregate gene columns
     hits_gene_omim = group_by_gene(hits_gene_omim)
 
@@ -204,16 +204,16 @@ if __name__ == "__main__":
         help="Output filepath",
     )
     parser.add_argument(
-        "--ensembl_gtf",
+        "--ensembl",
         type=str,
         required=True,
-        help="Path to Ensembl gene GTF",
+        help="Path to Ensembl gene CSV",
     )
     parser.add_argument(
         "--gnomad_constraint",
         type=str,
         required=True,
-        help="Path to Ensembl gene GTF",
+        help="Path to gnomAD constraint file",
     )
     parser.add_argument(
         "--OMIM_path",
@@ -226,6 +226,12 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="Control allele length distribution TSV",
+    )
+    parser.add_argument(
+        "--segdup",
+        type=str,
+        required=True,
+        help="Segmental duplication BED",
     )
     parser.add_argument(
         "--hpo",
@@ -243,10 +249,11 @@ if __name__ == "__main__":
     main(
         args.repeats,
         args.output_file,
-        args.ensembl_gtf,
+        args.ensembl,
         args.gnomad_constraint,
         args.OMIM_path,
         args.controls,
+        args.segdup,
         args.hpo,
         args.c4r_outliers
     )

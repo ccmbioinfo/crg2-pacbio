@@ -51,7 +51,7 @@ rule annotate_repeat_outliers:
     log:  "logs/repeat_outliers/{family}.annotate.repeat.outliers.log"
     params: 
       crg2_pacbio = config["tools"]["crg2_pacbio"],
-      genes = config["trgt"]["ensembl_gtf"],
+      genes = config["trgt"]["ensembl"],
       OMIM = config["trgt"]["omim_path"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
       constraint = config["trgt"]["gnomad_constraint"],
@@ -66,14 +66,14 @@ rule annotate_repeat_outliers:
         then
             (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input} \
                 --output_file  {output} \
-                --ensembl_gtf {params.genes} \
+                --ensembl {params.genes} \
                 --gnomad_constraint {params.constraint} \
                 --OMIM_path {params.OMIM} \
 		--c4r_outliers {params.c4r_outliers}) > {log} 2>&1
         else
             (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input} \
                 --output_file  {output} \
-                --ensembl_gtf {params.genes} \
+                --ensembl {params.genes} \
                 --gnomad_constraint {params.constraint} \
                 --OMIM_path {params.OMIM} \
                 --hpo {params.HPO} \
