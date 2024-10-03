@@ -18,7 +18,8 @@ from annotation.annotate import (
     group_by_gene, 
     compare_to_controls,
     get_denovo_al,
-    annotate_segdup
+    annotate_segdup,
+    group_by_segdup
 )
 
 
@@ -49,7 +50,7 @@ def main(
 
     # annotate with gene constraint
     print("Add gnomAD gene constraint")
-    constraint_cols = ["gene", "lof.oe_ci.upper", "lof.pLI"]
+    constraint_cols = ["gene", "mane_select", "lof.oe_ci.upper", "lof.pLI"]
     constraint = pd.read_csv(constraint, sep="\t")[constraint_cols].dropna()
     hits_gene = add_constraint(constraint, hits_gene)
 
@@ -66,11 +67,15 @@ def main(
         print("Add HPO terms")
         hpo = pd.read_csv(hpo, sep="\t")
         hits_gene_omim = add_hpo(hpo, hits_gene_omim)
-
-    # annotate with segmental duplications
-    #segdup = 
+    
     # group and aggregate gene columns
     hits_gene_omim = group_by_gene(hits_gene_omim)
+
+    # annotate with segmental duplications
+    segdup = pd.read_csv(segdup, sep="\t", compression="gzip", header=None, names=["Chromosome", "Start", "End", "Segdup", "Strand", "Score"])
+    segdup["Chromosome"] = segdup["Chromosome"].str.replace("chr", "")
+    hits_gene_omim = annotate_segdup(pr.PyRanges(hits_gene_omim), pr.PyRanges(segdup))
+    hits_gene_omim = group_by_segdup(hits_gene_omim)
 
     # annotate with control allele distributions
     print("Annotate against control distributions")
@@ -148,8 +153,8 @@ def main(
         "per_allele_reads_child", "father_MC", "mother_MC", "child_MC", "min_mean_diff"
     ]
     hits_gene_omim = hits_gene_omim[
-        ["Chromosome", "Start", "End", "TRID", "gene_name", "gene_id", "gene_biotype"]
-        + ["omim_phenotype","omim_inheritance", "HPO"]
+        ["Chromosome", "Start", "End", "TRID", "gene_name", "gene_id", "gene_biotype", "Segdup"]
+        + ["omim_phenotype", "omim_inheritance", "HPO"]
         + constraint_cols
         + ["Feature"]
         + trgt_denovo_al_cols
@@ -163,6 +168,7 @@ def main(
     hits_gene_omim = hits_gene_omim.rename(
         columns={
             "Feature": "feature",
+            "Segdup": "segdup",
             "Chromosome": "CHROM",
             "Start": "POS",
             "End": "END",
@@ -177,12 +183,13 @@ def main(
     except KeyError:
         pass 
     hits_gene_omim.fillna(".", inplace=True)
-    hits_gene_omim.replace({"-1": "."}, inplace=True)
+    hits_gene_omim.replace({"-1": ".", "nan": "."}, inplace=True)
 
     # write to file
     today = date.today()
     today = today.strftime("%Y-%m-%d")
     out_file = out_file.replace(".csv", "")
+    hits_gene_omim = hits_gene_omim.drop_duplicates()
     hits_gene_omim.to_csv(f"{out_file}.csv", index=False)
     hits_gene_omim.to_csv(f"{out_file}.{today}.csv", index=False)
 

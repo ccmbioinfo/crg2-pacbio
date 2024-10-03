@@ -86,14 +86,15 @@ def annotate_genes(loci: pr.PyRanges, genes: pr.PyRanges) -> pd.DataFrame:
     )
 
     return loci_ensembl_df
+
 def add_constraint(constraint: pd.DataFrame, hits_gene: pd.DataFrame) -> pd.DataFrame:
-    """Add transcript-specific gnomAD v4 LOEUF and pLI scores"""
+    """Add gnomAD v4 LOEUF and pLI scores for MANE transcripts"""
+    constraint = constraint[constraint["mane_select"] == True]
     hits_gene = hits_gene.merge(
         constraint, left_on="gene_name", right_on="gene", how="left"
     )
 
     return hits_gene
-
 
 def group_by_gene(hits_gene: pd.DataFrame) -> pd.DataFrame:
     """
@@ -105,18 +106,21 @@ def group_by_gene(hits_gene: pd.DataFrame) -> pd.DataFrame:
         "gene_id",
         "gene_biotype",
         "Feature",
-        "lof.oe_ci.upper",
+        "lof.oe_ci.upper", 
         "lof.pLI",
+        "gene"
     ]
 
+    hits_gene[["lof.oe_ci.upper", "lof.pLI", "gene"]] = hits_gene[["lof.oe_ci.upper", "lof.pLI", "gene"]].astype(str)
     hits_gene_dedup = hits_gene.groupby(["trid"]).agg(
         {
             "gene_name": ";".join,
             "gene_id": ";".join,
             "gene_biotype": ";".join,
             "Feature": ";".join,
-            "lof.oe_ci.upper": min,
-            "lof.pLI": max,
+            "lof.oe_ci.upper": lambda x: ";".join(np.unique(x).astype(str)),
+            "lof.pLI": lambda x: ";".join(np.unique(x).astype(str)),
+            "gene": lambda x: ";".join(np.unique(x).astype(str))
         }
     )
     # merge with original loci table
@@ -125,6 +129,24 @@ def group_by_gene(hits_gene: pd.DataFrame) -> pd.DataFrame:
     hits_gene_merged_dedup = hits_gene_merged.drop_duplicates()
 
     return hits_gene_merged_dedup
+
+
+def group_by_segdup(hits_gene: pd.DataFrame) -> pd.DataFrame:
+    """
+    One hit may be associated with multiple segdup features and so multiple rows
+    Aggregate by segdups and join features to remove duplicate rows
+    """
+    hits_segdup_dedup = hits_gene.groupby(["trid"]).agg(
+        {
+            "Segdup": ";".join,
+        }
+    )
+    # merge with original loci table
+    hits_gene = hits_gene.drop("Segdup", axis=1)
+    hits_segdup_merged = hits_gene.merge(hits_segdup_dedup, on=["trid"], how="left")
+    hits_segdup_merged_dedup = hits_segdup_merged.drop_duplicates(keep="first")
+
+    return hits_segdup_merged_dedup
 
 
 def prepare_OMIM(genemap2_path: str) -> pd.DataFrame:
@@ -426,4 +448,16 @@ def get_denovo_al(allele_lens: str, genotype: int) -> int:
     return denovo_allele_len
 
 
+def annotate_segdup(loci: pr.PyRanges, segdup: pr.PyRanges) -> pd.DataFrame:
+    """
+    Annotate loci against segmental duplications
+    """
+    loci_segdup = loci.join(
+        segdup, suffix="_segdup", how="left", apply_strand_suffix=False
+    ).drop(["Strand", "Score"])
+    loci_segdup_df = loci_segdup.df
+    loci_segdup_df["Segdup"] = np.where(
+        loci_segdup_df["Segdup"].isnull(), ".", loci_segdup_df["Segdup"]
+    )
 
+    return loci_segdup_df
