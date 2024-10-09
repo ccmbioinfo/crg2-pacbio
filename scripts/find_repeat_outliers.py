@@ -182,7 +182,6 @@ def main(cases, dist, output_file):
     # merge case alleles to controls allele length distribution dataframe
     cases_long["case_trid"] = cases_long["trid"]
     cases_long["trid"] = cases_long["case_trid"].str.rsplit("_", n=1).str[0]
-    dist["trid"] = dist["trid"].str.rsplit("_", n=1).str[0]
     merged = cases_long.merge(dist, on="trid", how="left")
     merged = merged.astype(
         {
