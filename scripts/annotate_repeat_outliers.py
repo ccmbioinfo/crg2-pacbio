@@ -67,7 +67,7 @@ def main(
 
     # annotate with gene constraint
     print("Add gnomAD gene constraint")
-    constraint_cols = ["gene", "lof.oe_ci.upper", "lof.pLI"]
+    constraint_cols = ["gene", "mane_select", "lof.oe_ci.upper", "lof.pLI"]
     constraint = pd.read_csv(constraint, sep="\t")[constraint_cols].dropna()
     hits_gene = add_constraint(constraint, hits_gene)
 
@@ -113,7 +113,7 @@ def main(
     hits_gene_omim = hits_gene_omim[
         ["Chromosome", "Start", "End", "trid", "gene_name", "gene_id", "gene_biotype"]
         + ["omim_phenotype","omim_inheritance", "HPO"]
-        + constraint_cols
+        + ["gene", "lof.oe_ci.upper", "lof.pLI"]
         + ["Feature", "control_range", "cutoff"]
         + c4r_col
         + ["max_z_score_len", "num_samples"]
@@ -142,6 +142,8 @@ def main(
     hits_gene_omim.fillna(".", inplace=True)
     hits_gene_omim.replace({"-1": "."}, inplace=True)
 
+    # drop dups
+    hits_gene_omim = hits_gene_omim.drop_duplicates()
     # write to file
     today = date.today()
     today = today.strftime("%Y-%m-%d")
