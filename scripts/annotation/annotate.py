@@ -108,10 +108,13 @@ def group_by_gene(hits_gene: pd.DataFrame) -> pd.DataFrame:
         "Feature",
         "lof.oe_ci.upper", 
         "lof.pLI",
-        "gene"
+        "gene",
+        "omim_phenotype", 
+        "omim_inheritance",
+        "HPO"
     ]
 
-    hits_gene[["lof.oe_ci.upper", "lof.pLI", "gene"]] = hits_gene[["lof.oe_ci.upper", "lof.pLI", "gene"]].astype(str)
+    hits_gene[["lof.oe_ci.upper", "lof.pLI", "gene", "omim_phenotype", "omim_inheritance", "HPO"]] = hits_gene[["lof.oe_ci.upper", "lof.pLI", "gene", "omim_phenotype", "omim_inheritance", "HPO"]].astype(str)
     hits_gene_dedup = hits_gene.groupby(["trid"]).agg(
         {
             "gene_name": ";".join,
@@ -120,7 +123,10 @@ def group_by_gene(hits_gene: pd.DataFrame) -> pd.DataFrame:
             "Feature": ";".join,
             "lof.oe_ci.upper": lambda x: ";".join(np.unique(x).astype(str)),
             "lof.pLI": lambda x: ";".join(np.unique(x).astype(str)),
-            "gene": lambda x: ";".join(np.unique(x).astype(str))
+            "gene": lambda x: ";".join(np.unique(x).astype(str)),
+            "omim_phenotype": lambda x: ";".join(np.unique(x).astype(str)),
+            "omim_inheritance":  lambda x: ";".join(np.unique(x).astype(str)),
+            "HPO": lambda x: ";".join(np.unique(x).astype(str))
         }
     )
     # merge with original loci table
@@ -285,7 +291,7 @@ def annotate_OMIM(loci_ensembl: pd.DataFrame, omim: pd.DataFrame) -> pd.DataFram
     """
     loci_ensembl_omim = loci_ensembl.merge(omim, how="left", on="gene_id")
     loci_ensembl_omim["omim_phenotype"] = loci_ensembl_omim["omim_phenotype"].fillna(
-        "-1"
+        "."
     )
 
     return loci_ensembl_omim
@@ -321,10 +327,13 @@ def filter_outliers(row: pd.Series, allele_len_cols: list) -> bool:
         for allele_len in allele_len_cols
     ]
     cutoff = row["cutoff"]
-    if max(allele_lens) < cutoff:
-        return False
-    else:
-        return True
+    try:
+        if max(allele_lens) <= round(cutoff):
+            return False
+        else:
+            return True
+    except:
+        return True # missing in control database
 
 
 def num_expanded(row: pd.Series, allele_len_cols: list) -> bool:
