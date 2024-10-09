@@ -144,8 +144,12 @@ def main(
         "cutoff",
     ]
 
-    # order columns
+    # replace comma separator with semi-colon to avoid issues in excel
     trgt_denovo_al_cols = ["child_AL", "child_denovo_AL", "mother_AL", "father_AL"]
+    for col in trgt_denovo_al_cols:
+        hits_gene_omim[col] = hits_gene_omim[col].astype(str).str.replace(",", ";", regex=False)
+    
+    # order columns
     trgt_denovo_cols = [
         "denovo_coverage", "allele_coverage", "allele_ratio", "child_coverage", 
         "child_ratio", "mean_diff_father", "mean_diff_mother", "allele_origin", 
@@ -155,7 +159,7 @@ def main(
     hits_gene_omim = hits_gene_omim[
         ["Chromosome", "Start", "End", "TRID", "gene_name", "gene_id", "gene_biotype", "Segdup"]
         + ["omim_phenotype", "omim_inheritance", "HPO"]
-        + constraint_cols
+        + ["gene", "lof.oe_ci.upper", "lof.pLI"]
         + ["Feature"]
         + trgt_denovo_al_cols
         + ["outlier"]
