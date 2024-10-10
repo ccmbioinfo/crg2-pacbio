@@ -761,7 +761,7 @@ def main(
 
     # exclude C4R counts if not part of C4R study
     if c4r != "True":
-        inhouse_cols = []
+        inhouse_cols = [col for col in inhouse_cols if col != "seen_in_C4R"]
 
     # add BND directionality information to INFO column
     df_merge["INFO_extended"] = df_merge.apply(
