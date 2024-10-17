@@ -408,7 +408,7 @@ def filter_candidates(df: pd.DataFrame) -> pd.DataFrame:
     df_filt = df[
         (df['denovo_coverage'] >= 5) &
         (df['allele_ratio'] >= 0.7) &
-        (df['child_ratio'].between(0.3, 0.7)) &
+        # (df['child_ratio'].between(0.3, 0.7)) &
         (df['mother_dropout_prob'] < 0.005) &
         (df['father_dropout_prob'] < 0.005) &
         (df['mother_dropout'] == "N") & 
@@ -416,6 +416,12 @@ def filter_candidates(df: pd.DataFrame) -> pd.DataFrame:
         (df['mean_diff_mother'] > 7) & 
         (df['mean_diff_father'] > 7)          
     ].copy()        
+    df_filt = df_filt[
+        (
+            (df_filt['child_ratio'].between(0.3, 0.7)) |
+            (df_filt['trid'].str.contains('chrX', case=False))
+        )
+    ]
     df_filt = df_filt.sort_values(by=["min_mean_diff"], ascending=False)
 
     return df_filt
