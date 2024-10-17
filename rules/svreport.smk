@@ -46,7 +46,7 @@ rule sv_report:
         anno_path = config["annotation"]["sv_report"]["anno_path"],
         inhouse = config["annotation"]["sv_report"]["inhouse"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
-        c4r = config["annotation"]["sv_report"]["c4r"],
+        c4r = config["annotation"]["c4r"],
     conda:
         "../envs/str_sv.yaml"
     shell:

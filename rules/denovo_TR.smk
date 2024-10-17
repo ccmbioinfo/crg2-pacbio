@@ -76,6 +76,7 @@ rule annotate_trgt_denovo:
       OMIM = config["trgt"]["omim_path"],
       segdup = config["trgt"]["segdup"],
       controls = config["trgt"]["control_alleles"],
+      c4r = config["annotation"]["c4r"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
       c4r_outliers = config["trgt"]["C4R_outliers"]
     log:  "logs/denovo_TRs/{family}.annotate.TRGT.denovo.log"
@@ -91,6 +92,7 @@ rule annotate_trgt_denovo:
                 --gnomad_constraint {params.constraint} \
                 --OMIM_path {params.OMIM} \
                 --segdup {params.segdup} \
+                --c4r {params.c4r} \
                 --controls {params.controls} \
 		        --c4r_outliers {params.c4r_outliers}) > {log} 2>&1
         else
@@ -100,6 +102,7 @@ rule annotate_trgt_denovo:
                 --gnomad_constraint {params.constraint} \
                 --OMIM_path {params.OMIM} \
                 --segdup {params.segdup} \
+                --c4r {params.c4r} \
                 --controls {params.controls} \
                 --hpo {params.HPO} \
 		        --c4r_outliers {params.c4r_outliers}) > {log} 2>&1

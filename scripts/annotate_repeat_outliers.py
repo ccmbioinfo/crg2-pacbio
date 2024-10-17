@@ -27,8 +27,9 @@ def main(
     ensembl: str,
     constraint: str,
     omim: str,
+    c4r: bool,
     hpo: Optional[str] = None,
-    c4r: Optional[str] = None
+    c4r_counts: Optional[str] = None
 ) -> None:
     # convert hits dataframe from long to wide format
     hits = pd.read_csv(hits)
@@ -90,9 +91,10 @@ def main(
 
     # annotate with C4R outlier counts
     print("Adding inhouse outlier counts")
+    print(c4r)
      
     try: 
-        c4r_counts = pd.read_csv(c4r)
+        c4r_counts = pd.read_csv(c4r_counts)
         hits_gene_omim = hits_gene_omim.merge(c4r_counts, left_on="trid", right_on="TRID", how="left")
         hits_gene_omim["count"] = hits_gene_omim["count"].replace(np.nan, 0)
         hits_gene_omim = hits_gene_omim.rename({"count": "C4R_outlier_count", "samples": "C4R_outlier_samples"}, axis=1)
@@ -100,6 +102,9 @@ def main(
     except:
         print("Failed to add C4R counts") 
         c4r_col = []
+    
+    if c4r != "True": 
+        c4r_col = ["C4R_outlier_count"] # remove C4R sample IDs for non-C4R projects
 
 
     # column cleanup
@@ -187,6 +192,12 @@ if __name__ == "__main__":
         help="Path to directory containing OMIM mim2gene and morbidmap files",
     )
     parser.add_argument(
+        "--c4r",
+        type=str,
+        required=True,
+        help="True if C4R project, otherwise false (C4R outlier sample IDs will be excluded from report)",
+    )
+    parser.add_argument(
         "--hpo",
         type=str,
         help="Path to HPO terms file",
@@ -205,6 +216,7 @@ if __name__ == "__main__":
         args.ensembl_gtf,
         args.gnomad_constraint,
         args.OMIM_path,
+        args.c4r,
         args.hpo,
         args.c4r_outliers
     )
