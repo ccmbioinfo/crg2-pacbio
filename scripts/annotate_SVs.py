@@ -8,7 +8,7 @@ from pybedtools import BedTool
 from sigfig import round
 from datetime import date
 import io
-
+import sys
 
 def rename_SV_cols(annotsv_df):
     annotsv_df.rename(
@@ -636,6 +636,9 @@ def main(
     if len(sample_cols) == 0:
         # C4R TCAG IDs
         sample_cols = [col for col in df.columns if "RLG" in col]
+    if len(sample_cols) == 0:
+        # genesteps TCAG IDs
+        sample_cols = [col for col in df.columns if "RGS" in col]
     if len(sample_cols) == 0:
         # C4R IDs
         regexp = re.compile("\d+[A-Z]*_[A-Z]*\d+")
