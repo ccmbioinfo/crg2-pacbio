@@ -124,7 +124,7 @@ rule vcf2db:
     log:
         "logs/vcf2db/{family}.vcf2db.{p}.log"
     params:
-        ped=format_pedigree
+        ped=config["run"]["ped"]
     threads: 1
     resources:
         mem_mb = 20000
