@@ -47,10 +47,10 @@ do
         sed -i "s+hpo: \"\"+hpo: \"${HPO}\"+"  ${ANALYSIS_DIR}/${family}/${analysis}/config.yaml
         sed -i "s+ped: \"\"+ped: \"${pedigree}\"+"  ${ANALYSIS_DIR}/${family}/${analysis}/config.yaml
         # add targets to job submission script
-        sed -i "s+{SLURM}+{SLURM} -p sv/${family}.pbsv.csv small_variants/coding/${family} pathogenic_repeats/${family}.known.path.str.loci.csv+g" ${ANALYSIS_DIR}/${family}/${analysis}/crg2-pacbio.sh
+        sed -i "s+{SLURM}+{SLURM} -p sv/${family}.pbsv.csv small_variants/coding/${family} pathogenic_repeats/${family}.known.path.str.loci.csv small_variants/panel/${family} small_variants/panel-flank/${family}   pathogenic_repeats/${family}.known.path.str.loci.csv repeat_outliers/${family}.repeat.outliers.annotated.csv TRGT_denovo/${family}.TRGT.denovo.annotated.csv+g" ${ANALYSIS_DIR}/${family}/${analysis}/crg2-pacbio.sh
 
 
-        # create samples.tsv 
+        # create samples.tsv and copy per-sample TRGT VCFs 
         echo -e "sample\tBAM" > ${ANALYSIS_DIR}/${family}/${analysis}/samples.tsv
         echo -e "family\tplatform\tsmall_variant_vcf\ttrgt_vcf_dir\tpbsv_vcf\ttrgt_pathogenic_vcf_dir" > ${ANALYSIS_DIR}/${family}/${analysis}/units.tsv
         for cram in ${crams[@]}
@@ -59,18 +59,23 @@ do
                 sample=`basename $cram | cut -d '.' -f1 | cut -d '_' -f2`
                 sample=`echo $sample | sed 's/-ready//'`
                 echo -e "$sample\t$cram" >> ${ANALYSIS_DIR}/${family}/${analysis}/samples.tsv
+		if [ ! -d ${ANALYSIS_DIR}/${family}/${analysis}/trgt ]; then 
+			mkdir ${ANALYSIS_DIR}/${family}/${analysis}/trgt
+		fi
+		trgt=`echo ${TCAG_SHARED}/*/${family}_${sample}*/*trgt*vcf.gz`
+		cp $trgt ${ANALYSIS_DIR}/${family}/${analysis}/trgt
         done
 
         # create units.tsv
-        small_var_vcf=`echo ${TCAG_SHARED}/*/${family}*joint/${family}.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz`
+        small_var_vcf=`echo ${TCAG_SHARED}/*/${family}*joint/${family}*joint.GRCh38.deepvariant.glnexus.phased.vcf.gz`
         if [ ! -f $small_var_vcf ]; then # singleton
                 small_var_vcf=`echo ${TCAG_SHARED}/*/${family}*/${family}*GRCh38.deepvariant.phased.vcf.gz`
         fi
-        sv_vcf=`echo ${TCAG_SHARED}/*/${family}*joint/${family}.joint.GRCh38.pbsv.phased.vcf.gz`
+        sv_vcf=`echo ${TCAG_SHARED}/*/${family}*joint/${family}*joint.GRCh38.pbsv.phased.vcf.gz`
         if [ ! -f $sv_vcf ]; then # singleton
                 sv_vcf=`echo ${TCAG_SHARED}/*/${family}*/${family}*GRCh38.pbsv.phased.vcf.gz`
         fi 
-        echo -e "$family\tPACBIO\t${small_var_vcf}\t\t${sv_vcf}\t" >> ${ANALYSIS_DIR}/${family}/${analysis}/units.tsv
+        echo -e "$family\tPACBIO\t${small_var_vcf}\ttrgt\t${sv_vcf}\t" >> ${ANALYSIS_DIR}/${family}/${analysis}/units.tsv
 
         # copy TCAG annotated CNV files for merging
         mkdir ${ANALYSIS_DIR}/${family}/${analysis}/cnv
