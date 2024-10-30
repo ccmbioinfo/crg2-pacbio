@@ -32,27 +32,24 @@ rule trgt_denovo:
         trgt_denovo = config["tools"]["trgt-denovo"],
         ref = config["ref"]["genome"],
         bed = config["trgt"]["adotto_repeats"]
-    output: "TRGT_denovo/{family}.TRGT.denovo.tsv"
-    log:  "logs/denovo_TRs/{family}.TRGT-denovo.log"
+    output: "TRGT_denovo/{family}_{child}.TRGT.denovo.tsv"
+    log: "logs/denovo_TRs/{family}_{child}.TRGT-denovo.log"
     resources:
         threads = 8
     shell:
         """
-        # TO DO: account for family structure with multiple children
-        # map family member label (e.g. child) to sample ID
+        # Get family member IDs from mapping file
         while IFS=$'\t' read -r family_member sample_ID
         do
-            echo $sample_ID
-            if [[ "${{family_member}}" == "child" ]]; then
-                child_ID=`echo ${{sample_ID}}`
-            elif [[ "${{family_member}}" == "father" ]]; then
-                father_ID=`echo ${{sample_ID}}`
-            else
-                mother_ID=`echo ${{sample_ID}}`
+            if [[ "${{family_member}}" == "father" ]]; then
+                father_ID=${{sample_ID}}
+            elif [[ "${{family_member}}" == "mother" ]]; then
+                mother_ID=${{sample_ID}}
             fi
-        done<{input.ID_map}
+        done < {input.ID_map}
 
-        child_bam=`awk '{{print $2}}' {input.samples} | grep ${{child_ID}} | sed 's/.bam/.trgt/'`
+        # Get BAM paths
+        child_bam=`awk '{{print $2}}' {input.samples} | grep {wildcards.child} | sed 's/.bam/.trgt/'`
         father_bam=`awk '{{print $2}}' {input.samples} | grep ${{father_ID}} | sed 's/.bam/.trgt/'`
         mother_bam=`awk '{{print $2}}' {input.samples} | grep ${{mother_ID}} | sed 's/.bam/.trgt/'`
 
@@ -63,12 +60,11 @@ rule trgt_denovo:
                 --child $child_bam \
                 -@ {resources.threads} \
                 --out {output}
-                                                            
-        """    
+        """   
 
 rule annotate_trgt_denovo:
-    input: "TRGT_denovo/{family}.TRGT.denovo.tsv"
-    output: "TRGT_denovo/{family}.TRGT.denovo.annotated.csv"
+    input: "TRGT_denovo/{family}_{child}.TRGT.denovo.tsv"
+    output: "TRGT_denovo/{family}_{child}.TRGT.denovo.annotated.csv"
     params:
       crg2_pacbio = config["tools"]["crg2_pacbio"],
       genes = config["trgt"]["ensembl"],
@@ -79,7 +75,7 @@ rule annotate_trgt_denovo:
       c4r = config["annotation"]["c4r"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
       c4r_outliers = config["trgt"]["C4R_outliers"]
-    log:  "logs/denovo_TRs/{family}.annotate.TRGT.denovo.log"
+    log:  "logs/denovo_TRs/{family}_{child}.annotate.TRGT.denovo.log"
     conda: 
         "../envs/str_sv.yaml"
     shell:
