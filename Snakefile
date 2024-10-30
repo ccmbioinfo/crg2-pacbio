@@ -8,11 +8,20 @@ include: "rules/outlier_expansions.smk"
 include: "rules/pathogenic_expansion_loci.smk"
 include: "rules/denovo_TR.smk"
 
+def get_children_ids(ped_file):
+    import pandas as pd
+    pedigree = pd.read_csv(ped_file, sep=" ", header=None, 
+                          names=["family_ID", "individual_ID", "paternal_ID", "maternal_ID", "sex", "phenotype"])
+    children = pedigree[pedigree["paternal_ID"] != "0"][pedigree["maternal_ID"] != "0"]["individual_ID"].apply(lambda x: x.split("_")[1]).values
+    family = pedigree["family_ID"].iloc[0]
+
+    return family, children
+
 samples = pd.read_table(config["run"]["samples"], dtype=str).set_index("sample", drop=False)
 
 ##### Target rules #####
 project = config["run"]["project"]
-family = project
+family, children = get_children_ids(config["run"]["ped"])
 
 rule all:
     input:
@@ -22,5 +31,7 @@ rule all:
         "sv/{family}.pbsv.csv".format(family=project),
         "repeat_outliers/{family}.repeat.outliers.annotated.csv".format(family=project),
         "pathogenic_repeats/{family}.known.path.str.loci.csv".format(family=project),
-        "TRGT_denovo/{family}.TRGT.denovo.annotated.csv".format(family=project)
+        expand("TRGT_denovo/{family}/{child}.TRGT.denovo.annotated.csv",
+               family=family,
+               child=children)
 
