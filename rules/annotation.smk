@@ -123,8 +123,6 @@ rule vcf2db:
          db="annotated/{p}/{family}-gemini.db",
     log:
         "logs/vcf2db/{family}.vcf2db.{p}.log"
-    params:
-        ped=config["run"]["ped"]
     threads: 1
     resources:
         mem_mb = 20000
