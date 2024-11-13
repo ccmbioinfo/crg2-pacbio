@@ -24,7 +24,7 @@ RESOURCE_MAPPING = {
 jobscript = slurm_utils.parse_jobscript()
 job_properties = read_job_properties(jobscript)
 
-sbatch_options = {}
+sbatch_options = {"tmp": "1T"}
 cluster_config = slurm_utils.load_cluster_config(CLUSTER_CONFIG)
 
 # 1) sbatch default arguments and cluster
