@@ -15,13 +15,14 @@ def get_children_ids(ped_file):
     children = pedigree[pedigree["paternal_ID"] != "0"][pedigree["maternal_ID"] != "0"]["individual_ID"].apply(lambda x: x.split("_")[1]).values
     family = pedigree["family_ID"].iloc[0]
 
-    return family, children
+    return children
 
 samples = pd.read_table(config["run"]["samples"], dtype=str).set_index("sample", drop=False)
 
 ##### Target rules #####
 project = config["run"]["project"]
-family, children = get_children_ids(config["run"]["ped"])
+if config["run"]["ped"]:
+	children = get_children_ids(config["run"]["ped"])
 
 rule all:
     input:
@@ -31,7 +32,7 @@ rule all:
         "sv/{family}.pbsv.csv".format(family=project),
         "repeat_outliers/{family}.repeat.outliers.annotated.csv".format(family=project),
         "pathogenic_repeats/{family}.known.path.str.loci.csv".format(family=project),
-        expand("TRGT_denovo/{family}/{child}.TRGT.denovo.annotated.csv",
-               family=family,
-               child=children)
+        expand("TRGT_denovo/{family}_{child}.TRGT.denovo.annotated.csv",
+               family=project,
+               child=children) if config["run"]["ped"] else []
 
