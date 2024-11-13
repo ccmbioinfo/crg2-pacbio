@@ -35,7 +35,7 @@ $mc cp ${family}/*/pathogenic_repeats/${family}.known.path.str.loci.2*.csv minio
 $mc cp ${family}/*/repeat_outliers/${family}.repeat.outliers.annotated.2*.csv minio/results-c4r/long_read_seq/reports_2024/${family}
 
 # TRGT de novo tandem repeats
-$mc cp ${family}/*/TRGT_denovo/${family}.TRGT.denovo.annotated.2*.csv minio/results-c4r/long_read_seq/reports_2024/${family}
+$mc cp ${family}/*/TRGT_denovo/${family}*TRGT.denovo.annotated.2*.csv minio/results-c4r/long_read_seq/reports_2024/${family}
 
 # TCAG CNVs
 $mc cp ${family}/*/cnv/${family}*cnv*csv  minio/results-c4r/long_read_seq/reports_2024/${family}
