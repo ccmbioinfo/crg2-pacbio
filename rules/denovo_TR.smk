@@ -69,7 +69,7 @@ rule annotate_trgt_denovo:
       crg2_pacbio = config["tools"]["crg2_pacbio"],
       genes = config["trgt"]["ensembl"],
       constraint = config["trgt"]["gnomad_constraint"],
-      OMIM = config["trgt"]["omim_path"],
+      OMIM = config["annotation"]["omim_path"],
       segdup = config["trgt"]["segdup"],
       controls = config["trgt"]["control_alleles"],
       c4r = config["annotation"]["c4r"],

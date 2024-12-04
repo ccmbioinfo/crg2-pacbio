@@ -42,6 +42,7 @@ rule sv_report:
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         hpo = config["run"]["hpo"],
+        omim = config["annotation"]["omim_path"],
         exon = config["annotation"]["sv_report"]["exon"],
         anno_path = config["annotation"]["sv_report"]["anno_path"],
         inhouse = config["annotation"]["sv_report"]["inhouse"],
@@ -55,7 +56,7 @@ rule sv_report:
         -annotsv {input.annotsv} \
         -snpeff {input.snpeff} \
         -vcf {input.pbsv_vcf} \
-        -omim {params.anno_path}/OMIM_hgnc_join_omim_phenos_2024-02-06.tsv \
+        -omim {params.omim} \
         -hpo {params.hpo} \
         -exon {params.exon} \
         -gnomad {params.anno_path}/gnomad_v2_sv.sites_hg38_liftover_FINAL_drop_cols.bed \

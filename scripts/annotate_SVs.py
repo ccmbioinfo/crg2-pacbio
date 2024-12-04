@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from pysam import VariantFile
 import argparse
+from annotation.annotate import prepare_OMIM, annotate_OMIM
 from collections import defaultdict
 from pybedtools import BedTool
 from sigfig import round
@@ -180,11 +181,11 @@ def add_omim(omim_df, gene):
         for g in gene:
             try:
                 phenos.append(
-                    str(omim_df[omim_df["gene_name"] == g]["omim_phenotype"].values[0])
+                    str(omim_df[omim_df["gene_id"] == g]["omim_phenotype"].values[0])
                 )
                 inheritance.append(
                     str(
-                        omim_df[omim_df["gene_name"] == g]["omim_inheritance"].values[0]
+                        omim_df[omim_df["gene_id"] == g]["omim_inheritance"].values[0]
                     )
                 )
             except IndexError:
@@ -691,11 +692,14 @@ def main(
         print("No HPO terms")
 
     # add OMIM phenos and inheritance by gene matching
+    print("Preparing OMIM data")
+    omim_df = prepare_OMIM(f"{omim}/genemap2.txt")
+
     df_merge["omim_phenotype"] = [
-        add_omim(omim, gene)[0] for gene in df_merge["GENE_NAME"].values
+        add_omim(omim_df, gene)[0] for gene in df_merge["ENSEMBL_GENE"].values
     ]
     df_merge["omim_inheritance"] = [
-        add_omim(omim, gene)[1] for gene in df_merge["GENE_NAME"].values
+        add_omim(omim_df, gene)[1] for gene in df_merge["ENSEMBL_GENE"].values
     ]
 
     # add gnomAD SVs
@@ -880,9 +884,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-omim",
-        help="OMIM tab delimited file containing gene names and scores",
         type=str,
         required=True,
+        help="Path to directory containing OMIM mim2gene and morbidmap files",
     )
     parser.add_argument(
         "-vcf",
@@ -968,9 +972,6 @@ if __name__ == "__main__":
     # parse original pbsv VCF just to ensure all SVs are included in final report
     vcf = VariantFile(args.vcf)
 
-    omim = pd.read_csv(args.omim, sep="\t")
-    omim = omim[pd.notnull(omim["omim_phenotype"])]
-
     hpo = args.hpo
     if hpo:
         hpo = pd.read_csv(
@@ -1003,7 +1004,7 @@ if __name__ == "__main__":
     main(
         df,
         snpeff_df,
-        omim,
+        args.omim,
         hpo,
         vcf,
         prefix,

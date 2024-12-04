@@ -52,7 +52,7 @@ rule annotate_repeat_outliers:
     params: 
       crg2_pacbio = config["tools"]["crg2_pacbio"],
       genes = config["trgt"]["ensembl"],
-      OMIM = config["trgt"]["omim_path"],
+      OMIM = config["annotation"]["omim_path"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
       constraint = config["trgt"]["gnomad_constraint"],
       c4r_outliers = config["trgt"]["C4R_outliers"],
