@@ -66,8 +66,8 @@ sQuery="select \
         dp as Depth,\
         qual as Quality,\
         gene as Gene,\
-		COALESCE(clinvar_pathogenic, '') || COALESCE( ';' || NULLIF(clinvar_sig,''), '') as Clinvar, \
-        clinvar_status as Clinvar_status, \
+        COALESCE(clinvar_pathogenic, '') || COALESCE( ';' || NULLIF(clinvar_sig,''), '') || COALESCE( ';' || NULLIF(clinvar_sig_conf,''), '') as Clinvar, \
+	clinvar_status as Clinvar_status, \
         ensembl_gene_id as Ensembl_gene_id,\
         transcript as Ensembl_transcript_id,\
         aa_length as AA_position,\
