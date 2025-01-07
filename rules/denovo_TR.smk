@@ -49,9 +49,16 @@ rule trgt_denovo:
         done < {input.ID_map}
 
         # Get BAM paths
-        child_bam=`awk '{{print $2}}' {input.samples} | grep {wildcards.child} | sed 's/.bam/.trgt/'`
-        father_bam=`awk '{{print $2}}' {input.samples} | grep ${{father_ID}} | sed 's/.bam/.trgt/'`
-        mother_bam=`awk '{{print $2}}' {input.samples} | grep ${{mother_ID}} | sed 's/.bam/.trgt/'`
+        child_bam=`cat {input.samples} | grep -P "{wildcards.child}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/'`
+        father_bam=`cat {input.samples} | grep -P "${{father_ID}}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/'`
+        mother_bam=`cat {input.samples} | grep -P "${{mother_ID}}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/'`
+	echo         {params.trgt_denovo} trio --reference {params.ref} \
+                --bed {params.bed} \
+                --father $father_bam \
+                --mother $mother_bam \
+                --child $child_bam \
+                -@ {resources.threads} \
+                --out {output}
 
         {params.trgt_denovo} trio --reference {params.ref} \
                 --bed {params.bed} \
