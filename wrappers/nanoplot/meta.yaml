@@ -1,0 +1,5 @@
+name:  NanoPlot
+description: Generates plots for long read sequencing data
+authors: Kobe Huynh
+input: sorted bam file
+output: statistics and plots such as read length, base quality, and read quality
