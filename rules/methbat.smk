@@ -102,8 +102,9 @@ rule methbat_call_outliers:
         mem_mb = 40000
     shell:
         """
+        input=`echo {input.meth_probs} | sed 's/.combined.bed//'`
         methbat profile \
-        --input-prefix {input.meth_probs} \
+        --input-prefix $input \
         --input-regions {input.cohort} \
         --output-region-profile {output}
         """
