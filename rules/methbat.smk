@@ -127,7 +127,7 @@ rule methbat_annotate_outliers:
         mem_mb = 40000
     shell:
         """
-        if [ -f {params.hpo} ]; then
+        if [ -z {params.hpo} ]; then
                 python3 ../scripts/annotate_methylation_outliers.py \
                 --outliers {input.outliers} \
                 --output_file {output} \
