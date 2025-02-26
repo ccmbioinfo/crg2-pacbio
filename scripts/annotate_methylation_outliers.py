@@ -236,7 +236,18 @@ def main(
         }
     )
 
-    outliers_gene_omim.replace({"-1": ".", "nan": "."}, inplace=True)
+    # round numeric columns 
+    outliers_gene_omim["asm_fishers_pvalue"] = outliers_gene_omim["asm_fishers_pvalue"].round(7)
+    # these numeric columns have some missing values encoded as "."
+    for col in ["mean_hap1_methyl", "mean_hap2_methyl", "mean_meth_delta", "mean_abs_meth_delta_zscore"]:
+        outliers_gene_omim[col] = outliers_gene_omim[col].replace(".", np.nan)
+    numeric_cols = [
+        "mean_hap1_methyl", "mean_hap2_methyl", "mean_meth_delta",
+        "mean_abs_meth_delta_zscore", "mean_combined_methyl", "mean_combined_methyl_zscore", "max_abs_meth_delta_zscore"
+    ]
+    outliers_gene_omim[numeric_cols] = outliers_gene_omim[numeric_cols].round(2)
+
+    outliers_gene_omim.replace({"-1": ".", "nan": ".", np.nan: "."}, inplace=True)
 
 
     columns = [
