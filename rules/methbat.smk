@@ -75,13 +75,13 @@ rule methbat_build_cohort:
         mem_mb = 600000
     shell:
         """
-        # both sequencing platforms
+        # only include control samples
         echo -e "identifier\tfilename\tlabels" > methbat/cohort_profile_paths.tsv
-        for f in methbat/profiles/*tsv
+        for sample in  {input}
         do
-                ID=`basename $f | cut -d'.' -f1`
-                echo -e "$ID\t$f\t" >>  methbat/cohort_profile_paths.tsv
-        done 
+                ID=$(basename $sample .profile.tsv)
+                echo -e "$ID\t$sample\t" >> methbat/cohort_profile_paths.tsv
+        done
 
         methbat build \
         --input-collection  methbat/cohort_profile_paths.tsv \
@@ -115,6 +115,7 @@ rule methbat_annotate_outliers:
         outliers = "methbat/outliers/{sample}.outliers.tsv",
         coverage = "mosdepth/{sample}/{sample}.regions.bed.gz"
     params:
+        crg2_pacbio = config["tools"]["crg2_pacbio"],
         ensembl = config["trgt"]["ensembl"],
         gnomad_constraint = config["trgt"]["gnomad_constraint"],
         OMIM_path = config["annotation"]["omim_path"], 
@@ -127,8 +128,8 @@ rule methbat_annotate_outliers:
         mem_mb = 40000
     shell:
         """
-        if [ -z {params.hpo} ]; then
-                python3 ../scripts/annotate_methylation_outliers.py \
+        if [ ! -z "{params.hpo}" ]; then
+                python3 {params.crg2_pacbio}/scripts/annotate_methylation_outliers.py \
                 --outliers {input.outliers} \
                 --output_file {output} \
                 --ensembl {params.ensembl} \
@@ -138,11 +139,12 @@ rule methbat_annotate_outliers:
                 --hpo {params.hpo}
         else
             echo "HPO not found"
-            python3 ../scripts/annotate_methylation_outliers.py \
+            python3 {params.crg2_pacbio}/scripts/annotate_methylation_outliers.py \
                 --outliers {input.outliers} \
                 --output_file {output} \
                 --ensembl {params.ensembl} \
                 --gnomad_constraint {params.gnomad_constraint} \
                 --OMIM_path {params.OMIM_path} \
                 --coverage {input.coverage}
+        fi
         """
