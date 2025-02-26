@@ -55,7 +55,7 @@ def prepare_Ensembl_GTF(gtf_path: str, cols: list) -> pd.DataFrame:
     ensembl_gr = pr.read_gtf(gtf_path)[cols]
     introns = ensembl_gr.features.introns(by="gene")
     ensembl_gr = pd.concat([ensembl_gr.df, introns.df], ignore_index=True)
-    features = ["exon", "three_prime_utr", "five_prime_utr", "intron"]
+    features = ["exon", "three_prime_utr", "five_prime_utr", "intron", "upstream", "downstream"]
     ensembl_gr = ensembl_gr[ensembl_gr.Feature.isin(features)]
 
     return ensembl_gr
