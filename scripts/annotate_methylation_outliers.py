@@ -241,7 +241,7 @@ def main(
     for col in ["mean_hap1_methyl", "mean_hap2_methyl", "mean_meth_delta", "mean_abs_meth_delta_zscore"]:
         outliers_gene_omim[col] = outliers_gene_omim[col].replace(".", np.nan)
     numeric_cols = [
-        "mean_hap1_methyl", "mean_hap2_methyl", "mean_meth_delta",
+        "category_pop_freq","mean_hap1_methyl", "mean_hap2_methyl", "mean_meth_delta",
         "mean_abs_meth_delta_zscore", "mean_combined_methyl", "mean_combined_methyl_zscore", "max_abs_meth_delta_zscore"
     ]
     outliers_gene_omim[numeric_cols] = outliers_gene_omim[numeric_cols].round(2)
