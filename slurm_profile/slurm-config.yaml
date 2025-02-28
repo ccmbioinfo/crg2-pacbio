@@ -29,5 +29,6 @@ allsnvreport:
 vcf2db:
   time: "50:00:00"
 
-
+methbat_build_cohort:
+  mem: "600G"
 

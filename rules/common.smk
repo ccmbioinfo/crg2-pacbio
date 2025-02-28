@@ -13,6 +13,8 @@ report: "../report/workflow.rst"
 #validate(config, schema="../schemas/config.schema.yaml")
 
 samples = pd.read_table(config["run"]["samples"], dtype=str).set_index("sample", drop=False)
+case = samples[samples["case_or_control"] == "case"]
+controls = samples[samples["case_or_control"] == "control"]
 #validate(samples, schema="../schemas/samples.schema.yaml")
 
 units = pd.read_table(config["run"]["units"], dtype=str).set_index(["family"], drop=False)
@@ -72,3 +74,6 @@ def get_bam(wildcards):
     bam = samples.loc[wildcards.sample, "BAM"]
 
     return bam
+
+def get_methbat_profiles(wildcards):
+    return [f"methbat/profiles/{sample}.profile.tsv" for sample in controls.index]
