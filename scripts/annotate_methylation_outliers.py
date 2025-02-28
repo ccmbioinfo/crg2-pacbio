@@ -69,6 +69,7 @@ def annotate_reg_regions(outliers: pd.DataFrame, greendb: str) -> pd.DataFrame:
     """Annotate outliers with GREENDB regulatory regions"""
     greendb = pd.read_csv(greendb, sep="\t", compression="gzip")
     greendb.rename(columns={"#Chromosome": "Chromosome"}, inplace=True)
+    greendb["Chromosome"] = greendb["Chromosome"].str.replace("chr", "")
     # convert greendb and outlier dataframes to PyRanges objects and join them to find overlaps
     greendb_pr = pr.PyRanges(greendb)
     outliers.rename(columns={"chrom": "Chromosome", "start": "Start", "end": "End"}, inplace=True)
@@ -161,6 +162,16 @@ def main(
         coordinates_dict[coord] = coordinates.count(coord)
     outliers["adjacent_tiles"] = outliers.apply(lambda row: annotate_adjacents_tiles(row["chrom"], row["start"], row["end"], coordinates_dict), axis=1)
 
+    # add a maximum delta column
+    outliers['max_abs_meth_delta_zscore'] = outliers.apply(
+        lambda x: np.abs(x['mean_abs_meth_delta_zscore']) if pd.isna(x['mean_combined_methyl_zscore'])
+        else np.abs(x['mean_combined_methyl_zscore']) if pd.isna(x['mean_abs_meth_delta_zscore'])
+        else np.maximum(np.abs(x['mean_abs_meth_delta_zscore']), np.abs(x['mean_combined_methyl_zscore'])),
+        axis=1
+    )
+    # add a maximum number of CpGs column
+    outliers['max_num_cpgs'] = outliers[['num_phased_cpgs', 'num_unphased_cpgs']].max(axis=1)
+
     # convert to pyranges object
     outliers.rename({"chrom": "Chromosome", "start": "Start", "end": "End"}, axis=1, inplace=True)
     outliers_pr = pr.PyRanges(outliers)
@@ -207,18 +218,6 @@ def main(
     outliers_gene_omim = annotate_reg_regions(outliers_gene_omim, "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/GRCh38_GREEN-DB.bed.gz")
     print(outliers_gene_omim.columns)
     outliers_gene_omim = group_by_greendb(outliers_gene_omim)
-
-
-    # add a maximum delta column
-    outliers_gene_omim['max_abs_meth_delta_zscore'] = outliers_gene_omim.apply(
-        lambda x: np.abs(x['mean_abs_meth_delta_zscore']) if pd.isna(x['mean_combined_methyl_zscore'])
-        else np.abs(x['mean_combined_methyl_zscore']) if pd.isna(x['mean_abs_meth_delta_zscore'])
-        else np.maximum(np.abs(x['mean_abs_meth_delta_zscore']), np.abs(x['mean_combined_methyl_zscore'])),
-        axis=1
-    )
-
-    # add a maximum number of CpGs column
-    outliers_gene_omim['max_num_cpgs'] = outliers_gene_omim[['num_phased_cpgs', 'num_unphased_cpgs']].max(axis=1)
     
     # column cleanup
     for col in ["gene_name", "gene_id", "gene_biotype", "Feature"]:
