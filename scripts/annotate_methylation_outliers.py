@@ -20,50 +20,15 @@ def annotate_adjacents_tiles(chr: str, start: int, end: int, coordinates_dict: d
 
     return count 
 
-def find_closest_exon(outlier_row: pd.Series, exons: pd.DataFrame) -> pd.Series:
+def find_closest_exon(outliers: pd.DataFrame, exons: pr.PyRanges) -> pd.DataFrame:
     """Find the closest exon to an outlier region"""
-    # Filter exons on same chromosome
-    chrom_exons = exons[exons["Chromosome"] == outlier_row["Chromosome"]]
-    
-    if len(chrom_exons) == 0:
-        return pd.Series({
-            "closest_exon_dist": None,
-            "closest_exon_gene": None,
-            "closest_exon_start": None,
-            "closest_exon_end": None
-        })
-    
-    # Vectorized distance calculation: calculate start and end distances for all exons at once
-    # Where the start of the exon is greater than the end of the outlier, the distance is the difference between the start of the exon and the end of the outlier
-    # Where the end of the exon is less than the start of the outlier, the distance is the difference between the end of the exon and the start of the outlier
-    # Where the exon overlaps with the outlier, the distance is 0
-    start_dists = np.where(outlier_row["End"] < chrom_exons["Start"],
-                          chrom_exons["Start"] - outlier_row["End"],
-                          np.inf)
-    
-    end_dists = np.where(outlier_row["Start"] > chrom_exons["End"], 
-                         outlier_row["Start"] - chrom_exons["End"],
-                         np.inf)
-    
-    # Check for overlaps between outlier region and exons
-    # overlaps is a series of booleans
-    overlaps = ((outlier_row["Start"] <= chrom_exons["End"]) & 
-                (outlier_row["End"] >= chrom_exons["Start"]))
-    
-    # Combine all distances, using 0 for overlaps
-    distances = np.where(overlaps, 0, 
-                        np.minimum(start_dists, end_dists))
-    
-    # Find closest exon
-    min_dist_idx = np.argmin(distances)
-    closest_exon = chrom_exons.iloc[min_dist_idx]
-    
-    return pd.Series({
-        "closest_exon_dist": distances[min_dist_idx],
-        "closest_exon_gene": closest_exon["gene_name"] if pd.isna(closest_exon["gene_name"]) == False else closest_exon["gene_id"],
-        "closest_exon_start": closest_exon["Start"],
-        "closest_exon_end": closest_exon["End"]
-    })
+    outliers_pr = pr.PyRanges(outliers[["Chromosome", "Start", "End"]])
+    outliers_exon = outliers_pr.nearest(exons, strandedness=False, apply_strand_suffix=False,suffix="_exon").df
+    outliers_exon["closest_exon_gene"] = outliers_exon.apply(lambda x: x["gene_name"] if not pd.isna(x["gene_name"]) else x["gene_id"], axis=1)
+    outliers_exon.drop(columns=["Start_exon", "End_exon","Strand", "gene_name", "gene_id", "gene_biotype", "Feature", "Distance"], inplace=True)
+
+    return outliers_exon
+
 
 def annotate_reg_regions(outliers: pd.DataFrame, greendb: str) -> pd.DataFrame:
     """Annotate outliers with GREENDB regulatory regions"""
@@ -100,15 +65,100 @@ def group_by_greendb(hits_gene: pd.DataFrame) -> pd.DataFrame:
     hits_greendb_merged_dedup = hits_greendb_merged.drop_duplicates(keep="first")
 
     return hits_greendb_merged_dedup
-from annotate import (
-    annotate_genes,
-    gene_set,
-    add_constraint,
-    prepare_OMIM,
-    annotate_OMIM,
-    add_hpo,
-    group_by_gene,
-)
+
+def SVs_to_pr(svs: str, sample: str) -> pr.PyRanges:
+    """
+    Filter SVs for sample of interest and convert to PyRanges object
+    """
+    svs = pd.read_csv(svs, low_memory=False)
+    svs.rename(columns={"CHROM": "Chromosome", "POS": "Start", "END": "End"}, inplace=True)
+    # filter out variants that are hom ref in this sample
+    svs = svs[svs[f"{sample}_GT"] != "0/0"]
+    svs = svs[["Chromosome", "Start", "End","SVTYPE", f"{sample}_GT", "cmh_maxAF"]]
+    svs_pr = pr.PyRanges(svs)
+
+    return svs_pr
+
+def CNVs_to_pr(cnvs: str, sample: str) -> pr.PyRanges:
+    """
+    Filter CNVs for sample of interest and convert to PyRanges object
+    """
+    cnvs = pd.read_csv(cnvs, sep="\t")
+    cnvs.rename(columns={"CHROM": "Chromosome", "START": "Start", "END": "End"}, inplace=True)
+    cnvs = cnvs[["Chromosome", "Start", "End", "SVTYPE", f"{sample}|GT"]]
+    cnvs["Chromosome"] = cnvs["Chromosome"].astype(str)
+    cnvs["Chromosome"] = cnvs["Chromosome"].str.replace("chr", "")
+    cnvs_pr = pr.PyRanges(cnvs)
+
+    return cnvs_pr
+
+def TRs_to_pr(trs: str, sample: str) -> pr.PyRanges:
+    """
+    Filter Tandem repeat for sample of interest and z-score >= 3 and convert to PyRanges object
+    """
+    trs = pd.read_csv(trs)
+    trs = trs[(trs["sample"] == sample) & (trs["z_score_len"] >= 3)]
+    trs["Chromosome"] = trs["case_trid"].str.split("_").str[0].str.replace("chr", "")
+    trs["Start"] = trs["case_trid"].str.split("_").str[1].astype(int)
+    trs["End"] = trs["case_trid"].str.split("_").str[2].astype(int)
+    trs["motif"] = trs["case_trid"].str.split("_").str[3]
+    trs = trs[["Chromosome", "Start", "End", "allele_len", "motif"]]
+    trs_pr = pr.PyRanges(trs)
+
+    return trs_pr
+
+def small_variants_to_pr(small_variants: str) -> pr.PyRanges:
+    """
+    Convert pre-filtered small variants to PyRanges object
+    """
+    small_variants = pd.read_csv(small_variants, header=None, sep="\t", names=["Chromosome", "Start", "End", "Ref", "Alt", "GT", "gnomAD_AF_popmax"])
+    small_variants["Chromosome"] = small_variants["Chromosome"].astype(str)
+    small_variants["Chromosome"] = small_variants["Chromosome"].str.replace("chr", "")
+    small_variants_pr = pr.PyRanges(small_variants)
+
+    return small_variants_pr
+
+def find_closest_variant(outliers_pr: pr.PyRanges, variants_pr: pr.PyRanges, sample: str, suffix: str) -> pd.DataFrame:
+    """
+    Find the closest variant to each methylation outlier using PyRanges nearest function
+    """
+    outliers_pr_variant = outliers_pr.nearest(variants_pr, strandedness=False, suffix=f"_{suffix}")
+    outliers_variant = outliers_pr_variant.df
+    outliers_variant[f"closest_{suffix}"] = outliers_variant.apply(lambda x:collapse_variant_anno(x, suffix, sample), axis=1)
+    outliers_variant.drop(columns=[f"Start_{suffix}", f"End_{suffix}"], inplace=True)
+    if suffix == "SV":
+        outliers_variant.drop(columns=["SVTYPE",  f"{sample}_GT", "cmh_maxAF", "Distance"], inplace=True)
+    elif suffix == "CNV":
+        outliers_variant.drop(columns=["SVTYPE",  f"{sample}|GT", "Distance"], inplace=True)
+    elif suffix == "TR":
+        outliers_variant.drop(columns=["allele_len", "motif", "Distance"], inplace=True)
+    elif suffix == "SMV":
+        outliers_variant.drop(columns=["Ref", "Alt", "GT", "gnomAD_AF_popmax", "Distance"], inplace=True)
+
+    return outliers_variant
+
+def collapse_variant_anno(row: pd.Series, variant: str, sample: str) -> str:
+    # TODO: need to figure out filtering for SV rarity
+    # CNVs: no filter?
+    # TRs: Z-score >=3 
+    # SMVs: gnomAD popmax AF < 0.01
+    if row.Distance > 1000 and variant != "SMV":
+        return np.nan
+    elif row.Distance > 50 and variant == "SMV":
+        return np.nan
+    else:
+        if variant == "SV":
+            GT_col = [i for i in row.index if "GT" in i and sample in i][0]
+            variant = "SV" + ":" + row.Chromosome + ":" + str(row.Start_SV) + "-" + str(row.End_SV) + "-" + row.SVTYPE + "-" + row[GT_col] + "-AF:" + str(row.cmh_maxAF) + "-dist:" + str(row.Distance)
+        elif variant == "CNV":
+            GT_col = [i for i in row.index if "GT" in i and sample in i][0]
+            variant = "CNV" + ":" +row.Chromosome + ":" + str(row.Start_CNV) + "-" + str(row.End_CNV) + "-" + row.SVTYPE + "-" + row[GT_col] + "-" + "dist:" + str(row.Distance)
+        elif variant == "TR":
+            variant = "TR" + ":" +row.Chromosome + ":" + str(row.Start_TR) + "-" + str(row.End_TR) + "-" + row.motif + "-" + "TR" + "-" + "AL:" + str(row.allele_len) + "-" + "dist:" + str(row.Distance)
+        elif variant == "SMV":
+            variant = "small_var" + ":" + row.Chromosome + ":" + str(row.Start_SMV) + "-" + str(row.End_SMV) + "-" + row.Ref + "-" + row.Alt + "-" + row.GT + "-" + "AF:" + str(row.gnomAD_AF_popmax) + "-" + "dist:" + str(row.Distance)
+        return variant
+    
 
 from annotate import (
     annotate_genes,
@@ -126,11 +176,16 @@ def main(
     ensembl: str,
     constraint: str,
     omim: str,
+    SV_path: str,
+    CNV_path: str,
+    TR_outlier_path: str,
+    SMV_path: str,
     coverage: Optional[str] = None,
     hpo: Optional[str] = None
 ) -> None:
 
     print("Loading and filtering methylation outliers")
+    sample = outliers.split("/")[-1].split(".")[0]
     outliers = pd.read_csv(outliers, sep="\t")
     try:
         coverage = pd.read_csv(coverage, compression="gzip", sep="\t", header=None, names=["chrom", "start", "end", "cpg_ID", "mean_coverage"])
@@ -174,19 +229,39 @@ def main(
 
     # convert to pyranges object
     outliers.rename({"chrom": "Chromosome", "start": "Start", "end": "End"}, axis=1, inplace=True)
-    outliers_pr = pr.PyRanges(outliers)
+    outliers_pr = pr.PyRanges(outliers[["Chromosome", "Start", "End"]])
+
+    # annotate with sample variants: SVs, CNVs, TRs, and small variants
+    SVs_pr = SVs_to_pr(SV_path, sample)
+    CNVs_pr = CNVs_to_pr(CNV_path, sample)
+    TRs_pr = TRs_to_pr(TR_outlier_path, sample)
+    SMVs_pr = small_variants_to_pr(SMV_path)
+
+    outliers_sv = find_closest_variant(outliers_pr, SVs_pr, sample, "SV")
+    outliers_cnv = find_closest_variant(outliers_pr, CNVs_pr, sample, "CNV")
+    outliers_tr = find_closest_variant(outliers_pr, TRs_pr, sample, "TR")
+    outliers_smv = find_closest_variant(outliers_pr, SMVs_pr, sample, "SMV")
+
+    outliers_variants = outliers.merge(
+        outliers_sv, on=["Chromosome", "Start", "End"], how="left").merge(
+            outliers_cnv, on=["Chromosome", "Start", "End"], how="left").merge(
+                outliers_tr, on=["Chromosome", "Start", "End"], how="left").merge(
+                    outliers_smv, on=["Chromosome", "Start", "End"], how="left")
+    
+    outliers_variants["nearby_variant"] = outliers_variants.apply(lambda x: (";").join([v for v in [x["closest_SV"], x["closest_CNV"], x["closest_TR"], x["closest_SMV"]] if not pd.isna(v)]), axis=1)
 
     # annotate outliers with Ensembl genes
     print("Annotate against Ensembl genes")
+    outliers_pr = pr.PyRanges(outliers_variants)
     gene_gr = pd.read_csv(ensembl)
     outliers_gene = annotate_genes(outliers_pr, pr.PyRanges(gene_gr))
 
     # annotate with closest exon
     print("Annotate with closest exon")
     exons = gene_gr[gene_gr["Feature"] == "exon"]
-    closest_exons = outliers_gene.apply(lambda x: find_closest_exon(x, exons), axis=1)
-    outliers_gene = pd.concat([outliers_gene, closest_exons], axis=1)
-
+    exons_pr = pr.PyRanges(exons)
+    outliers_exon = find_closest_exon(outliers_gene, exons_pr)
+    outliers_gene = outliers_gene.merge(outliers_exon, on=["Chromosome", "Start", "End"], how="left")
 
     # annotate with gene constraint
     print("Add gnomAD gene constraint")
@@ -252,7 +327,7 @@ def main(
     columns = [
         "CHROM", "POS", "END", "adjacent_tiles", "summary_label", "compare_label", 
         "gene_name", "gene_id", "gene_biotype", "closest_exon_gene", "omim_phenotype", "omim_inheritance", 
-        "HPO", "gnomad_constraint_gene", "lof.oe_ci.upper", "lof.pLI", "feature",
+        "HPO", "gnomad_constraint_gene", "lof.oe_ci.upper", "lof.pLI", "feature", "nearby_variant",
         "category_pop_count", "category_pop_freq", "asm_fishers_pvalue",
         "mean_hap1_methyl", "mean_hap2_methyl", "mean_meth_delta",
         "mean_abs_meth_delta_zscore", "mean_combined_methyl",
@@ -279,7 +354,7 @@ def main(
     # ]
         columns = [
             "CHROM", "POS", "END", "summary_label", "compare_label", 
-            "gene_name", "gene_id", "gene_biotype", "omim_phenotype", "omim_inheritance",  "gnomad_constraint_gene", "lof.oe_ci.upper", "lof.pLI", "feature",
+            "gene_name", "gene_id", "gene_biotype", "omim_phenotype", "omim_inheritance",  "gnomad_constraint_gene", "lof.oe_ci.upper", "lof.pLI", "feature", "nearby_variant",
             "category_pop_count", "category_pop_freq", "asm_fishers_pvalue",
             "mean_hap1_methyl", "mean_hap2_methyl", "mean_meth_delta",
             "mean_abs_meth_delta_zscore", "mean_combined_methyl",
@@ -335,9 +410,33 @@ if __name__ == "__main__":
         help="Path to directory containing OMIM mim2gene and morbidmap files",
     )
     parser.add_argument(
+        "--SV_path",
+        type=str,
+        required=True,
+        help="Path to SV report",
+    )
+    parser.add_argument(
+        "--CNV_path",
+        type=str,
+        required=True,
+        help="Path to TCAG CNV report",
+    )
+    parser.add_argument(
+        "--TR_outlier_path",
+        type=str,
+        required=True,
+        help="Path to TR outlier report",
+    )
+    parser.add_argument(
+        "--SMV_path",
+        type=str,
+        required=True,
+        help="Path to annotated small variant VCF",
+    )
+    parser.add_argument(
         "--coverage",
         type=str,
-        help="mosdepth regions.bed.gz file for CpG islands",
+        help="mosdepth regions.bed.gz file for 200bp tiles",
     )
     parser.add_argument(
         "--hpo",
@@ -354,8 +453,12 @@ if __name__ == "__main__":
             args.ensembl,
             args.gnomad_constraint,
             args.OMIM_path,
+            args.SV_path,
+            args.CNV_path,
+            args.TR_outlier_path,
+            args.SMV_path,
             args.coverage,
-            args.hpo,
+            args.hpo
         )
     else:
         print("Cohort comparison provided, omitting HPO and coverage annotations")
@@ -365,6 +468,10 @@ if __name__ == "__main__":
             args.ensembl,
             args.gnomad_constraint,
             args.OMIM_path,
+            args.SV_path,
+            args.CNV_path,
+            args.TR_outlier_path,
+            args.SMV_path
         )
 
 
