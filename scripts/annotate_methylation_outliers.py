@@ -37,7 +37,7 @@ def annotate_reg_regions(outliers: pd.DataFrame, greendb: str) -> pd.DataFrame:
     greendb["Chromosome"] = greendb["Chromosome"].str.replace("chr", "")
     # convert greendb and outlier dataframes to PyRanges objects and join them to find overlaps
     greendb_pr = pr.PyRanges(greendb)
-    outliers.rename(columns={"chrom": "Chromosome", "start": "Start", "end": "End"}, inplace=True)
+    #outliers.rename(columns={"chrom": "Chromosome", "start": "Start", "end": "End"}, inplace=True)
     outliers_pr = pr.PyRanges(outliers)
     outliers_pr = outliers_pr.join(greendb_pr, how="left", suffix="_greendb")
     outliers = outliers_pr.df.drop(columns=["Start_greendb", "End_greendb", "regionID", "constrain_pct", "PhyloP100_median", "closestGene_dist", "closestProt_symbol", "closestProt_dist", "N_methods"])
@@ -159,6 +159,35 @@ def collapse_variant_anno(row: pd.Series, variant: str, sample: str) -> str:
             variant = "small_var" + ":" + row.Chromosome + ":" + str(row.Start_SMV) + "-" + str(row.End_SMV) + "-" + row.Ref + "-" + row.Alt + "-" + row.GT + "-" + "AF:" + str(row.gnomAD_AF_popmax) + "-" + "dist:" + str(row.Distance)
         return variant
     
+def merge_adjacent_outliers(outliers: pd.DataFrame) -> pd.DataFrame:
+    """
+    Merge adjacent outliers into a single row
+    """
+    outliers_minimal = pr.PyRanges(outliers[["Chromosome", "Start", "End"]])
+    merged_outliers = outliers_minimal.cluster(count=True) # use pyranges cluster function to merge adjacent outliers
+    outliers_merged_intervals = outliers.merge(merged_outliers.df, on=["Chromosome", "Start", "End"], how="left").sort_values(by="Count", ascending=False) # merge outliers with cluster counts
+    outliers_merged_grouped = outliers_merged_intervals.groupby(["Cluster"]).agg({ # aggregate by cluster
+        "Count": "first", # count of adjacent outliers
+        "Chromosome": "first",
+        "Start": "min",
+        "End": "max",
+        "summary_label": ";".join,
+        "compare_label": ";".join,
+        "category_pop_count": "max",
+        "category_pop_freq": "max",
+        "asm_fishers_pvalue": "min",
+        "mean_hap1_methyl": "mean",
+        "mean_hap2_methyl": "mean",
+        "mean_meth_delta": "max",
+        "mean_abs_meth_delta_zscore": lambda x: min(x) if min(x) < 0 else max(x), # if min zscore is negative, use min, otherwise use max
+        "mean_combined_methyl": "mean", 
+        "mean_combined_methyl_zscore": lambda x: min(x) if min(x) < 0 else max(x),
+        "num_phased_cpgs": "sum",
+        "num_unphased_cpgs": "sum",
+        "num_partial_cpgs": "sum"
+    })
+
+    return outliers_merged_grouped
 
 from annotate import (
     annotate_genes,
@@ -187,18 +216,15 @@ def main(
     print("Loading and filtering methylation outliers")
     sample = outliers.split("/")[-1].split(".")[0]
     outliers = pd.read_csv(outliers, sep="\t")
+    outliers.rename({"chrom": "Chromosome", "start": "Start", "end": "End"}, axis=1, inplace=True)
     try:
         coverage = pd.read_csv(coverage, compression="gzip", sep="\t", header=None, names=["chrom", "start", "end", "cpg_ID", "mean_coverage"])
         # annotate regions with average coverage from mosdepth
-        outliers = outliers.merge(coverage, on=["chrom", "start", "end"], how="left")
+        outliers = outliers.merge(coverage, right_on=["chrom", "start", "end"], left_on=["Chromosome", "Start", "End"], how="left")
     except:
         print("No coverage file provided")
   
-    try:
-        outliers["chrom"] = outliers["chrom"].str.replace("chr", "")
-    except KeyError: #cohort comparison
-        outliers.rename(columns={"#chrom": "chrom"}, inplace=True)
-        outliers["chrom"] = outliers["chrom"].str.replace("chr", "")
+    outliers["Chromosome"] = outliers["Chromosome"].str.replace("chr", "")
 
     try:
         outliers = outliers[(outliers["compare_label"] != "Uncategorized") & 
@@ -207,16 +233,8 @@ def main(
         outliers = outliers[(outliers["summary_comparison"] != "Uncategorized") & 
                             (outliers["summary_comparison"] != "InsufficientData")]
 
-    # count number of adjacent outlier tiles
-    outliers["chr-start"] = outliers["chrom"] + "-" + outliers["start"].astype(str)
-    outliers["chr-end"] = outliers["chrom"] + "-" + outliers["end"].astype(str)
-    coordinates = outliers["chr-start"].tolist()
-    coordinates.extend(outliers["chr-end"].tolist())
-    coordinates_dict = {}
-    for coord in coordinates:
-        coordinates_dict[coord] = coordinates.count(coord)
-    outliers["adjacent_tiles"] = outliers.apply(lambda row: annotate_adjacents_tiles(row["chrom"], row["start"], row["end"], coordinates_dict), axis=1)
-
+    # merge adjacent outliers
+    outliers = merge_adjacent_outliers(outliers)
     # add a maximum delta column
     outliers['max_abs_meth_delta_zscore'] = outliers.apply(
         lambda x: np.abs(x['mean_abs_meth_delta_zscore']) if pd.isna(x['mean_combined_methyl_zscore'])
@@ -225,10 +243,9 @@ def main(
         axis=1
     )
     # add a maximum number of CpGs column
-    outliers['max_num_cpgs'] = outliers[['num_phased_cpgs', 'num_unphased_cpgs']].max(axis=1)
+    outliers['max_num_cpgs'] = outliers[['num_phased_cpgs', 'num_unphased_cpgs', 'num_partial_cpgs']].max(axis=1)
 
     # convert to pyranges object
-    outliers.rename({"chrom": "Chromosome", "start": "Start", "end": "End"}, axis=1, inplace=True)
     outliers_pr = pr.PyRanges(outliers[["Chromosome", "Start", "End"]])
 
     # annotate with sample variants: SVs, CNVs, TRs, and small variants
@@ -285,13 +302,12 @@ def main(
 
     # add a trid column so dataframe is compatible with group_by_gene and group_by_greendb functions
     outliers_gene_omim["trid"] = outliers_gene_omim.apply(lambda x: x["Chromosome"] + str(x["Start"]) + str(x["End"]), axis=1)
-    print(outliers_gene_omim.columns)
     outliers_gene_omim = group_by_gene(outliers_gene_omim)
+    print(outliers_gene_omim.columns)
 
     # annotate with GREENDB
     print("Add GREENDB regulatory regions")
     outliers_gene_omim = annotate_reg_regions(outliers_gene_omim, "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/GRCh38_GREEN-DB.bed.gz")
-    print(outliers_gene_omim.columns)
     outliers_gene_omim = group_by_greendb(outliers_gene_omim)
     
     # column cleanup
@@ -307,6 +323,7 @@ def main(
             "Start": "POS",
             "End": "END",
             "gene": "gnomad_constraint_gene",
+            "Count": "tile_count"
         }
     )
 
@@ -325,7 +342,7 @@ def main(
 
 
     columns = [
-        "CHROM", "POS", "END", "adjacent_tiles", "summary_label", "compare_label", 
+        "CHROM", "POS", "END", "tile_count", "summary_label", "compare_label", 
         "gene_name", "gene_id", "gene_biotype", "closest_exon_gene", "omim_phenotype", "omim_inheritance", 
         "HPO", "gnomad_constraint_gene", "lof.oe_ci.upper", "lof.pLI", "feature", "nearby_variant",
         "category_pop_count", "category_pop_freq", "asm_fishers_pvalue",
@@ -353,7 +370,7 @@ def main(
     #         "compare_num_samples"
     # ]
         columns = [
-            "CHROM", "POS", "END", "summary_label", "compare_label", 
+            "CHROM", "POS", "END", "tile_count", "summary_label", "compare_label", 
             "gene_name", "gene_id", "gene_biotype", "omim_phenotype", "omim_inheritance",  "gnomad_constraint_gene", "lof.oe_ci.upper", "lof.pLI", "feature", "nearby_variant",
             "category_pop_count", "category_pop_freq", "asm_fishers_pvalue",
             "mean_hap1_methyl", "mean_hap2_methyl", "mean_meth_delta",
