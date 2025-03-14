@@ -102,7 +102,7 @@ def TRs_to_pr(trs: str, sample: str) -> pr.PyRanges:
     trs["Start"] = trs["case_trid"].str.split("_").str[1].astype(int)
     trs["End"] = trs["case_trid"].str.split("_").str[2].astype(int)
     trs["motif"] = trs["case_trid"].str.split("_").str[3]
-    trs = trs[["Chromosome", "Start", "End", "allele_len", "motif"]]
+    trs = trs[["Chromosome", "Start", "End", "z_score_len", "motif"]]
     trs_pr = pr.PyRanges(trs)
 
     return trs_pr
@@ -131,7 +131,7 @@ def find_closest_variant(outliers_pr: pr.PyRanges, variants_pr: pr.PyRanges, sam
     elif suffix == "CNV":
         outliers_variant.drop(columns=["SVTYPE",  f"{sample}|GT", "Distance"], inplace=True)
     elif suffix == "TR":
-        outliers_variant.drop(columns=["allele_len", "motif", "Distance"], inplace=True)
+        outliers_variant.drop(columns=["z_score_len", "motif", "Distance"], inplace=True)
     elif suffix == "SMV":
         outliers_variant.drop(columns=["Ref", "Alt", "GT", "gnomAD_AF_popmax", "Distance"], inplace=True)
 
@@ -154,7 +154,7 @@ def collapse_variant_anno(row: pd.Series, variant: str, sample: str) -> str:
             GT_col = [i for i in row.index if "GT" in i and sample in i][0]
             variant = "CNV" + ":" +row.Chromosome + ":" + str(row.Start_CNV) + "-" + str(row.End_CNV) + "-" + row.SVTYPE + "-" + row[GT_col] + "-" + "dist:" + str(row.Distance)
         elif variant == "TR":
-            variant = "TR" + ":" +row.Chromosome + ":" + str(row.Start_TR) + "-" + str(row.End_TR) + "-" + row.motif + "-" + "TR" + "-" + "AL:" + str(row.allele_len) + "-" + "dist:" + str(row.Distance)
+            variant = "TR" + ":" +row.Chromosome + ":" + str(row.Start_TR) + "-" + str(row.End_TR) + "-" + row.motif + "-" + "TR" + "-" + "zscore:" + str(row.z_score_len) + "-" + "dist:" + str(row.Distance)
         elif variant == "SMV":
             variant = "small_var" + ":" + row.Chromosome + ":" + str(row.Start_SMV) + "-" + str(row.End_SMV) + "-" + row.Ref + "-" + row.Alt + "-" + row.GT + "-" + "AF:" + str(row.gnomAD_AF_popmax) + "-" + "dist:" + str(row.Distance)
         return variant
@@ -176,15 +176,16 @@ def merge_adjacent_outliers(outliers: pd.DataFrame) -> pd.DataFrame:
         "category_pop_count": "max",
         "category_pop_freq": "max",
         "asm_fishers_pvalue": "min",
-        "mean_hap1_methyl": "mean",
-        "mean_hap2_methyl": "mean",
+        "mean_hap1_methyl": lambda x: round(x.mean(), 2), 
+        "mean_hap2_methyl": lambda x: round(x.mean(), 2), 
         "mean_meth_delta": "max",
         "mean_abs_meth_delta_zscore": lambda x: min(x) if min(x) < 0 else max(x), # if min zscore is negative, use min, otherwise use max
-        "mean_combined_methyl": "mean", 
+        "mean_combined_methyl": lambda x: round(x.mean(), 2),  
         "mean_combined_methyl_zscore": lambda x: min(x) if min(x) < 0 else max(x),
         "num_phased_cpgs": "sum",
         "num_unphased_cpgs": "sum",
-        "num_partial_cpgs": "sum"
+        "num_partial_cpgs": "sum",
+        "mean_coverage": lambda x: round(x.mean(), 2), 
     })
 
     return outliers_merged_grouped
@@ -333,12 +334,12 @@ def main(
     for col in ["mean_hap1_methyl", "mean_hap2_methyl", "mean_meth_delta", "mean_abs_meth_delta_zscore"]:
         outliers_gene_omim[col] = outliers_gene_omim[col].replace(".", np.nan)
     numeric_cols = [
-        "category_pop_freq","mean_hap1_methyl", "mean_hap2_methyl", "mean_meth_delta",
+        "mean_coverage", "category_pop_freq","mean_hap1_methyl", "mean_hap2_methyl", "mean_meth_delta",
         "mean_abs_meth_delta_zscore", "mean_combined_methyl", "mean_combined_methyl_zscore", "max_abs_meth_delta_zscore"
     ]
     outliers_gene_omim[numeric_cols] = outliers_gene_omim[numeric_cols].round(2)
 
-    outliers_gene_omim.replace({"-1": ".", "nan": ".", np.nan: "."}, inplace=True)
+    outliers_gene_omim.replace({"-1": ".", "nan": ".", np.nan: ".", "-1;-1": ".", " ": ".", "-1;": "", ";-1": ""}, inplace=True)
 
 
     columns = [
@@ -356,19 +357,6 @@ def main(
         outliers_gene_omim = outliers_gene_omim[columns]
         outliers_gene_omim = outliers_gene_omim.sort_values(by="max_abs_meth_delta_zscore", ascending=False)
     except KeyError:
-    #     columns = [
-    #         "CHROM", "POS", "END", "baseline_category", "compare_category", "summary_comparison",
-    #         "gene_name", "gene_id", "gene_biotype", "omim_phenotype", "omim_inheritance", 
-    #         "HPO", "gnomad_constraint_gene", "lof.oe_ci.upper", "lof.pLI", "feature",
-    #         "zscore_avg_abs_meth_deltas",
-    #         "delta_avg_abs_meth_deltas",
-    #         "baseline_num_phased",
-    #         "compare_num_phased",
-    #         "zscore_avg_combined_methyls",
-    #         "delta_avg_combined_methyls", 
-    #         "baseline_num_samples",
-    #         "compare_num_samples"
-    # ]
         columns = [
             "CHROM", "POS", "END", "tile_count", "summary_label", "compare_label", 
             "gene_name", "gene_id", "gene_biotype", "omim_phenotype", "omim_inheritance",  "gnomad_constraint_gene", "lof.oe_ci.upper", "lof.pLI", "feature", "nearby_variant",
