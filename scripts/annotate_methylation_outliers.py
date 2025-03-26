@@ -339,8 +339,8 @@ def main(
     ]
     outliers_gene_omim[numeric_cols] = outliers_gene_omim[numeric_cols].round(2)
 
-    outliers_gene_omim.replace({"-1": ".", "nan": ".", np.nan: ".", "-1;-1": ".", " ": ".", "-1;": "", ";-1": ""}, inplace=True)
-    outliers_gene_omim.fillna('.').replace(r'^\s*$', '.', regex=True, inplace=True)
+    # Replace various missing value indicators with periods
+    outliers_gene_omim.replace({"-1": ".", "nan": ".", np.nan: ".", "-1;-1": ".", "-1;": "", ";-1": "", "": "."}, inplace=True)
 
 
     columns = [
@@ -377,6 +377,7 @@ def main(
     out_file = out_file.replace(".csv", "")
     outliers_gene_omim = outliers_gene_omim.drop_duplicates()
     print(f"Writing to file {out_file}.{today}.csv")
+    outliers_gene_omim.to_csv(f"{out_file}.csv", index=False)
     outliers_gene_omim.to_csv(f"{out_file}.{today}.csv", index=False)
 
 
