@@ -2,7 +2,7 @@ run:
   project: "NA12878"
   samples: samples.tsv
   units: units.tsv
-  variants_for_methbat: variants_for_methbat.tsv
+  variants_for_methbat: ""
   pipeline: "pacbio"
   hpo: "" # proband-specific HPO terms
   ped: ""

@@ -20,7 +20,8 @@ controls = samples[samples["case_or_control"] == "control"]
 units = pd.read_table(config["run"]["units"], dtype=str).set_index(["family"], drop=False)
 #validate(units, schema="../schemas/units.schema.yaml")
 
-variants_for_methbat = pd.read_table(config["run"]["variants_for_methbat"], dtype=str).set_index(["variant_type"], drop=False)
+if config["run"]["variants_for_methbat"] != "": 
+    variants_for_methbat = pd.read_table(config["run"]["variants_for_methbat"], dtype=str).set_index(["variant_type"], drop=False)
 
 project = config["run"]["project"]
 
