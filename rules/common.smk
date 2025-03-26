@@ -20,6 +20,8 @@ controls = samples[samples["case_or_control"] == "control"]
 units = pd.read_table(config["run"]["units"], dtype=str).set_index(["family"], drop=False)
 #validate(units, schema="../schemas/units.schema.yaml")
 
+variants_for_methbat = pd.read_table(config["run"]["variants_for_methbat"], dtype=str).set_index(["variant_type"], drop=False)
+
 project = config["run"]["project"]
 
 def get_wrapper_path(*dirs):
@@ -70,10 +72,22 @@ def get_trgt_path_str_vcf_dir(wildcards):
     return input_vcf
 
 def get_bam(wildcards):
-    print(wildcards.sample)
     bam = samples.loc[wildcards.sample, "BAM"]
 
     return bam
 
 def get_methbat_profiles(wildcards):
     return [f"methbat/profiles/{sample}.profile.tsv" for sample in controls.index]
+
+# input functions for methbat outlier workflow
+def get_sample_smvs(wildcards):
+    return variants_for_methbat.loc["small_variants", "path"]
+
+def get_pbsv_csv(wildcards):
+    return variants_for_methbat.loc["SVs", "path"]
+
+def get_cnvs(wildcards):
+    return variants_for_methbat.loc["CNVs", "path"]
+
+def get_TR_outliers (wildcards):
+    return variants_for_methbat.loc["TR_outliers", "path"]
