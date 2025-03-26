@@ -6,23 +6,17 @@ import pyranges as pr
 import sys
 from typing import Optional
 
-sys.path.insert(0, "/home/ccmmarvin/crg2-pacbio/scripts/annotation")
-
-
-def annotate_adjacents_tiles(
-    chr: str, start: int, end: int, coordinates_dict: dict
-) -> int:
-    """determine if outlier region is adjacent to 0, one, or two outlier regions"""
-    count = 0
-    start = f"{chr}-{start}"
-    end = f"{chr}-{end}"
-    if coordinates_dict[start] > 1:
-        count += 1
-    if coordinates_dict[end] > 1:
-        count += 1
-
-    return count
-
+from annotation.annotate import (
+    annotate_genes,
+    gene_set,
+    add_constraint,
+    prepare_OMIM,
+    annotate_OMIM,
+    add_hpo,
+    group_by_gene,
+    annotate_reg_regions,
+    group_by_greendb,
+)
 
 def find_closest_exon(outliers: pd.DataFrame, exons: pr.PyRanges) -> pd.DataFrame:
     """Find the closest exon to an outlier region"""
@@ -49,71 +43,6 @@ def find_closest_exon(outliers: pd.DataFrame, exons: pr.PyRanges) -> pd.DataFram
     )
 
     return outliers_exon
-
-
-def annotate_reg_regions(outliers: pd.DataFrame, greendb: str) -> pd.DataFrame:
-    """Annotate outliers with GREENDB regulatory regions"""
-    greendb = pd.read_csv(greendb, sep="\t", compression="gzip")
-    greendb.rename(columns={"#Chromosome": "Chromosome"}, inplace=True)
-    greendb["Chromosome"] = greendb["Chromosome"].str.replace("chr", "")
-    # convert greendb and outlier dataframes to PyRanges objects and join them to find overlaps
-    greendb_pr = pr.PyRanges(greendb)
-    # outliers.rename(columns={"chrom": "Chromosome", "start": "Start", "end": "End"}, inplace=True)
-    outliers_pr = pr.PyRanges(outliers)
-    outliers_pr = outliers_pr.join(greendb_pr, how="left", suffix="_greendb")
-    outliers = outliers_pr.df.drop(
-        columns=[
-            "Start_greendb",
-            "End_greendb",
-            "regionID",
-            "constrain_pct",
-            "PhyloP100_median",
-            "closestGene_dist",
-            "closestProt_symbol",
-            "closestProt_dist",
-            "N_methods",
-        ]
-    )
-    outliers.rename(
-        columns={
-            "std_type": "GREENDB_reg_region",
-            "db_source": "GREENDB_source",
-            "closestGene_symbol": "GREENDB_closest_gene",
-            "controlled_genes": "GREENDB_controlled_genes",
-        },
-        inplace=True,
-    )
-    outliers.replace({np.nan: "."}, inplace=True)
-
-    return outliers
-
-
-def group_by_greendb(hits_gene: pd.DataFrame) -> pd.DataFrame:
-    """
-    One hit may be associated with multiple GREENDB features and therefore multiple rows
-    Aggregate by GREENDB and join features to remove duplicate rows
-    """
-    hits_greendb_dedup = hits_gene.groupby(["trid"]).agg(
-        {
-            "GREENDB_reg_region": ";".join,
-            "GREENDB_source": ";".join,
-            "GREENDB_closest_gene": ";".join,
-            "GREENDB_controlled_genes": ";".join,
-        }
-    )
-    # merge with original loci table
-    hits_gene = hits_gene.drop(
-        columns=[
-            "GREENDB_reg_region",
-            "GREENDB_source",
-            "GREENDB_closest_gene",
-            "GREENDB_controlled_genes",
-        ]
-    )
-    hits_greendb_merged = hits_gene.merge(hits_greendb_dedup, on=["trid"], how="left")
-    hits_greendb_merged_dedup = hits_greendb_merged.drop_duplicates(keep="first")
-
-    return hits_greendb_merged_dedup
 
 
 def SVs_to_pr(svs: str, sample: str) -> pr.PyRanges:
@@ -347,17 +276,6 @@ def merge_adjacent_outliers(outliers: pd.DataFrame) -> pd.DataFrame:
     )
 
     return outliers_merged_grouped
-
-
-from annotate import (
-    annotate_genes,
-    gene_set,
-    add_constraint,
-    prepare_OMIM,
-    annotate_OMIM,
-    add_hpo,
-    group_by_gene,
-)
 
 
 def main(

@@ -476,3 +476,67 @@ def annotate_segdup(loci: pr.PyRanges, segdup: pr.PyRanges) -> pd.DataFrame:
     )
 
     return loci_segdup_df
+
+
+def annotate_reg_regions(loci: pd.DataFrame, greendb: str) -> pd.DataFrame:
+    """Annotate loci with GREENDB regulatory regions"""
+    greendb = pd.read_csv(greendb, sep="\t", compression="gzip")
+    greendb.rename(columns={"#Chromosome": "Chromosome"}, inplace=True)
+    greendb["Chromosome"] = greendb["Chromosome"].str.replace("chr", "")
+    # convert greendb and loci dataframes to PyRanges objects and join them to find overlaps
+    greendb_pr = pr.PyRanges(greendb)
+    loci_pr = pr.PyRanges(loci)
+    loci_pr = loci_pr.join(greendb_pr, how="left", suffix="_greendb")
+    loci = loci_pr.df.drop(
+        columns=[
+            "Start_greendb",
+            "End_greendb",
+            "regionID",
+            "constrain_pct",
+            "PhyloP100_median",
+            "closestGene_dist",
+            "closestProt_symbol",
+            "closestProt_dist",
+            "N_methods",
+        ]
+    )
+    loci.rename(
+        columns={
+            "std_type": "GREENDB_reg_region",
+            "db_source": "GREENDB_source",
+            "closestGene_symbol": "GREENDB_closest_gene",
+            "controlled_genes": "GREENDB_controlled_genes",
+        },
+        inplace=True,
+    )
+    loci.replace({np.nan: "."}, inplace=True)
+
+    return loci
+
+
+def group_by_greendb(hits_gene: pd.DataFrame) -> pd.DataFrame:
+    """
+    One hit may be associated with multiple GREENDB features and therefore multiple rows
+    Aggregate by GREENDB and join features to remove duplicate rows
+    """
+    hits_greendb_dedup = hits_gene.groupby(["trid"]).agg(
+        {
+            "GREENDB_reg_region": ";".join,
+            "GREENDB_source": ";".join,
+            "GREENDB_closest_gene": ";".join,
+            "GREENDB_controlled_genes": ";".join,
+        }
+    )
+    # merge with original loci table
+    hits_gene = hits_gene.drop(
+        columns=[
+            "GREENDB_reg_region",
+            "GREENDB_source",
+            "GREENDB_closest_gene",
+            "GREENDB_controlled_genes",
+        ]
+    )
+    hits_greendb_merged = hits_gene.merge(hits_greendb_dedup, on=["trid"], how="left")
+    hits_greendb_merged_dedup = hits_greendb_merged.drop_duplicates(keep="first")
+
+    return hits_greendb_merged_dedup
