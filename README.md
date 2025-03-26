@@ -24,11 +24,11 @@ units.tsv example:
 family	platform	small_variant_vcf	trgt_vcf_dir	pbsv_vcf	trgt_pathogenic_vcf_dir
 1042	PACBIO	/hpf/largeprojects/ccmbio/ccmmarvin_tcag_shared/PacBio/MEA26290/1042_TR0246.joint/1042_TR0246.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz	trgt	/hpf/largeprojects/ccmbio/ccmmarvin_tcag_shared/PacBio/MEA26290/1042_TR0246.joint/1042_TR0246.joint.GRCh38.pbsv.phased.vcf.gz
 ```
-samples.tsv example:
+samples.tsv example (not that the case_or_control field is ONLY required for the methylation outlier workflow, see below):
 ```
-sample	BAM
-01	/hpf/largeprojects/ccmbio/ccmmarvin_tcag_shared/PacBio/MEA26290/1042_TR0246/01.m84090_240206_172710_s2.hifi_reads.bc2010.KL.GRCh38.aligned.haplotagged.bam
-02	/hpf/largeprojects/ccmbio/ccmmarvin_tcag_shared/PacBio/MEA26290/1042_TR0247/02.m84090_240206_192642_s3.hifi_reads.bc2011.KL.GRCh38.aligned.haplotagged.bam
+sample	BAM	case_or_control
+01	/hpf/largeprojects/ccmbio/ccmmarvin_tcag_shared/PacBio/MEA26290/1042_TR0246/01.m84090_240206_172710_s2.hifi_reads.bc2010.KL.GRCh38.aligned.haplotagged.bam  
+02	/hpf/largeprojects/ccmbio/ccmmarvin_tcag_shared/PacBio/MEA26290/1042_TR0247/02.m84090_240206_192642_s3.hifi_reads.bc2011.KL.GRCh38.aligned.haplotagged.bam  
 ```
 - Add paths to the HPO term file and pedigree file to config.yaml. 
 - Do a dry run: add a `-n` flag to the Snakemake command in crg2-pacbio.sh. This will print out the rules that will be run, but not actually run them.
