@@ -88,7 +88,6 @@ rule methbat_build_cohort:
         --output-profile {output}
         """
 
-
 rule methbat_call_outliers:
     input:
         meth_probs = "pb-cpg-tools/{sample}/{sample}.combined.bed",
@@ -109,11 +108,24 @@ rule methbat_call_outliers:
         --output-region-profile {output}
         """
 
+rule filter_sample_smvs: 
+    input: get_sample_smvs
+    output: 
+        temp("methbat/{sample}.rare.smvs.bed")
+    conda: "../envs/common.yaml"
+    shell:
+        """
+        bcftools query -s {wildcards.sample} -i '(INFO/gnomad_af_popmax <0.01 | INFO/gnomad_af_popmax == ".") & GT!="RR" & GT!="./." ' {input} -f '%CHROM\t%POS0\t%END\t%REF\t%ALT\t[%GT]\t%gnomad_af_popmax\n' > {output}
+        """
 
 rule methbat_annotate_outliers:
     input: 
         outliers = "methbat/outliers/{sample}.outliers.tsv",
-        coverage = "mosdepth/{sample}/{sample}.regions.bed.gz"
+        coverage = "mosdepth/{sample}/{sample}.regions.bed.gz",
+        smvs ="methbat/{sample}.rare.smvs.bed",
+        svs = get_pbsv_csv,
+        cnvs = get_cnvs,
+        trs = get_TR_outliers
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         ensembl = config["trgt"]["ensembl"],
@@ -135,6 +147,10 @@ rule methbat_annotate_outliers:
                 --ensembl {params.ensembl} \
                 --gnomad_constraint {params.gnomad_constraint} \
                 --OMIM_path {params.OMIM_path} \
+                --SV_path {input.svs} \
+                --CNV_path {input.cnvs} \
+                --TR_outlier_path {input.trs} \
+                --SMV_path {input.smvs} \
                 --coverage {input.coverage} \
                 --hpo {params.hpo}
         else
@@ -145,6 +161,10 @@ rule methbat_annotate_outliers:
                 --ensembl {params.ensembl} \
                 --gnomad_constraint {params.gnomad_constraint} \
                 --OMIM_path {params.OMIM_path} \
-                --coverage {input.coverage}
+                --SV_path {input.svs} \
+                --CNV_path {input.cnvs} \
+                --TR_outlier_path {input.trs} \
+                --SMV_path {input.smvs} \
+                --coverage {input.coverage} 
         fi
         """
