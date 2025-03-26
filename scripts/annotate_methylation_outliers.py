@@ -340,6 +340,7 @@ def main(
     outliers_gene_omim[numeric_cols] = outliers_gene_omim[numeric_cols].round(2)
 
     outliers_gene_omim.replace({"-1": ".", "nan": ".", np.nan: ".", "-1;-1": ".", " ": ".", "-1;": "", ";-1": ""}, inplace=True)
+    outliers_gene_omim.fillna('.').replace(r'^\s*$', '.', regex=True, inplace=True)
 
 
     columns = [
