@@ -165,6 +165,6 @@ rule methbat_annotate_outliers:
                 --CNV_path {input.cnvs} \
                 --TR_outlier_path {input.trs} \
                 --SMV_path {input.smvs} \
-                --coverage {input.coverage} \
+                --coverage {input.coverage} 
         fi
         """
