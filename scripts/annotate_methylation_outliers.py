@@ -54,8 +54,17 @@ def SVs_to_pr(svs: str, sample: str) -> pr.PyRanges:
         columns={"CHROM": "Chromosome", "POS": "Start", "END": "End"}, inplace=True
     )
     # filter out variants that are hom ref in this sample
-    svs = svs[svs[f"{sample}_GT"] != "0/0"]
-    svs = svs[["Chromosome", "Start", "End", "SVTYPE", f"{sample}_GT", "cmh_maxAF"]]
+    try:
+        svs = svs[svs[f"{sample}_GT"] != "0/0"]
+    except KeyError: # renamed genesteps samples
+        sample_split = sample.rsplit("_", 1)
+        sample = sample_split[0].replace("_", "") + "_" + sample_split[1]
+        svs = svs[svs[f"{sample}_GT"] != "0/0"]
+
+    try:
+        svs = svs[["Chromosome", "Start", "End", "SVTYPE", f"{sample}_GT", "cmh_maxAF"]]
+    except KeyError:
+        svs = svs[["Chromosome", "Start", "End", "SVTYPE", f"{sample}_GT", "CoLoRSdb_maxAF"]]
     svs_pr = pr.PyRanges(svs)
 
     return svs_pr
@@ -125,9 +134,15 @@ def find_closest_variant(
     )
     outliers_variant.drop(columns=[f"Start_{suffix}", f"End_{suffix}"], inplace=True)
     if suffix == "SV":
-        outliers_variant.drop(
-            columns=["SVTYPE", f"{sample}_GT", "cmh_maxAF", "Distance"], inplace=True
-        )
+        try:
+            GT_col = [i for i in outliers_variant.columns if "GT" in i][0]
+            outliers_variant.drop(
+                columns=["SVTYPE", GT_col, "cmh_maxAF", "Distance"], inplace=True
+            )
+        except KeyError:
+            outliers_variant.drop(
+                columns=["SVTYPE", GT_col, "CoLoRSdb_maxAF", "Distance"], inplace=True
+            )
     elif suffix == "CNV":
         outliers_variant.drop(
             columns=["SVTYPE", f"{sample}|GT", "Distance"], inplace=True
@@ -155,7 +170,16 @@ def collapse_variant_anno(row: pd.Series, variant: str, sample: str) -> str:
         return np.nan
     else:
         if variant == "SV":
-            GT_col = [i for i in row.index if "GT" in i and sample in i][0]
+            try:
+                GT_col = [i for i in row.index if "GT" in i and sample in i][0]
+            except IndexError:
+                sample_split = sample.rsplit("_", 1)
+                sample = sample_split[0].replace("_", "") + "_" + sample_split[1]
+                GT_col = [i for i in row.index if "GT" in i and sample in i][0]
+            if "cmh_maxAF" in row.index:
+                af_col = "cmh_maxAF"
+            else:
+                af_col = "CoLoRSdb_maxAF"
             variant = (
                 "SV"
                 + ":"
@@ -169,7 +193,7 @@ def collapse_variant_anno(row: pd.Series, variant: str, sample: str) -> str:
                 + "-"
                 + row[GT_col]
                 + "-AF:"
-                + str(row.cmh_maxAF)
+                + str(row[af_col])
                 + "-dist:"
                 + str(row.Distance)
             )
