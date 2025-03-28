@@ -5,7 +5,7 @@
 #SBATCH --mem=4G
 #SBATCH --output=%x-%j.out
 
-SF=~/crg2-pacbio/Snakefile/methylation_outliers.smk
+SF=~/crg2-pacbio/methylation_outliers.smk
 CP="/hpf/largeprojects/ccm_dccforge/dccdipg/Common/snakemake"
 SLURM=~/crg2-pacbio/slurm_profile/
 CONFIG="config.yaml"
