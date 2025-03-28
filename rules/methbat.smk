@@ -113,9 +113,19 @@ rule filter_sample_smvs:
     output: 
         temp("methbat/{sample}.rare.smvs.bed")
     conda: "../envs/common.yaml"
+    log:
+        "logs/methbat/filter_sample_smvs/{sample}.log"
     shell:
         """
-        bcftools query -s {wildcards.sample} -i '(INFO/gnomad_af_popmax <0.01 | INFO/gnomad_af_popmax == ".") & GT!="RR" & GT!="./." ' {input} -f '%CHROM\t%POS0\t%END\t%REF\t%ALT\t[%GT]\t%gnomad_af_popmax\n' > {output}
+        {{
+            bcftools query -s {wildcards.sample} -i '(INFO/gnomad_af_popmax <0.01 | INFO/gnomad_af_popmax == ".") & GT!="RR" & GT!="./." ' {input} -f '%CHROM\t%POS0\t%END\t%REF\t%ALT\t[%GT]\t%gnomad_af_popmax\n' > {output}
+        }} || {{
+            # renamed genesteps samples 
+            family=`echo {wildcards.sample}| cut -d'_' -f1,2,3 | tr -d '_'`
+            participant=`echo {wildcards.sample}| cut -d'_' -f4`
+            sample=`echo -e "${{family}}_${{participant}}"`
+            bcftools query -s $sample -i '(INFO/gnomad_af_popmax <0.01 | INFO/gnomad_af_popmax == ".") & GT!="RR" & GT!="./." ' {input} -f '%CHROM\t%POS0\t%END\t%REF\t%ALT\t[%GT]\t%gnomad_af_popmax\n' > {output}
+        }}
         """
 
 rule methbat_annotate_outliers:
