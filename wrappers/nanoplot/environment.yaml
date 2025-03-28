@@ -1,0 +1,8 @@
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - Python ==3.7
+  - NanoPlot ==1.44.1
+  
