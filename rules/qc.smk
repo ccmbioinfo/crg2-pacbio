@@ -1,6 +1,6 @@
 rule nanoplot:
     input:
-        bam = "mapped/{family}_{sample}.bam"
+        bam = get_bam
     output:
         "qc/nanoplot/{family}_{sample}/NanoStats.txt",
         "qc/nanoplot/{family}_{sample}/Non_Weighted_Histogram_Read_Length_mqc.png"
