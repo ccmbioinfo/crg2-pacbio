@@ -37,7 +37,6 @@ def recode_genes(disease_thresholds):
     disease_thresholds.loc[disease_thresholds["Gene"] == "XYLT", "Gene"] = "XYLT1"
     disease_thresholds.loc[disease_thresholds["Gene"] == "TK2/BEAN", "Gene"] = "BEAN1"
     disease_thresholds.loc[disease_thresholds["Gene"] == "MARCH6", "Gene"] = "MARCHF6"
-    disease_thresholds.loc[disease_thresholds["Gene"] == "C9orf72", "Gene"] = "C9ORF72"
     disease_thresholds.loc[disease_thresholds["Gene"] == "FMR1/FMR4", "Gene"] = "FMR1"
     disease_thresholds.loc[
         disease_thresholds["Gene"] == "LOC642361/NUTM2B-AS1", "Gene"
@@ -71,33 +70,9 @@ def is_disease(motif_count, threshold, motif, allele_length):
             motif_count = "."
 
     is_disease = False
-    if threshold != threshold or motif_count == ".":
+    if pd.isna(threshold):
         # threshold is NaN
         is_disease = None
-    elif "(" in threshold:
-        is_disease = None
-    elif "-" in threshold:
-        try:
-            min_thresh = int(threshold.split("-")[0])
-        except ValueError:
-            min_thresh = int(threshold.replace(">", "").split("-")[0])
-        max_thresh = int(threshold.split("-")[1])
-        for count in motif_count:
-            if count >= min_thresh and count <= max_thresh:
-                is_disease = True
-    elif ">" in threshold:
-        threshold = int(threshold.replace(">", ""))
-        for count in motif_count:
-            if count > int(threshold):
-                is_disease = True
-        for count in motif_count:
-            if count > int(threshold):
-                is_disease = True
-    elif "," in threshold:
-        path_counts = [int(t) for t in threshold.split(",")]
-        for count in motif_count:
-            if count in path_counts:
-                is_disease = True
     else:
         for count in motif_count:
             if count >= int(threshold):
@@ -165,24 +140,20 @@ def main(vcf, disease_thresholds, output_file):
         thresh_dict[gene] = threshold
         disorder_dict[gene] = disorder
 
-    vcf_df["DISEASE_THRESHOLD"] = vcf_df["TRID"].map(thresh_dict)
-    vcf_df["DISORDER"] = vcf_df["TRID"].map(disorder_dict)
+    vcf_df["GENE"] = vcf_df["TRID"].str.split("_").str[1]
+    vcf_df["DISEASE_THRESHOLD"] = vcf_df["GENE"].map(thresh_dict)
+    vcf_df["DISORDER"] = vcf_df["GENE"].map(disorder_dict)
 
-    # fill in missing disease thresholds 
+
+        # fill in missing disease thresholds 
     vcf_df.loc[vcf_df["TRID"] == "C11ORF80", "DISEASE_THRESHOLD"] = "500" # OMIM
-    vcf_df.loc[vcf_df["TRID"] == "AFF2", "DISEASE_THRESHOLD"] = "200" # Rajan-Babu et al 2024 supplementary table 1
     vcf_df.loc[vcf_df["TRID"] == "TMEM185A", "DISEASE_THRESHOLD"] = "300" # Shaw et al 2002
 
     # fill in missing disorders (OMIM)
     vcf_df.loc[
         vcf_df["TRID"] == "C11ORF80", "DISORDER"
     ] = "Spastic paraplegia 6, autosomal dominant"
-    vcf_df.loc[
-        vcf_df["TRID"] == "NIPA1", "DISORDER"
-    ] = "Spastic paraplegia 6, autosomal dominant	"
-    vcf_df.loc[
-        vcf_df["TRID"] == "AFF2", "DISORDER"
-    ] = "Intellectual developmental disorder, X-linked 109"
+
 
     # prep report for export
     allele_length_cols = [col for col in vcf_df.columns if "allele_length" in col]
@@ -216,7 +187,7 @@ def main(vcf, disease_thresholds, output_file):
             "END",
             "REF",
             "ALT",
-            "TRID",
+            "GENE",
             "DISORDER",
             "MOTIFS",
             "STRUC",
@@ -231,8 +202,6 @@ def main(vcf, disease_thresholds, output_file):
     )
 
     vcf_df = vcf_df[report_cols]
-    vcf_df = vcf_df.rename(columns={"TRID": "GENE"})
-
     today = date.today()
     today = today.strftime("%Y-%m-%d")
     output_prefix = output_file.replace(".csv", "")
