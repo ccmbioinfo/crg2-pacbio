@@ -41,28 +41,14 @@ def recode_genes(disease_thresholds):
     disease_thresholds.loc[
         disease_thresholds["Gene"] == "LOC642361/NUTM2B-AS1", "Gene"
     ] = "NUTM2B-AS1"
-    disease_thresholds.loc[disease_thresholds["Gene"] == "ZNF9/CNBP", "Gene"] = "CNBP"
+    disease_thresholds.loc[disease_thresholds["Gene"] == "ZNF9/CNBP", "Gene"] = "CNBP" 
+    disease_thresholds.loc[disease_thresholds["Gene"] == "C11orf80", "Gene"] = "C11ORF80"
     return disease_thresholds
 
 
-def is_disease(motif_count, threshold, motif, allele_length):
+def is_disease(motif_count, gene, threshold):
     if "_" in motif_count:
-        # ATNX8
-        # motif with submotifs
-        # calculate motif count: divide allele length by motif length
-        if threshold == ">110":
-            motif_len = len(motif)
-            if allele_length == "None":
-                motif_count = "."
-            else:
-                alleles = allele_length.split("|")
-                a1, a2 = float(int(alleles[0]) / motif_len), float(
-                    int(alleles[1]) / motif_len
-                )
-                motif_count = [a1, a2]
-        else:
-            # for other genes with submotifs, don't have reliable way to interpret pathogencity
-            return None
+        return None
     else:
         try:
             motif_count = [int(m) for m in motif_count.split("|")]
@@ -75,7 +61,12 @@ def is_disease(motif_count, threshold, motif, allele_length):
         is_disease = None
     else:
         for count in motif_count:
-            if count >= int(threshold):
+            if count == ".":
+                continue
+            elif gene == "VWA1":
+                if count == 1 or count == 3: # 2 copies is benign as per STRchive 
+                    is_disease = True
+            elif count >= int(threshold):
                 is_disease = True
     return is_disease
 
@@ -141,18 +132,14 @@ def main(vcf, disease_thresholds, output_file):
         disorder_dict[gene] = disorder
 
     vcf_df["GENE"] = vcf_df["TRID"].str.split("_").str[1]
+    vcf_df.loc[vcf_df["POS"] == 25013530, "GENE"] = "PRTS_ARX"
+    vcf_df.loc[vcf_df["POS"] == 25013649, "GENE"] = "EIEE1_ARX"
     vcf_df["DISEASE_THRESHOLD"] = vcf_df["GENE"].map(thresh_dict)
     vcf_df["DISORDER"] = vcf_df["GENE"].map(disorder_dict)
 
-
-        # fill in missing disease thresholds 
-    vcf_df.loc[vcf_df["TRID"] == "C11ORF80", "DISEASE_THRESHOLD"] = "500" # OMIM
-    vcf_df.loc[vcf_df["TRID"] == "TMEM185A", "DISEASE_THRESHOLD"] = "300" # Shaw et al 2002
-
-    # fill in missing disorders (OMIM)
-    vcf_df.loc[
-        vcf_df["TRID"] == "C11ORF80", "DISORDER"
-    ] = "Spastic paraplegia 6, autosomal dominant"
+    # fill in missing disease thresholds 
+    vcf_df.loc[vcf_df["GENE"] == "C11ORF80", "DISEASE_THRESHOLD"] = 500.0 # OMIM
+    vcf_df.loc[vcf_df["GENE"] == "TMEM185A", "DISEASE_THRESHOLD"] = 300.0 # Shaw et al 2002
 
 
     # prep report for export
@@ -167,9 +154,8 @@ def main(vcf, disease_thresholds, output_file):
         vcf_df[f"DISEASE_PREDICTION_{col}"] = vcf_df.apply(
             lambda row: is_disease(
                 row[col],
-                row.DISEASE_THRESHOLD,
-                row.MOTIFS,
-                row[col.replace("motif_count", "allele_length")],
+                row["GENE"],
+                row.DISEASE_THRESHOLD
             ),
             axis=1,
         )
@@ -179,6 +165,8 @@ def main(vcf, disease_thresholds, output_file):
     )
     for col in disease_pred_cols:
         vcf_df.drop(col, axis=1)
+    # for loci that are homozygous reference in all samples, set ALT allele to "."
+    vcf_df.loc[vcf_df["ALT"] == "||", "ALT"] = "homozygous_ref"
 
     report_cols = (
         [
