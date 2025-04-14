@@ -64,7 +64,7 @@ def is_disease(motif_count, gene, threshold):
             if count == ".":
                 continue
             elif gene == "VWA1":
-                if count == 1 or count == 3: # 2 copies is benign as per STRchive 
+                if count != 2: # 2 copies is benign as per STRchive 
                     is_disease = True
             elif count >= int(threshold):
                 is_disease = True
