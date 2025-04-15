@@ -91,7 +91,7 @@ snakemake --use-conda -s ${SF} --cores 4 --conda-prefix ${CP} --configfile ${CON
 - filter annotate de novo repeats with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_denovo_repeats.py)
 
 ## Pathogenic repeat loci report: pathogenic_repeats/{family}.known.path.str.loci.csv
-- genotype repeats per-sample using TRGTv1.0.0 against the [pathogenic repeat loci BED file](https://github.com/PacificBiosciences/trgt/blob/main/repeats/pathogenic_repeats.hg38.bed) provided by TRGT (the GIAB 937,122 catalog only contains 50/56 loci). Note that TRGT requires BAMs; these must be added to the samples.tsv file
+- genotype repeats per-sample using TRGTv1.0.0 against the union of the [pathogenic repeat loci BED file](https://github.com/PacificBiosciences/trgt/blob/main/repeats/pathogenic_repeats.hg38.bed) provided by TRGT and the disease catalog provided by [STRchive](https://strchive.org/_astro/STRchive-disease-loci.hg38.TRGT.B2FLLAlV.bed) (a total of 77 loci). Note that TRGT requires BAMs; these must be added to the samples.tsv file
 - merge sample VCFs into multi-sample family VCF
 - annotate repeat loci with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_path_str_loci.py)
 
