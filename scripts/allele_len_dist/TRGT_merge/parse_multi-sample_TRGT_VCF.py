@@ -45,7 +45,12 @@ def calculate_stats(allele_dict):
         stats[f"{key}_mean"] = np.mean(allele_dict[key])
         stats[f"{key}_std"] = np.std(allele_dict[key])
         stats[f"cutoff_{key.split('_')[0]}"], stats[f"range_{key.split('_')[0]}"] = get_quantiles_cutoffs(allele_dict[key])
-    
+        # get z-scores for all alleles
+        if stats[f"{key}_std"] == 0:
+            stats[f"{key}_std"] = 0.1
+        stats[f"{key}_zscore"] = [round((x - stats[f"{key}_mean"]) / stats[f"{key}_std"], 2) for x in allele_dict[key]]
+
+    # Calculate mean and std for average methylation and motif purity
     for metric in ["AM", "MP"]:
         combined = allele_dict[f"short_{metric}"] + allele_dict[f"long_{metric}"]
         combined = [x for x in combined if not pd.isnull(x)]
@@ -61,7 +66,8 @@ def main(input_vcf, output_tsv):
             "trid": [], "short_allele_len_mean": [], "long_allele_len_mean": [],
             "short_allele_len_std": [], "long_allele_len_std": [],
             "cutoff_short": [], "cutoff_long": [], "range_long": [], "range_short": [],
-            "AM_mean": [], "AM_std": [], "MP_mean": [], "MP_std": []
+            "AM_mean": [], "AM_std": [], "MP_mean": [], "MP_std": [],
+            "short_allele_len_zscore": [], "long_allele_len_zscore": [] 
         }
 
         for variant in vcf_in:
