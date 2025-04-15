@@ -1,309 +1,228 @@
 import argparse
 import pandas as pd
 import numpy as np
+import pysam
 
 
-def split_alleles(alleles: pd.Series) -> tuple:
-    """
-    Split alleles by comma and return lengths and sequences of shortest and longest alleles.
-    Note that there may be more than two alleles called by TRGT at a locus in an individual (somaticism?)
-    """
-    alleles = alleles.split(",")
-    # meth = meth.split(",")
-    # mp = mp.split(",")
-    allele_lens = [len(a) for a in alleles]
-    short_allele_len, long_allele_len = min(allele_lens), max(allele_lens)
-    short_index, long_index = allele_lens.index(min(allele_lens)), allele_lens.index(
-        max(allele_lens)
-    )
-    short_allele, long_allele = alleles[short_index], alleles[long_index]
-    # short_allele_meth, long_allele_meth = meth[short_index], meth[long_index]
-    # short_allele_mp, long_allele_mp = mp[short_index], mp[long_index]
+def resample_quantiles(counts, num_resamples=100):
+    resamples = np.random.choice(counts, len(counts) * num_resamples).reshape(num_resamples, -1)
+    return list(np.quantile(resamples, 0.95, axis=1))
 
-    # return short_allele, short_allele_len, short_allele_meth, short_allele_mp, long_allele, long_allele_len, long_allele_meth, long_allele_mp
-    return (
-        short_allele,
-        short_allele_len,
-        short_index,
-        long_allele,
-        long_allele_len,
-        long_index,
-    )
+def get_counts_with_finite_std(counts):
+    return counts[:-1] + [counts[-1] + 0.1] if len(set(counts)) == 1 else counts
 
+def get_cutoff(quantiles):
+    return np.mean(quantiles) + max(1, np.std(quantiles))
 
-def split_meth_mp(
-    meth_mp: pd.Series, short_index: pd.Series, long_index: pd.Series
-) -> tuple:
-    """
-    Split methylation or motify purity and return value for shortest and longest allele
-    """
-    try:
-        meth_mp_short = meth_mp.split(",")[short_index]
-        meth_mp_long = meth_mp.split(",")[long_index]
-    except AttributeError:
-        meth_mp_short = np.nan
-        meth_mp_long = np.nan
-    return meth_mp_short, meth_mp_long
+def get_quantiles_cutoffs(allele_lens):
+    quantiles = get_counts_with_finite_std(resample_quantiles(allele_lens))
+    return get_cutoff(quantiles), [min(allele_lens), max(allele_lens)]
 
+def get_rank(zscores, zscore):
+    # get the rank of a zscore in a list
+    if zscore == np.nan:
+        return np.nan
+    else:
+        sorted_list = sorted(zscores, reverse=True)
+        # Find the rightmost/largest index of zscore in the sorted list
+        for i in range(len(sorted_list)-1, -1, -1):
+            if sorted_list[i] == zscore:
+                return i + 1
+        return None
 
-def calc_z_score(
-    allele_type: str,
-    allele_length: int,
-    short_allele_len_mean: float,
-    short_allele_len_std: float,
-    long_allele_len_mean: float,
-    long_allele_len_std: float,
-    am: float,
-    AM_mean: float,
-    AM_std: float,
-    mp: float,
-    MP_mean: float,
-    MP_std: float,
-) -> tuple:
-    """
-    Calculate z-score for sample allele length, methylation, and motif purity compared to control distribution
-    """
-
-    means = {
-        "long_allele_len_mean": long_allele_len_mean,
-        "short_allele_len_mean": short_allele_len_mean,
-        "AM_mean": AM_mean,
-        "MP_mean": MP_mean,
+def process_variant(variant, samples):
+    allele_dict = {
+        "short_allele_len": [], "long_allele_len": [], "short_AM": [], "long_AM": [],
+        "short_MP": [], "long_MP": []
     }
-    stds = {
-        "long_allele_len_std": long_allele_len_std,
-        "short_allele_len_std": short_allele_len_std,
-        "AM_std": AM_std,
-        "MP_std": MP_std,
-    }
-
-    def calculate_z_score(value, mean, std):
+    for sample in samples:
+        allele_lens = variant.samples[sample]['AL']
+        AM = variant.samples[sample]['AM']
         try:
-            z_score = (value - mean) / std
-        except ZeroDivisionError:
-            z_score = (value - mean) / 0.0001  # handle division by zero
-        return round(z_score, 3)
+            MP = variant.samples[sample]["MP"]
+        except KeyError:  # Fallback to AP for older TRGT version
+            MP = variant.samples[sample]["AP"]
+        if allele_lens[0] is not None:
+            min_index, max_index = allele_lens.index(min(allele_lens)), allele_lens.index(max(allele_lens))
+            allele_dict["short_allele_len"].append(min(allele_lens))
+            allele_dict["long_allele_len"].append(max(allele_lens))
+            allele_dict["short_AM"].append(AM[min_index])
+            allele_dict["long_AM"].append(AM[max_index])
+            allele_dict["short_MP"].append(MP[min_index])
+            allele_dict["long_MP"].append(MP[max_index])
+    return allele_dict
 
-    z_score_len = calculate_z_score(
-        allele_length, means[f"{allele_type}_len_mean"], stds[f"{allele_type}_len_std"]
-    )
-    try:
-        z_score_am = calculate_z_score(
-            float(am), means["AM_mean"] / 255, stds["AM_std"] / 255
-        )  # CMH TRGT VCFs called with v0.4.0, AM a value between 0 and 255
-    except:
-        z_score_am = "."
-    try:
-        z_score_mp = calculate_z_score(float(mp), means["MP_mean"], stds["MP_std"])
-    except:
-        z_score_mp = "."
+def calculate_stats(allele_dict):
+    stats = {}
+    for key in ["short_allele_len", "long_allele_len"]:
+        stats[f"{key}_mean"] = np.mean(allele_dict[key])
+        stats[f"{key}_std"] = np.std(allele_dict[key])
+        stats[f"cutoff_{key.split('_')[0]}"], stats[f"range_{key.split('_')[0]}"] = get_quantiles_cutoffs(allele_dict[key])
+        # get z-scores for all alleles
+        if stats[f"{key}_std"] == 0:
+            stats[f"{key}_std"] = 0.1
+        stats[f"{key}_zscore"] = [round((x - stats[f"{key}_mean"]) / stats[f"{key}_std"], 2) for x in allele_dict[key]]
 
-    return z_score_len, z_score_am, z_score_mp
-
-
-def main(cases, dist, output_file):
-    # get length of shortest and longest alleles
-    # cases["short_allele"], cases["short_allele_len"], cases["short_allele_meth"], cases["short_allele_MP"], cases["long_allele"], cases["long_allele_len"], cases["long_allele_meth"], cases["long_allele_MP"], = zip(
-    #     *cases.apply(lambda x: split_alleles(x.alleles, x.avg_methylation, x.motif_purity), axis=1)
-    # )
-
-    (
-        cases["short_allele"],
-        cases["short_allele_len"],
-        cases["short_allele_index"],
-        cases["long_allele"],
-        cases["long_allele_len"],
-        cases["long_allele_index"],
-    ) = zip(*cases.apply(lambda x: split_alleles(x.alleles), axis=1))
-
-    cases["short_allele_meth"], cases["long_allele_meth"] = zip(
-        *cases.apply(
-            lambda x: split_meth_mp(
-                x.avg_methylation, x.short_allele_index, x.long_allele_index
-            ),
-            axis=1,
-        )
-    )
-
-    cases["short_allele_MP"], cases["long_allele_MP"] = zip(
-        *cases.apply(
-            lambda x: split_meth_mp(
-                x.motif_purity, x.short_allele_index, x.long_allele_index
-            ),
-            axis=1,
-        )
-    )
-
-    # drop alleles, not needed for now?
-    cases = cases.drop(columns=["alleles"]).copy()
-
-    # convert dataframe from wide to long format
-    # allele lengths
-    cases_al = pd.melt(
-        cases,
-        id_vars=["trid", "sample"],
-        value_vars=["short_allele_len", "long_allele_len"],
-        var_name="allele_length_type",
-        value_name="allele_length",
-    )
-    cases_al = cases_al.drop(columns=["trid", "sample"])
-
-    # allele sequences
-    cases_al_seq = pd.melt(
-        cases,
-        id_vars=["trid", "sample"],
-        value_vars=["short_allele", "long_allele"],
-        var_name="allele_type",
-        value_name="allele_sequence",
-    )
-    cases_al_seq = cases_al_seq.drop(columns=["trid", "sample"])
-
-    # methylation
-    cases_meth = pd.melt(
-        cases,
-        id_vars=["trid", "sample"],
-        value_vars=["short_allele_meth", "long_allele_meth"],
-        var_name="allele_am_type",
-        value_name="AM",
-    )
-    cases_meth = cases_meth.drop(columns=["trid", "sample"])
-
-    # motif purity
-    cases_mp = pd.melt(
-        cases,
-        id_vars=["trid", "sample"],
-        value_vars=["short_allele_MP", "long_allele_MP"],
-        var_name="allele_mp_type",
-        value_name="MP",
-    )
-
-    cases_long = pd.concat([cases_al, cases_al_seq, cases_meth, cases_mp], axis=1)
-
-    # merge case alleles to controls allele length distribution dataframe
-    cases_long["case_trid"] = cases_long["trid"]
-    cases_long["trid"] = cases_long["case_trid"].str.rsplit("_", n=1).str[0]
-    merged = cases_long.merge(dist, on="trid", how="left")
-    merged = merged.astype(
-        {
-            "short_allele_len_mean": float,
-            "long_allele_len_mean": float,
-            "short_allele_len_std": float,
-            "long_allele_len_std": float,
-            "cutoff_short": float,
-            "cutoff_long": float,
-            "MP": float,
-            "AM_mean": float,
-            "AM_std": float,
-            "MP_mean": float,
-            "MP_std": float,
-        }
-    )
-
-    # calculate z_scores for each case allele compared to controls
-    print("Calculating z scores")
-    merged["z_score_len"], merged["z_score_AM"], merged["z_score_MP"] = zip(
-        *merged.apply(
-            lambda row: calc_z_score(
-                row["allele_type"],
-                row["allele_length"],
-                row["short_allele_len_mean"],
-                row["short_allele_len_std"],
-                row["long_allele_len_mean"],
-                row["long_allele_len_std"],
-                row["AM"],
-                row["AM_mean"],
-                row["AM_std"],
-                row["MP"],
-                row["MP_mean"],
-                row["MP_std"],
-            ),
-            axis=1,
-        )
-    )
-
-    # split into  two dataframes: short alleles and long alleles
-    merged_short = merged[merged["allele_type"] == "short_allele"][
-        [
-            "case_trid",
-            "sample",
-            "allele_type",
-            "allele_length",
-            "cutoff_short",
-            "z_score_len",
-            "range_short",
-            "AM",
-            "AM_mean",
-            "AM_std",
-            "z_score_AM",
-            "MP",
-            "MP_mean",
-            "MP_std",
-            "z_score_MP",
-        ]
-    ]
-    merged_long = merged[merged["allele_type"] == "long_allele"][
-        [
-            "case_trid",
-            "sample",
-            "allele_type",
-            "allele_length",
-            "cutoff_long",
-            "z_score_len",
-            "range_long",
-            "AM",
-            "AM_mean",
-            "AM_std",
-            "z_score_AM",
-            "MP",
-            "MP_mean",
-            "MP_std",
-            "z_score_MP",
-        ]
-    ]
-
-    # cat short and long alleles into one dataframe
-    print("Concatentating short and long alleles")
-    merged_short.rename(
-        {"range_short": "control_range", "cutoff_short": "cutoff"}, inplace=True, axis=1
-    )
-    merged_long.rename(
-        {"range_long": "control_range", "cutoff_long": "cutoff"}, inplace=True, axis=1
-    )
-    merged_cat = pd.concat([merged_short, merged_long], axis=0)
+    # Calculate mean and std for average methylation and motif purity
+    for metric in ["AM", "MP"]:
+        combined = allele_dict[f"short_{metric}"] + allele_dict[f"long_{metric}"]
+        combined = [x for x in combined if not pd.isnull(x)]
+        stats[f"{metric}_mean"] = np.mean(combined) if combined else np.nan
+        stats[f"{metric}_std"] = np.std(combined) if combined else np.nan
     
-    # shorten sample names (e.g. remove .m84090_240207_191948_s1.hifi_reads.bc2013.KL.GRCh38.aligned.haplotagged.trgt.sorted)
-    merged_cat["sample"] = merged_cat["sample"].apply(lambda x: x.split('.')[0])
+    return stats
 
-    # remove unnecessary columns
-    merged_cat = merged_cat[
-        [
-            "case_trid",
-            "sample",
-            "allele_type",
-            "allele_length",
-            "z_score_len",
-            "control_range",
-            "cutoff",
-            "AM",
-            "AM_mean",
-            "AM_std",
-            "z_score_AM",
-            "MP",
-            "MP_mean",
-            "MP_std",
-            "z_score_MP",
-        ]
-    ]
-    merged_cat.rename({"allele_length": "allele_len"}, axis=1, inplace=True)
+def sample_vcf_to_dict(case_vcf):
+    # first, make a dictionary of the case(s) alleles (sample_dict[sample][trid] = [short_allele_len, long_allele_len, AM_short_allele, AM_long_allele, MP_short_allele, MP_long_allele])
+    sample_dict = {}
+    with pysam.VariantFile(case_vcf, 'r') as vcf_in:
+        samples = vcf_in.header.samples
+        for variant in  vcf_in:
+            trid = variant.info['TRID']
+            if len(trid.split("_")) == 4: # older versions of TRGT include motif in TRID
+                trid = variant.info['TRID'].rsplit("_", 1)[0]
+            for sample in samples: # may be multiple cases/family members
+                sample_prefix = sample.split(".")[0]
+                # extract allele lengths
+                allele_lens = variant.samples[sample]['AL']
+                min_index, max_index = allele_lens.index(min(allele_lens)), allele_lens.index(max(allele_lens))
+                short_allele_len, long_allele_len = allele_lens[min_index], allele_lens[max_index]
+                # extract allele methylation
+                AM = variant.samples[sample]['AM']
+                try:
+                    AM = [round(am, 2) for am in AM]
+                    AM_short_allele, AM_long_allele = AM[min_index], AM[max_index]
+                except TypeError: # methylation missing
+                    AM_short_allele, AM_long_allele = np.nan, np.nan
+                # extract motif purity
+                try:
+                    MP = variant.samples[sample]["MP"]
+                except KeyError:  # fallback to AP for older TRGT version
+                    MP = variant.samples[sample]["AP"]
+                
+                try:
+                    MP = [round(mp, 2) for mp in MP]
+                    MP_short_allele, MP_long_allele = MP[min_index], MP[max_index]
+                except TypeError: # methylation missing
+                    MP_short_allele, MP_long_allele = np.nan, np.nan
 
-    # sort by z_score
-    merged_cat = merged_cat.sort_values(by="z_score_len", ascending=False)
 
-    # round
-    merged_cat.round(2)
+                if sample_prefix not in sample_dict:
+                    sample_dict[sample_prefix] = {}
 
-    # export
-    merged_cat.to_csv(output_file, index=False)
+                sample_dict[sample_prefix][trid] = [short_allele_len, long_allele_len, AM_short_allele, AM_long_allele, MP_short_allele, MP_long_allele]
+    
+    return sample_dict
+
+# iterate through background variants and compute allele stats
+# for each TRID, calculate stats
+# add TRID stats to sample dictionary (to output to df)
+def main(case_vcf, control_vcf, output_file):
+    sample_dict = sample_vcf_to_dict(case_vcf)
+    with pysam.VariantFile(control_vcf, 'r') as vcf_in:
+        samples = list(vcf_in.header.samples)
+        sample_stat_dict = {
+            "trid": [],
+            "sample": [],
+            "allele_type": [],
+            "allele_len": [], 
+            "z_score_len": [],
+            "z_score_len_rank": [], 
+            "allele_len_mean": [],
+            "allele_len_std": [], 
+            "cutoff": [], 
+            "range": [], 
+            "distance_to_cutoff": [],
+            "AM": [],
+            "AM_mean": [],
+            "AM_std": [],
+            "z_score_AM": [],
+            "MP": [],
+            "MP_mean": [],
+            "MP_std": [],
+            "z_score_MP": [],
+        }
+
+        for variant in  vcf_in:
+            trid = variant.info['TRID']
+            if len(trid.split("_")) == 4: # older versions of TRGT include motif in TRID
+                trid = variant.info['TRID'].rsplit("_", 1)[0]
+            print(f"Reading variant {trid}")
+            allele_dict = process_variant(variant, samples) # extract allele lengths, methylation, and motif purity for all samples at this locus
+            
+            try:
+                stats = calculate_stats(allele_dict) # calculate allele length, methylation, and motif purity distributions
+            except IndexError:   # genotype is missing for every sample
+                stats_keys = 'short_allele_len_mean', 'short_allele_len_std', 'cutoff_short', 'range_short', 'short_allele_len_zscore', 'long_allele_len_mean', 'long_allele_len_std', 'cutoff_long', 'range_long', 'long_allele_len_zscore', 'AM_mean', 'AM_std', 'MP_mean', 'MP_std'
+                stats = {key: np.nan for key in stats_keys if key not in ["trid"]}
+                
+            for case in sample_dict: # pull repeat stats from controls and calculate sample-specific allele length Z scores
+                for allele in ["short", "long"]:
+                    if trid not in sample_dict[case]:
+                        continue
+                    sample_stat_dict["trid"].append(trid)
+                    sample_stat_dict["sample"].append(case)
+                    sample_stat_dict["allele_type"].append(allele)
+                    allele_len_mean = stats[f"{allele}_allele_len_mean"]
+                    sample_stat_dict["allele_len_mean"].append(allele_len_mean)
+                    allele_len_std = stats[f"{allele}_allele_len_std"]
+                    sample_stat_dict["allele_len_std"].append(allele_len_std)
+                    cutoff = stats[f"cutoff_{allele}"]
+                    sample_stat_dict["cutoff"].append(cutoff)
+                    sample_stat_dict["range"].append(stats[f"range_{allele}"])
+                    
+                    if allele == "short":
+                        allele_len = sample_dict[case][trid][0]
+                        AM =  sample_dict[case][trid][2]
+                        MP = sample_dict[case][trid][4]
+                    else:
+                        allele_len = sample_dict[case][trid][1]
+                        AM =  sample_dict[case][trid][3]
+                        MP = sample_dict[case][trid][5]
+
+                    sample_stat_dict["allele_len"].append(allele_len)
+                    try:
+                        zscore_len = (allele_len - allele_len_mean) / allele_len_std
+                        dist_to_cutoff = allele_len - cutoff
+                    except TypeError: # no genotype information available in this sample for this allele
+                        zscore_len = np.nan
+                        dist_to_cutoff = np.nan
+                    except ZeroDivisionError: # allele length std is 0
+                        zscore_len = (allele_len - allele_len_mean) / 0.1
+                        dist_to_cutoff = allele_len - cutoff
+                        
+                    sample_stat_dict["z_score_len"].append(zscore_len)
+                    control_z_scores = stats[f"{allele}_allele_len_zscore"]
+                    try:
+                        control_z_scores.append(zscore_len)
+                        z_score_len_rank = get_rank(control_z_scores, zscore_len)
+                    except AttributeError: # no control z-scores available
+                        z_score_len_rank = np.nan
+                    sample_stat_dict["z_score_len_rank"].append(z_score_len_rank)  
+                    sample_stat_dict["distance_to_cutoff"].append(dist_to_cutoff)  
+                    # add methylation and motif purity information 
+                    sample_stat_dict["AM"].append(AM)
+                    sample_stat_dict["AM_mean"].append(stats["AM_mean"])
+                    sample_stat_dict["AM_std"].append(stats["AM_std"])
+                    try:
+                        zscore_AM = (AM - stats["AM_mean"]) / stats["AM_std"]
+                    except: 
+                        zscore_AM =  (AM - stats["AM_mean"]) / 0.1
+                    sample_stat_dict["z_score_AM"].append(zscore_AM)
+                    sample_stat_dict["MP"].append(MP)
+                    sample_stat_dict["MP_mean"].append(stats["MP_mean"])
+                    sample_stat_dict["MP_std"].append(stats["MP_std"])
+                    try:
+                        zscore_MP = (MP - stats["MP_mean"]) / stats["MP_std"]
+                    except: 
+                        zscore_MP =  (MP - stats["MP_mean"]) / 0.1
+                    sample_stat_dict["z_score_MP"].append(zscore_MP)
+        sample_stat_df = pd.DataFrame.from_dict(sample_stat_dict).round(2)
+        sample_stat_df.to_csv(output_file, sep="\t", index=False)
+        return sample_stat_df
+
+
+
 
 
 if __name__ == "__main__":
@@ -311,16 +230,16 @@ if __name__ == "__main__":
     description = "Find outlier repeats in family vs controls"
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
-        "--alleles_path",
+        "--case_vcf",
         type=str,
         required=True,
-        help="Repeat alleles for cases",
+        help="Case multi-sample TRGT VCF",
     )
     parser.add_argument(
-        "--control_alleles",
+        "--control_vcf",
         type=str,
         required=True,
-        help="Control allele length distribution CSV",
+        help="Control multi-sample TRGT VCF",
     )
     parser.add_argument(
         "--output_file",
@@ -330,14 +249,5 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    cases = pd.read_csv(
-        args.alleles_path,
-        sep=" ",
-        compression="gzip",
-        header=None,
-        names=["trid", "sample", "motif_purity", "avg_methylation", "alleles"],
-    )
-    print("Loading control distributions")
-    dist = pd.read_csv(args.control_alleles, sep="\t")
     print("Determining outlier repeats")
-    main(cases, dist, args.output_file)
+    main(args.case_vcf, args.control_vcf, args.output_file)
