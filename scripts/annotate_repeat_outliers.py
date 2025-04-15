@@ -33,11 +33,11 @@ def main(
 ) -> None:
     # convert hits dataframe from long to wide format
     hits = pd.read_csv(hits)
-    hits.rename({"case_trid": "trid"}, axis=1, inplace=True)
+    #hits.rename({"case_trid": "trid"}, axis=1, inplace=True)
     hits_pivot = pivot_hits(hits)
 
     # make a column with maximum z score for allele length across samples
-    z_score_cols = [col for col in hits_pivot.columns if "z_score_len" in col]
+    z_score_cols = [col for col in hits_pivot.columns if "z_score_len" in col and "rank" not in col]
     for col in z_score_cols:
         hits_pivot[col] = [
             round(score, 3) if not pd.isnull(score) else None
@@ -46,12 +46,12 @@ def main(
     hits_pivot["max_z_score_len"] = hits_pivot[z_score_cols].max(axis=1)
 
     # filter out non-outliers
-    print("Filter outliers")
+    # print("Filter outliers")
     al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
-    hits_pivot["outlier"] = hits_pivot.apply(
-        lambda row: filter_outliers(row, al_cols), axis=1
-    )
-    hits_pivot = hits_pivot[hits_pivot["outlier"]]
+    # hits_pivot["outlier"] = hits_pivot.apply(
+    #     lambda row: filter_outliers(row, al_cols), axis=1
+    # )
+    # hits_pivot = hits_pivot[hits_pivot["outlier"]]
 
     # make a column that sums the number of individuals carrying a particular repeat expansion
     hits_pivot["num_samples"] = hits_pivot.apply(
@@ -113,6 +113,7 @@ def main(
 
     am_cols = [col for col in hits_gene_omim.columns if "AM" in col]
     mp_cols = [col for col in hits_gene_omim.columns if "MP" in col]
+    z_score_ranks_cols = [col for col in hits_gene_omim.columns if "z_score_len_rank" in col]
     
 
     hits_gene_omim = hits_gene_omim[
@@ -124,6 +125,7 @@ def main(
         + ["max_z_score_len", "num_samples"]
         + al_cols
         + z_score_cols
+        + z_score_ranks_cols
         + am_cols
         + mp_cols
     ]
