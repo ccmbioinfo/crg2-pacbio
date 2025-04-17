@@ -55,6 +55,12 @@ annotation:
 params:
   snpeff:
     java_opts: "-Xms750m -Xmx20g"
+  qualimap:
+    mem: "60G"
+    nw: 200
+    c: "-c"
+    hm: 3
+    extra: ""
 
 trgt:
   samples: "samples.tsv"

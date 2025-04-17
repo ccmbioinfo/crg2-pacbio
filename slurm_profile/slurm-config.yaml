@@ -29,5 +29,8 @@ allsnvreport:
 vcf2db:
   time: "50:00:00"
 
+qualimap:
+  mem: "60G"
+  time: "100:00:00"
 
 
