@@ -13,7 +13,7 @@ def pivot_hits(df: pd.DataFrame) -> pd.DataFrame:
     hits["trid"] = hits["trid"] + "_" + hits["allele_type"]
     hits = hits.drop("allele_type", axis=1)
     hit_pivot = hits.pivot(
-        index=["trid", "control_range", "cutoff"],
+        index=["trid", "range", "cutoff"],
         columns="sample",
         values=["allele_len", "z_score_len", "z_score_len_rank", "AM", "z_score_AM", "MP", "z_score_MP"],
     ).reset_index()
@@ -26,7 +26,7 @@ def pivot_hits(df: pd.DataFrame) -> pd.DataFrame:
     hit_pivot = hit_pivot.rename(
         columns={
             "_trid": "trid",
-            "_control_range": "control_range",
+            "_range": "range",
             "_cutoff": "cutoff",
             "_AM": "AM",
             "_z_score_AM": "z_score_AM",

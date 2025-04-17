@@ -32,7 +32,7 @@ def main(
     c4r_counts: Optional[str] = None
 ) -> None:
     # convert hits dataframe from long to wide format
-    hits = pd.read_csv(hits)
+    hits = pd.read_csv(hits, sep="\t")
     #hits.rename({"case_trid": "trid"}, axis=1, inplace=True)
     hits_pivot = pivot_hits(hits)
 
@@ -46,14 +46,11 @@ def main(
     hits_pivot["max_z_score_len"] = hits_pivot[z_score_cols].max(axis=1)
 
     # filter out non-outliers
-    # print("Filter outliers")
-    al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
-    # hits_pivot["outlier"] = hits_pivot.apply(
-    #     lambda row: filter_outliers(row, al_cols), axis=1
-    # )
-    # hits_pivot = hits_pivot[hits_pivot["outlier"]]
+    print("Filter outliers")
+    hits_pivot["max_z_score_len"] = hits_pivot["max_z_score_len"].apply(lambda x: abs(x) >= 3)
 
     # make a column that sums the number of individuals carrying a particular repeat expansion
+    al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
     hits_pivot["num_samples"] = hits_pivot.apply(
         lambda row: num_expanded(row, al_cols), axis=1
     )
@@ -120,7 +117,7 @@ def main(
         ["Chromosome", "Start", "End", "trid", "gene_name", "gene_id", "gene_biotype"]
         + ["omim_phenotype","omim_inheritance", "HPO"]
         + ["gene", "lof.oe_ci.upper", "lof.pLI"]
-        + ["Feature", "control_range", "cutoff"]
+        + ["Feature", "range", "cutoff"]
         + c4r_col
         + ["max_z_score_len", "num_samples"]
         + al_cols
