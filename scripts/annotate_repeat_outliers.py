@@ -150,17 +150,18 @@ def main(
     mp_cols = [col for col in hits_gene_omim.columns if "MP" in col]
     z_score_ranks_cols = [col for col in hits_gene_omim.columns if "z_score_len_rank" in col]
     
-
+    
     hits_gene_omim = hits_gene_omim[
         ["Chromosome", "Start", "End", "trid", "motif", "gene_name", "gene_id", "gene_biotype", "Feature"]
         + ["omim_phenotype","omim_inheritance", "HPO"]
-        + ["gene", "lof.oe_ci.upper", "lof.pLI", "OE_len", "Overlap", "reciprocal_overlap"]
+        + ["gene", "lof.oe_ci.upper", "lof.pLI", "OE_len"]
         + ["ENCODE_promoter_ID", "ENCODE_promoter_coord", "range", "cutoff"]
         + c4r_col
         + ["max_z_score_len", "num_samples"]
         + al_cols
         + z_score_cols
         + z_score_ranks_cols
+        + ["allele_len_std"]
         + am_cols
         + mp_cols
     ]
@@ -172,8 +173,7 @@ def main(
             "End": "END",
             "trid": "TRID",
             "gene": "gnomad_constraint_gene",
-            "Overlap": "OE_overlap",
-            "reciprocal_overlap": "OE_reciprocal_overlap"
+            "allele_len_std": "CMH_allele_len_std"
         }
     )
 
