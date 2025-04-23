@@ -152,7 +152,7 @@ def main(
     
 
     hits_gene_omim = hits_gene_omim[
-        ["Chromosome", "Start", "End", "trid", "gene_name", "gene_id", "gene_biotype", "Feature"]
+        ["Chromosome", "Start", "End", "trid", "motif", "gene_name", "gene_id", "gene_biotype", "Feature"]
         + ["omim_phenotype","omim_inheritance", "HPO"]
         + ["gene", "lof.oe_ci.upper", "lof.pLI", "OE_len", "Overlap", "reciprocal_overlap"]
         + ["ENCODE_promoter_ID", "ENCODE_promoter_coord", "range", "cutoff"]
