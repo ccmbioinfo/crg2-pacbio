@@ -477,3 +477,33 @@ def annotate_segdup(loci: pr.PyRanges, segdup: pr.PyRanges) -> pd.DataFrame:
     )
 
     return loci_segdup_df
+
+
+def calculate_reciprocal_overlap(row):
+    """Calculate reciprocal overlap between TRID and constraint region"""
+    if pd.isna(row['Start_constraint']) or pd.isna(row['End_constraint']):
+        return 0
+        
+    # Get coordinates
+    trid_start = row['Start']
+    trid_end = row['End']
+    constraint_start = row['Start_constraint'] 
+    constraint_end = row['End_constraint']
+    
+    # Calculate overlap
+    overlap_start = max(trid_start, constraint_start)
+    overlap_end = min(trid_end, constraint_end)
+    overlap_length = overlap_end - overlap_start
+    
+    # Calculate lengths
+    trid_length = trid_end - trid_start
+    constraint_length = constraint_end - constraint_start
+    
+    # Calculate reciprocal overlap
+    trid_overlap = overlap_length / trid_length
+    try:
+        constraint_overlap = overlap_length / constraint_length
+    except ZeroDivisionError:
+        constraint_overlap = 0
+    
+    return round(min(trid_overlap, constraint_overlap), 4)

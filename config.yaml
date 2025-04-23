@@ -73,3 +73,5 @@ trgt:
   control_alleles: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/code/scripts/trgt/crg2-pacbio/scripts/VCFs/cmh_0.4.0.sorted.no.missing.95perc.vcf.gz"
   C4R_outliers: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/C4R_all_outliers_batch/outliers/aggregated_outliers_2024-10-09.csv"
   adotto_repeats: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/repeat_definitions/adotto_repeats.hg38.bed"
+  promoters: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/GRCh38-PLS.bed"
+  TR_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/Danzi_et_al_2025_supp_table_3.csv"
