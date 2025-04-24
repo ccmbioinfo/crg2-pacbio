@@ -13,9 +13,9 @@ def pivot_hits(df: pd.DataFrame) -> pd.DataFrame:
     hits["trid"] = hits["trid"] + "_" + hits["allele_type"]
     hits = hits.drop("allele_type", axis=1)
     hit_pivot = hits.pivot(
-        index=["trid", "control_range", "cutoff"],
+        index=["trid", "range", "cutoff", "allele_len_std"],
         columns="sample",
-        values=["allele_len", "z_score_len", "AM", "z_score_AM", "MP", "z_score_MP"],
+        values=["allele_len", "z_score_len", "z_score_len_rank", "allele_len_std", "AM", "z_score_AM", "MP", "z_score_MP"],
     ).reset_index()
 
     hit_pivot.columns = (
@@ -26,12 +26,14 @@ def pivot_hits(df: pd.DataFrame) -> pd.DataFrame:
     hit_pivot = hit_pivot.rename(
         columns={
             "_trid": "trid",
-            "_control_range": "control_range",
+            "_range": "range",
             "_cutoff": "cutoff",
             "_AM": "AM",
             "_z_score_AM": "z_score_AM",
             "_MP": "MP",
             "_z_score_MP": "z_score_MP",
+            "_z_score_len_rank": "z_score_len_rank",
+            "_allele_len_std": "allele_len_std",
         }
     )
 
@@ -478,6 +480,36 @@ def annotate_segdup(loci: pr.PyRanges, segdup: pr.PyRanges) -> pd.DataFrame:
     return loci_segdup_df
 
 
+def calculate_reciprocal_overlap(row):
+    """Calculate reciprocal overlap between TRID and constraint region"""
+    if pd.isna(row['Start_constraint']) or pd.isna(row['End_constraint']):
+        return 0
+        
+    # Get coordinates
+    trid_start = row['Start']
+    trid_end = row['End']
+    constraint_start = row['Start_constraint'] 
+    constraint_end = row['End_constraint']
+    
+    # Calculate overlap
+    overlap_start = max(trid_start, constraint_start)
+    overlap_end = min(trid_end, constraint_end)
+    overlap_length = overlap_end - overlap_start
+    
+    # Calculate lengths
+    trid_length = trid_end - trid_start
+    constraint_length = constraint_end - constraint_start
+    
+    # Calculate reciprocal overlap
+    trid_overlap = overlap_length / trid_length
+    try:
+        constraint_overlap = overlap_length / constraint_length
+    except ZeroDivisionError:
+        constraint_overlap = 0
+    
+    return round(min(trid_overlap, constraint_overlap), 4)
+
+  
 def annotate_reg_regions(loci: pd.DataFrame, greendb: str) -> pd.DataFrame:
     """Annotate loci with GREENDB regulatory regions"""
     greendb = pd.read_csv(greendb, sep="\t", compression="gzip")
