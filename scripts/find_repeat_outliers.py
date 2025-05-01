@@ -72,8 +72,8 @@ def calculate_stats(allele_dict):
     
     return stats
 
-def sample_vcf_to_dict(case_vcf):
-    # first, make a dictionary of the case(s) alleles (sample_dict[sample][trid] = [short_allele_len, long_allele_len, AM_short_allele, AM_long_allele, MP_short_allele, MP_long_allele])
+def sample_vcf_to_dict(case_vcf, LPS_dict):
+    # first, make a dictionary of the case(s) alleles (sample_dict[sample][trid] = [short_allele_len, long_allele_len, short_allele_lps, long_allele_lps, AM_short_allele, AM_long_allele, MP_short_allele, MP_long_allele])
     sample_dict = {}
     with pysam.VariantFile(case_vcf, 'r') as vcf_in:
         samples = vcf_in.header.samples
@@ -86,7 +86,28 @@ def sample_vcf_to_dict(case_vcf):
                 # extract allele lengths
                 allele_lens = variant.samples[sample]['AL']
                 min_index, max_index = allele_lens.index(min(allele_lens)), allele_lens.index(max(allele_lens))
+                # extract allele LPS
                 short_allele_len, long_allele_len = allele_lens[min_index], allele_lens[max_index]
+                lps = LPS_dict[sample_prefix].get(trid, None)
+                if lps: 
+                    try:
+                        short_allele_lps = LPS_dict[sample_prefix][trid][min_index + 1]
+                        long_allele_lps = LPS_dict[sample_prefix][trid][max_index + 1]
+                    except KeyError:
+                        try:
+                            short_allele_lps = LPS_dict[sample_prefix][trid][max_index + 1]
+                            long_allele_lps = LPS_dict[sample_prefix][trid][max_index + 1]
+                        except KeyError: # for some loci, two different alleles of same length, and LPS output only lists allele 2 
+                            try:
+                                short_allele_lps = LPS_dict[sample_prefix][trid][2]
+                                long_allele_lps = LPS_dict[sample_prefix][trid][2]
+                            except KeyError:
+                                try:
+                                    short_allele_lps, long_allele_lps = LPS_dict[sample_prefix][trid][1], LPS_dict[sample_prefix][trid][1]
+                                except KeyError:
+                                    short_allele_lps, long_allele_lps = np.nan, np.nan
+                else: 
+                    short_allele_lps, long_allele_lps = np.nan, np.nan
                 # extract allele methylation
                 AM = variant.samples[sample]['AM']
                 try:
@@ -110,15 +131,33 @@ def sample_vcf_to_dict(case_vcf):
                 if sample_prefix not in sample_dict:
                     sample_dict[sample_prefix] = {}
 
-                sample_dict[sample_prefix][trid] = [short_allele_len, long_allele_len, AM_short_allele, AM_long_allele, MP_short_allele, MP_long_allele]
+                sample_dict[sample_prefix][trid] = [short_allele_len, long_allele_len, short_allele_lps, long_allele_lps, AM_short_allele, AM_long_allele, MP_short_allele, MP_long_allele]
     
     return sample_dict
+
+
 
 # iterate through background variants and compute allele stats
 # for each TRID, calculate stats
 # add TRID stats to sample dictionary (to output to df)
-def main(case_vcf, control_vcf, output_file):
-    sample_dict = sample_vcf_to_dict(case_vcf)
+def main(case_vcf, case_lps, control_vcf, output_file):
+    LPS_dict = {}
+    case_lps = pd.read_csv(case_lps, sep="\t")
+    for _, row in case_lps.iterrows(): 
+        # create dictionary in the format {sample: {TRID: {allele1: lps_len, allele2: lps_len}}} 
+        sample = row["sample"]
+        trid = row.trid
+        if len(trid.split("_")) == 4: 
+            trid = trid.rsplit("_", 1)[0]
+        allele = row.allele
+        lps = row.lps_len
+        if sample not in LPS_dict: 
+            LPS_dict[sample] = {}
+        if trid not in LPS_dict[sample]: 
+            LPS_dict[sample][trid] = {allele: lps}
+        else:
+            LPS_dict[sample][trid][allele] = lps 
+    sample_dict = sample_vcf_to_dict(case_vcf, LPS_dict)
     with pysam.VariantFile(control_vcf, 'r') as vcf_in:
         samples = list(vcf_in.header.samples)
         sample_stat_dict = {
@@ -141,13 +180,14 @@ def main(case_vcf, control_vcf, output_file):
             "MP_mean": [],
             "MP_std": [],
             "z_score_MP": [],
+            "LPS": [],
         }
 
         for variant in  vcf_in:
             trid = variant.info['TRID']
             if len(trid.split("_")) == 4: # older versions of TRGT include motif in TRID
                 trid = variant.info['TRID'].rsplit("_", 1)[0]
-            print(f"Reading variant {trid}")
+            #print(f"Reading variant {trid}")
             allele_dict = process_variant(variant, samples) # extract allele lengths, methylation, and motif purity for all samples at this locus
             
             try:
@@ -173,14 +213,17 @@ def main(case_vcf, control_vcf, output_file):
                     
                     if allele == "short":
                         allele_len = sample_dict[case][trid][0]
-                        AM =  sample_dict[case][trid][2]
-                        MP = sample_dict[case][trid][4]
+                        LPS = sample_dict[case][trid][2]
+                        AM =  sample_dict[case][trid][4]
+                        MP = sample_dict[case][trid][6]
                     else:
                         allele_len = sample_dict[case][trid][1]
-                        AM =  sample_dict[case][trid][3]
-                        MP = sample_dict[case][trid][5]
+                        LPS = sample_dict[case][trid][3]
+                        AM =  sample_dict[case][trid][5]
+                        MP = sample_dict[case][trid][7]
 
                     sample_stat_dict["allele_len"].append(allele_len)
+                    sample_stat_dict["LPS"].append(LPS)
                     try:
                         zscore_len = (allele_len - allele_len_mean) / allele_len_std
                         dist_to_cutoff = allele_len - cutoff
@@ -236,6 +279,12 @@ if __name__ == "__main__":
         help="Case multi-sample TRGT VCF",
     )
     parser.add_argument(
+        "--case_lps",
+        type=str,
+        required=True,
+        help="LPS values calculated by TRGT-LPS",
+    )
+    parser.add_argument(
         "--control_vcf",
         type=str,
         required=True,
@@ -250,4 +299,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     print("Determining outlier repeats")
-    main(args.case_vcf, args.control_vcf, args.output_file)
+    main(args.case_vcf, args.case_lps,  args.control_vcf, args.output_file)
