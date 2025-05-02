@@ -51,6 +51,19 @@ def hits_to_pr(hits: pd.DataFrame) -> pr.PyRanges:
 
     return hit_pr
 
+def annotate_motif(hits: pd.DataFrame, repeat_catalog: str) -> pd.DataFrame:
+    """
+    Annotate TRID motif. These are stripped from the TRID in the outlier file to save space, especially for large families.
+    """
+    repeat_catalog = pd.read_csv(repeat_catalog, sep="\t", header=None, names=["chr", "pos", "end", "ID"])
+    repeat_catalog["trid_short"] = repeat_catalog["ID"].str.split(";").str[0].str.replace("ID=", "").str.rsplit("_",n=1).str[0]
+    repeat_catalog["motif"] = repeat_catalog["ID"].str.split(";").str[1].str.replace("MOTIFS=", "")
+    repeat_catalog = repeat_catalog[["trid_short", "motif"]]
+    hits["trid_short"] = hits["trid"].str.rsplit("_", n=1).str[0]
+    hits = hits.merge(repeat_catalog, on="trid_short", how="left").drop("trid_short", axis=1)
+
+    return hits
+
 def prepare_Ensembl_GTF(gtf_path: str, cols: list) -> pd.DataFrame:
     """
     Convert GTF file into a PyRanges object and clean up columns

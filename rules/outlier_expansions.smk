@@ -145,7 +145,8 @@ rule annotate_repeat_outliers:
       c4r_outliers = config["trgt"]["C4R_outliers"],
       c4r = config["annotation"]["c4r"],
       promoters = config["trgt"]["promoters"],
-      TR_constraint = config["trgt"]["TR_constraint"]
+      TR_constraint = config["trgt"]["TR_constraint"],
+      repeat_catalog = config["trgt"]["adotto_repeats"]
     resources:
         mem_mb = 20000
     conda: 
@@ -162,6 +163,7 @@ rule annotate_repeat_outliers:
                 --promoters {params.promoters} \
                 --TR_constraint {params.TR_constraint} \
                 --c4r {params.c4r} \
+                --repeat_catalog {params.repeat_catalog} \
 		        --c4r_outliers {params.c4r_outliers}) > {log} 2>&1
         else
             (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input} \
@@ -172,6 +174,7 @@ rule annotate_repeat_outliers:
                 --promoters {params.promoters} \
                 --TR_constraint {params.TR_constraint} \
                 --c4r {params.c4r} \
+                --repeat_catalog {params.repeat_catalog} \
                 --hpo {params.HPO} \
                 --c4r_outliers {params.c4r_outliers}) > {log} 2>&1
         fi

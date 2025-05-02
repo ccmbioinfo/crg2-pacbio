@@ -9,6 +9,7 @@ from typing import Optional
 from annotation.annotate import (
     pivot_hits,
     hits_to_pr,
+    annotate_motif,
     annotate_genes,
     gene_set,
     num_expanded,
@@ -29,6 +30,7 @@ def main(
     promoters: str,
     TR_constraint: str,
     c4r: bool,
+    repeat_catalog: str,
     hpo: Optional[str] = None,
     c4r_counts: Optional[str] = None
 ) -> None:
@@ -48,6 +50,10 @@ def main(
     # filter out non-outliers
     print("Filter outliers")
     hits_pivot = hits_pivot[hits_pivot["max_z_score_len"].abs() >= 3]
+
+    # annotate with motif
+    print("Annotate with motif")
+    hits_pivot = annotate_motif(hits_pivot, repeat_catalog)
 
     # make a column that sums the number of individuals carrying a particular repeat expansion
     al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
@@ -103,8 +109,6 @@ def main(
     if c4r != "True": 
         c4r_col = ["C4R_outlier_count"] # remove C4R sample IDs for non-C4R projects
 
-    # add motif
-    hits_gene_omim["motif"] = hits_gene_omim["TRID"].str.split("_").str[3]
 
     # add promoters
     promoters = pr.read_bed(promoters)
@@ -250,6 +254,11 @@ if __name__ == "__main__":
         help="True if C4R project, otherwise false (C4R outlier sample IDs will be excluded from report)",
     )
     parser.add_argument(
+        "--repeat_catalog",
+        type=str,
+        help="Path to TRGT repeat catalog",
+    )
+    parser.add_argument(
         "--hpo",
         type=str,
         help="Path to HPO terms file",
@@ -271,6 +280,7 @@ if __name__ == "__main__":
         args.promoters,
         args.TR_constraint,
         args.c4r,
+        args.repeat_catalog,
         args.hpo,
         args.c4r_outliers
     )
