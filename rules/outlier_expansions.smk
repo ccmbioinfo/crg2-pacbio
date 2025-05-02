@@ -39,22 +39,22 @@ rule genotype_adotto_loci:
             --threads {threads}
         """       
 
-# rule sort_trgt_adotto_vcf:
-#     input: "repeat_outliers/{family}_{sample}.trgt.unsorted.vcf.gz"
-#     output: "repeat_outliers/{family}_{sample}.trgt.vcf.gz"
-#     log: "logs/bcftools/{family}_{sample}.sort.trgt.log"
-#     conda:
-#         "../envs/common.yaml"
-#     shell:
-#         """
-#         bcftools sort -Ob -o {output} {input};
-#         bcftools index {output}
-#         """
+rule sort_trgt_adotto_vcf:
+    input: "repeat_outliers/{family}_{sample}.trgt.unsorted.vcf.gz"
+    output: "repeat_outliers/{family}_{sample}.trgt.sorted.vcf.gz"
+    log: "logs/bcftools/{family}_{sample}.sort.trgt.log"
+    conda:
+        "../envs/common.yaml"
+    shell:
+        """
+        bcftools sort -Ob -o {output} {input};
+        bcftools index {output}
+        """
 
 rule merge_trgt_vcf:
     input: 
-        vcf = expand("repeat_outliers/{{family}}_{sample}.trgt.unsorted.vcf.gz", sample=samples.index),
-        indices = expand("repeat_outliers/{{family}}_{sample}.trgt.unsorted.vcf.gz.tbi", sample=samples.index) 
+        vcf = expand("repeat_outliers/{{family}}_{sample}.trgt.sorted.vcf.gz", sample=samples.index),
+        indices = expand("repeat_outliers/{{family}}_{sample}.trgt.sorted.vcf.gz.tbi", sample=samples.index) 
     params:
         trgt = config["tools"]["trgt"],
         genome = config["ref"]["genome"]
@@ -71,7 +71,7 @@ rule merge_trgt_vcf:
         """
 
 rule calculate_lps: 
-    input: "repeat_outliers/{family}_{sample}.trgt.unsorted.vcf.gz"
+    input: "repeat_outliers/{family}_{sample}.trgt.sorted.vcf.gz"
     output: temp("repeat_outliers/{family}_{sample}.trgt.lps.tsv")
     params:
         trgt_lps = config["tools"]["trgt-lps"]
@@ -99,21 +99,21 @@ rule combine_lps:
         lps_df = pd.concat(lps_list)
         lps_df.to_csv(output[0], sep="\t", index=False)
 
-rule sort_merged_trgt_vcf:
-    input: "repeat_outliers/{family}.trgt.vcf.gz"
-    output: "repeat_outliers/{family}.trgt.sorted.vcf.gz"
-    log: "logs/repeat_outliers/{family}.trgt.sorted.vcf.log"
-    conda:
-        "../envs/common.yaml"
-    shell:
-        """
-        bcftools sort -O z -o {output} {input}
-        tabix {output}
-        """
+# rule sort_merged_trgt_vcf:
+#     input: "repeat_outliers/{family}.trgt.vcf.gz"
+#     output: "repeat_outliers/{family}.trgt.sorted.vcf.gz"
+#     log: "logs/repeat_outliers/{family}.trgt.sorted.vcf.log"
+#     conda:
+#         "../envs/common.yaml"
+#     shell:
+#         """
+#         bcftools sort -O z -o {output} {input}
+#         tabix {output}
+#         """
 
 rule find_repeat_outliers:
     input: 
-        case_vcf = "repeat_outliers/{family}.trgt.sorted.vcf.gz",
+        case_vcf = "repeat_outliers/{family}.trgt.vcf.gz",
         control_vcf = config["trgt"]["control_alleles"], 
         lps = "repeat_outliers/{family}.trgt.lps.combined.tsv"
     output: "repeat_outliers/{family}.repeat.outliers.tsv"
