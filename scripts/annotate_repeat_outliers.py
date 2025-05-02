@@ -159,14 +159,13 @@ def main(
         ["Chromosome", "Start", "End", "trid", "motif", "gene_name", "gene_id", "gene_biotype", "Feature"]
         + ["omim_phenotype","omim_inheritance", "HPO"]
         + ["gene", "lof.oe_ci.upper", "lof.pLI", "OE_len"]
-        + ["ENCODE_promoter_ID", "ENCODE_promoter_coord", "range", "cutoff"]
+        + ["ENCODE_promoter_ID", "ENCODE_promoter_coord", "range", "cutoff", "allele_len_std"]
         + c4r_col
         + lps_cols
         + ["max_z_score_len", "num_samples"]
         + al_cols
         + z_score_cols
         + z_score_ranks_cols
-        + ["allele_len_std"]
         + am_cols
         + mp_cols
     ]
