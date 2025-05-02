@@ -47,6 +47,15 @@ def main(
         ]
     hits_pivot["max_z_score_len"] = hits_pivot[z_score_cols].max(axis=1)
 
+    # make a column with maximum LPS across samples
+    lps_cols = [col for col in hits_pivot.columns if "LPS" in col]
+    for col in lps_cols:
+        hits_pivot[col] = [
+            lps if not pd.isnull(lps) else None
+            for lps in hits_pivot[col]
+        ]
+    hits_pivot["max_LPS"] = hits_pivot[lps_cols].max(axis=1)
+
     # filter out non-outliers
     print("Filter outliers")
     hits_pivot = hits_pivot[hits_pivot["max_z_score_len"].abs() >= 3]
@@ -153,7 +162,7 @@ def main(
     am_cols = [col for col in hits_gene_omim.columns if "AM" in col]
     mp_cols = [col for col in hits_gene_omim.columns if "MP" in col]
     z_score_ranks_cols = [col for col in hits_gene_omim.columns if "z_score_len_rank" in col]
-    lps_cols = [col for col in hits_gene_omim.columns if "LPS" in col]
+    lps_cols = [col for col in hits_gene_omim.columns if "LPS" in col and 'max' not in col]
 
     hits_gene_omim = hits_gene_omim[
         ["Chromosome", "Start", "End", "trid", "motif", "gene_name", "gene_id", "gene_biotype", "Feature"]
@@ -161,6 +170,7 @@ def main(
         + ["gene", "lof.oe_ci.upper", "lof.pLI", "OE_len"]
         + ["ENCODE_promoter_ID", "ENCODE_promoter_coord", "range", "cutoff", "allele_len_std"]
         + c4r_col
+        + ["max_LPS"]
         + lps_cols
         + ["max_z_score_len", "num_samples"]
         + al_cols
