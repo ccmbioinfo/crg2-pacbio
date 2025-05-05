@@ -123,8 +123,8 @@ def main(
     promoters = pr.read_bed(promoters)
     hits_gene_omim_pr = pr.PyRanges(hits_gene_omim)
     hits_gene_omim = hits_gene_omim_pr.join(promoters, how="left", suffix="_promoter").df
-    hits_gene_omim["ENCODE_promoter_coord"] = hits_gene_omim["Chromosome"].astype(str) + ":" + hits_gene_omim["Start_promoter"].astype(str) + "-" + hits_gene_omim["End_promoter"].astype(str)
-    hits_gene_omim.loc[hits_gene_omim["Score"] == -1, "ENCODE_promoter_coord"] = "."
+    hits_gene_omim.loc[hits_gene_omim["Score"] == "-1", "ENCODE_promoter_coord"] = "."
+    hits_gene_omim.loc[hits_gene_omim["Score"] != "-1", "ENCODE_promoter_coord"] = hits_gene_omim["Chromosome"].astype(str) + ":" + hits_gene_omim["Start_promoter"].astype(str) + "-" + hits_gene_omim["End_promoter"].astype(str)
     hits_gene_omim.rename(columns={"Score": "ENCODE_promoter_ID"}, inplace=True)
     hits_gene_omim = hits_gene_omim.drop(columns=["Start_promoter", "End_promoter", "Name", "Strand"])
 
