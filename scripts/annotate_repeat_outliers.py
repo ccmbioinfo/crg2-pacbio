@@ -107,6 +107,7 @@ def main(
      
     try: 
         c4r_counts = pd.read_csv(c4r_counts)
+        c4r_counts["TRID"] = c4r_counts["TRID"].str.rsplit("_", n=3).str[0] + "_" + c4r_counts["TRID"].str.split("_").str[4]
         hits_gene_omim = hits_gene_omim.merge(c4r_counts, left_on="trid", right_on="TRID", how="left")
         hits_gene_omim["count"] = hits_gene_omim["count"].replace(np.nan, 0)
         hits_gene_omim = hits_gene_omim.rename({"count": "C4R_outlier_count", "samples": "C4R_outlier_samples"}, axis=1)
