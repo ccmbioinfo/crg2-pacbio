@@ -204,6 +204,10 @@ def main(
 
     # drop dups
     hits_gene_omim = hits_gene_omim.drop_duplicates()
+
+    # sort by max_LPS
+    hits_gene_omim = hits_gene_omim.sort_values(by="max_LPS", ascending=False)
+    
     # write to file
     today = date.today()
     today = today.strftime("%Y-%m-%d")
