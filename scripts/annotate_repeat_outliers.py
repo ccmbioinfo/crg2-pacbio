@@ -67,7 +67,7 @@ def main(
     # make a column that sums the number of individuals carrying a particular repeat expansion
     al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
     hits_pivot["num_samples"] = hits_pivot.apply(
-        lambda row: num_expanded(row, al_cols), axis=1
+        lambda row: num_expanded(row, al_cols, z_score_cols), axis=1
     )
 
     # convert hits to PyRanges object
@@ -124,6 +124,7 @@ def main(
     hits_gene_omim_pr = pr.PyRanges(hits_gene_omim)
     hits_gene_omim = hits_gene_omim_pr.join(promoters, how="left", suffix="_promoter").df
     hits_gene_omim["ENCODE_promoter_coord"] = hits_gene_omim["Chromosome"].astype(str) + ":" + hits_gene_omim["Start_promoter"].astype(str) + "-" + hits_gene_omim["End_promoter"].astype(str)
+    hits_gene_omim.loc[hits_gene_omim["Score"] == -1, "ENCODE_promoter_coord"] = "."
     hits_gene_omim.rename(columns={"Score": "ENCODE_promoter_ID"}, inplace=True)
     hits_gene_omim = hits_gene_omim.drop(columns=["Start_promoter", "End_promoter", "Name", "Strand"])
 
@@ -198,7 +199,7 @@ def main(
     except KeyError:
         pass 
     hits_gene_omim.fillna(".", inplace=True)
-    hits_gene_omim.replace({"-1": ".", "1:-1--1": "."}, inplace=True)
+    hits_gene_omim.replace({"-1": ".", "1:-1--1": ".", " ": ".", "nan": "."}, inplace=True)
 
     # drop dups
     hits_gene_omim = hits_gene_omim.drop_duplicates()

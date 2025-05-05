@@ -352,13 +352,14 @@ def filter_outliers(row: pd.Series, allele_len_cols: list) -> bool:
         return True # missing in control database
 
 
-def num_expanded(row: pd.Series, allele_len_cols: list) -> bool:
+def num_expanded(row: pd.Series, allele_len_cols: list, z_score_cols: list) -> bool:
     """
-    Sum number of individuals in whom repeat is expanded (i.e. allele length > cutoff)
+    Sum number of individuals in whom repeat is expanded (i.e. allele length > cutoff AND Z-score > 3)
     """
     allele_lens = [row[allele_len] for allele_len in allele_len_cols]
+    z_scores = [row[z_score] for z_score in z_score_cols]
     cutoff = row["cutoff"] if not pd.isna(row["cutoff"]) else 0
-    greater_than = sum([allele_len >= cutoff for allele_len in allele_lens])
+    greater_than = sum([allele_len >= cutoff and z_score >= 3 for allele_len, z_score in zip(allele_lens, z_scores)])
 
     return greater_than
 
