@@ -112,14 +112,14 @@ def main(
         c4r_counts["TRID"] = c4r_counts["TRID"].str.rsplit("_", n=3).str[0] + "_" + c4r_counts["TRID"].str.split("_").str[4]
         hits_gene_omim = hits_gene_omim.merge(c4r_counts, left_on="trid", right_on="TRID", how="left")
         hits_gene_omim["count"] = hits_gene_omim["count"].replace(np.nan, 0)
-        hits_gene_omim = hits_gene_omim.rename({"count": "C4R_outlier_count", "samples": "C4R_outlier_samples"}, axis=1)
-        c4r_col = ["C4R_outlier_count", "C4R_outlier_samples"]
+        hits_gene_omim = hits_gene_omim.rename({"count": "C4R_outlier_count", "samples": "C4R_outlier_samples", "allele_lens": "C4R_outlier_allele_lens"}, axis=1)
+        c4r_col = ["C4R_outlier_count", "C4R_outlier_samples", "C4R_outlier_allele_lens"]
     except:
         print("Failed to add C4R counts") 
         c4r_col = []
     
     if c4r != "True": 
-        c4r_col = ["C4R_outlier_count"] # remove C4R sample IDs for non-C4R projects
+        c4r_col = ["C4R_outlier_count", "C4R_outlier_allele_lens"] # remove C4R sample IDs for non-C4R projects
 
 
     # add promoters
