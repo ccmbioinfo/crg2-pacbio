@@ -194,7 +194,8 @@ def main(
             "End": "END",
             "trid": "TRID",
             "gene": "gnomad_constraint_gene",
-            "allele_len_std": "CMH_allele_len_std"
+            "allele_len_std": "CMH_allele_len_std",
+            "range": "control_range"
         }
     )
 
