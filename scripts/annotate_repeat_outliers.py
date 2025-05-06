@@ -193,9 +193,11 @@ def main(
             "Start": "POS",
             "End": "END",
             "trid": "TRID",
-            "gene": "gnomad_constraint_gene",
+            "gene": "gnomad_constraint_gene", 
             "allele_len_std": "CMH_allele_len_std",
-            "range": "control_range"
+            "range": "CMH_allele_len_range",
+            "cutoff": "CMH_outlier_cutoff",
+            "OE_len": "TR_constraint"
         }
     )
 
