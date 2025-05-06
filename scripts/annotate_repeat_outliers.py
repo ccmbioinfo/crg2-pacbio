@@ -58,6 +58,10 @@ def main(
         ]
     hits_pivot["max_LPS"] = hits_pivot[lps_cols].max(axis=1)
 
+    # make a column with maximum allele length across samples
+    al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
+    hits_pivot["max_sample_allele_len"] = hits_pivot[al_cols].max(axis=1)
+
     # filter out non-outliers
     print("Filter outliers")
     hits_pivot = hits_pivot[hits_pivot["max_z_score_len"].abs() >= 3]
@@ -67,7 +71,6 @@ def main(
     hits_pivot = annotate_motif(hits_pivot, repeat_catalog)
 
     # make a column that sums the number of individuals carrying a particular repeat expansion
-    al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
     hits_pivot["num_samples"] = hits_pivot.apply(
         lambda row: num_expanded(row, al_cols, z_score_cols), axis=1
     )
@@ -165,7 +168,7 @@ def main(
 
     am_cols = [col for col in hits_gene_omim.columns if "AM" in col]
     mp_cols = [col for col in hits_gene_omim.columns if "MP" in col]
-    z_score_ranks_cols = [col for col in hits_gene_omim.columns if "z_score_len_rank" in col]
+    z_score_ranks_cols = [col for col in hits_gene_omim.columns if "z_score_len_rank" in col and 'min' not in col]
     lps_cols = [col for col in hits_gene_omim.columns if "LPS" in col and 'max' not in col]
 
     hits_gene_omim = hits_gene_omim[
@@ -174,9 +177,9 @@ def main(
         + ["gene", "lof.oe_ci.upper", "lof.pLI", "OE_len"]
         + ["ENCODE_promoter_ID", "ENCODE_promoter_coord", "range", "cutoff", "allele_len_std"]
         + c4r_col
-        + ["max_LPS"]
+        + ["max_sample_allele_len", "max_z_score_len", "min_z_score_len_rank", "max_LPS"]
         + lps_cols
-        + ["max_z_score_len", "min_z_score_len_rank", "num_samples"]
+        + ["num_samples"]
         + al_cols
         + z_score_cols
         + z_score_ranks_cols
