@@ -71,7 +71,7 @@ def main(
     hits_pivot = annotate_motif(hits_pivot, repeat_catalog)
 
     # make a column that sums the number of individuals carrying a particular repeat expansion
-    hits_pivot["num_samples"] = hits_pivot.apply(
+    hits_pivot["num_outlier_samples"] = hits_pivot.apply(
         lambda row: num_expanded(row, al_cols, z_score_cols), axis=1
     )
 
@@ -179,7 +179,7 @@ def main(
         + c4r_col
         + ["max_sample_allele_len", "max_z_score_len", "min_z_score_len_rank", "max_LPS"]
         + lps_cols
-        + ["num_samples"]
+        + ["num_outlier_samples"]
         + al_cols
         + z_score_cols
         + z_score_ranks_cols
