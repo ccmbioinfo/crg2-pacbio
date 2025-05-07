@@ -8,6 +8,7 @@ from typing import Optional
 
 from annotation.annotate import (
     pivot_hits,
+    filter_outliers,
     hits_to_pr,
     annotate_motif,
     annotate_genes,
@@ -46,7 +47,17 @@ def main(
             round(score, 3) if not pd.isnull(score) else None
             for score in hits_pivot[col]
         ]
+    # filter out non-outliers
+    print("Filter outliers by outlier cutoff and Z-score")
+    al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
+    hits_pivot["outlier"] = hits_pivot.apply(
+        lambda row: filter_outliers(row, al_cols), axis=1
+    )
+    hits_pivot = hits_pivot[hits_pivot["outlier"]]
     hits_pivot["max_z_score_len"] = hits_pivot[z_score_cols].max(axis=1)
+    hits_pivot = hits_pivot[hits_pivot["max_z_score_len"] >= 3]
+
+
     hits_pivot["min_z_score_len_rank"] = hits_pivot[z_score_len_rank_cols].min(axis=1)
 
     # make a column with maximum LPS across samples
@@ -61,10 +72,6 @@ def main(
     # make a column with maximum allele length across samples
     al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
     hits_pivot["max_sample_allele_len"] = hits_pivot[al_cols].max(axis=1)
-
-    # filter out non-outliers
-    print("Filter outliers")
-    hits_pivot = hits_pivot[hits_pivot["max_z_score_len"].abs() >= 3]
 
     # annotate with motif
     print("Annotate with motif")
