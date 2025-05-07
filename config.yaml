@@ -73,6 +73,7 @@ trgt:
   gnomad_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/gnomad.v4.0.constraint_metrics.tsv"
   segdup: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/data/reference/annotation/GRCh38.segdups.bed.gz"
   control_alleles: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/code/scripts/trgt/crg2-pacbio/scripts/VCFs/cmh_0.4.0.sorted.no.missing.95perc.vcf.gz"
+  control_alleles_tsv: "/hpf/largeprojects/ccmbio/mcouse/pacbio_report_dev/results/create_cmh_allele_db/repeat_outliers/allele_db/CMH.trgt.v0.5.0.alleles.1436.samples.20240624.tsv"
   C4R_outliers: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/C4R_all_outliers_batch/outliers/aggregated_outliers_2024-10-09.csv"
   adotto_repeats: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/repeat_definitions/adotto_repeats.hg38.bed"
   promoters: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/GRCh38-PLS.bed"
