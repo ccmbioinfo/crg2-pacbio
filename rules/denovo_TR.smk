@@ -49,9 +49,9 @@ rule trgt_denovo:
         done < {input.ID_map}
 
         # Get BAM paths
-        child_bam=`cat {input.samples} | grep -P "{wildcards.child}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/'`
-        father_bam=`cat {input.samples} | grep -P "${{father_ID}}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/'`
-        mother_bam=`cat {input.samples} | grep -P "${{mother_ID}}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/'`
+        child_bam=`cat {input.samples} | grep -P "{wildcards.child}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/' | sed 's/.haplotagged//'`
+        father_bam=`cat {input.samples} | grep -P "${{father_ID}}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/' | sed 's/.haplotagged//'`  
+        mother_bam=`cat {input.samples} | grep -P "${{mother_ID}}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/' | sed 's/.haplotagged//'`
 	echo         {params.trgt_denovo} trio --reference {params.ref} \
                 --bed {params.bed} \
                 --father $father_bam \
@@ -78,7 +78,7 @@ rule annotate_trgt_denovo:
       constraint = config["trgt"]["gnomad_constraint"],
       OMIM = config["annotation"]["omim_path"],
       segdup = config["trgt"]["segdup"],
-      controls = config["trgt"]["control_alleles"],
+      controls = config["trgt"]["control_alleles_tsv"],
       c4r = config["annotation"]["c4r"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
       c4r_outliers = config["trgt"]["C4R_outliers"]
