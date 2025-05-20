@@ -55,16 +55,27 @@ def SVs_to_pr(svs: str, sample: str) -> pr.PyRanges:
     )
     # filter out variants that are hom ref in this sample
     try:
-        svs = svs[svs[f"{sample}_GT"] != "0/0"]
-    except KeyError: # renamed genesteps samples
-        sample_split = sample.rsplit("_", 1)
-        sample = sample_split[0].replace("_", "") + "_" + sample_split[1]
-        svs = svs[svs[f"{sample}_GT"] != "0/0"]
-
-    try:
-        svs = svs[["Chromosome", "Start", "End", "SVTYPE", f"{sample}_GT", "cmh_maxAF"]]
+        sample_gt_col = f"{sample}_GT"
+        svs = svs[svs[sample_gt_col] != "0/0"]
     except KeyError:
-        svs = svs[["Chromosome", "Start", "End", "SVTYPE", f"{sample}_GT", "CoLoRSdb_maxAF"]]
+        try: # renamed genesteps samples
+            sample_split = sample.rsplit("_", 1)
+            sample_gt_col = sample_split[0].replace("_", "") + "_" + sample_split[1] + "_GT"
+            svs = svs[svs[sample_gt_col] != "0/0"]
+        except KeyError: # C4R PacBio pilot 1 
+            try:
+                participant = sample.split("_")[1]
+                sample_gt_col = [i for i in svs.columns if participant in i and "GT" in i][0]
+                svs = svs[svs[sample_gt_col] != "0/0"]
+            except IndexError:
+                participant = sample.replace("_DNA_", "").replace("_A1", "") # e.g. DSK_DNA_023_03_A1
+                sample_gt_col = [i for i in svs.columns if participant in i and "GT" in i][0]
+                svs = svs[svs[sample_gt_col] != "0/0"]
+
+    try: 
+        svs = svs[["Chromosome", "Start", "End", "SVTYPE", sample_gt_col, "cmh_maxAF"]]
+    except KeyError:
+        svs = svs[["Chromosome", "Start", "End", "SVTYPE", sample_gt_col, "CoLoRSdb_maxAF"]]
     svs_pr = pr.PyRanges(svs)
 
     return svs_pr
@@ -74,11 +85,29 @@ def CNVs_to_pr(cnvs: str, sample: str) -> pr.PyRanges:
     """
     Filter CNVs for sample of interest and convert to PyRanges object
     """
-    cnvs = pd.read_csv(cnvs, sep="\t")
+    try:
+        cnvs = pd.read_csv(cnvs, sep="\t")
+    except: # no CNV report for this sample
+        return None
     cnvs.rename(
         columns={"CHROM": "Chromosome", "START": "Start", "END": "End"}, inplace=True
     )
-    cnvs = cnvs[["Chromosome", "Start", "End", "SVTYPE", f"{sample}|GT"]]
+    try:
+        cnvs = cnvs[["Chromosome", "Start", "End", "SVTYPE", f"{sample}|GT"]]
+    except KeyError:
+        try:
+            participant = sample.replace("_DNA_", "").replace("_A1", "") # e.g. DSK_DNA_023_03_A1
+            sample_gt_col = [i for i in cnvs.columns if participant in i and "GT" in i][0]
+            cnvs = cnvs[["Chromosome", "Start", "End", "SVTYPE", sample_gt_col]]
+        except IndexError:
+            try:
+                participant = sample.replace("DSK_", "").replace("DSK", "") # e.g. DSK_021_03
+                sample_gt_col = [i for i in cnvs.columns if participant in i and "GT" in i][0]
+                cnvs = cnvs[["Chromosome", "Start", "End", "SVTYPE", sample_gt_col]]
+            except IndexError:
+                participant = sample.rsplit("_", 1)[0]  + "." + sample.rsplit("_", 1)[1] # e.g. DSK_007.03
+                sample_gt_col = [i for i in cnvs.columns if participant in i and "GT" in i][0]
+                cnvs = cnvs[["Chromosome", "Start", "End", "SVTYPE", sample_gt_col]]
     cnvs["Chromosome"] = cnvs["Chromosome"].astype(str)
     cnvs["Chromosome"] = cnvs["Chromosome"].str.replace("chr", "")
     cnvs_pr = pr.PyRanges(cnvs)
@@ -91,13 +120,16 @@ def TRs_to_pr(trs: str, sample: str) -> pr.PyRanges:
     Filter Tandem repeat for sample of interest and z-score >= 3 and convert to PyRanges object
     """
     trs = pd.read_csv(trs)
-    trs = trs[(trs["sample"] == sample) & (trs["z_score_len"] >= 3)]
-    trs["Chromosome"] = trs["case_trid"].str.split("_").str[0].str.replace("chr", "")
-    trs["Start"] = trs["case_trid"].str.split("_").str[1].astype(int)
-    trs["End"] = trs["case_trid"].str.split("_").str[2].astype(int)
-    trs["motif"] = trs["case_trid"].str.split("_").str[3]
-    trs = trs[["Chromosome", "Start", "End", "z_score_len", "motif"]]
-    trs_pr = pr.PyRanges(trs)
+    trs_filter = trs[(trs["sample"] == sample) & (trs["z_score_len"] >= 3)]
+    if len(trs_filter) == 0:
+        sample_split = sample.split("_")[1]
+        trs_filter = trs[(trs["sample"].str.contains(sample_split)) & (trs["z_score_len"] >= 3)]
+    trs_filter["Chromosome"] = trs_filter["case_trid"].str.split("_").str[0].str.replace("chr", "")
+    trs_filter["Start"] = trs_filter["case_trid"].str.split("_").str[1].astype(int)
+    trs_filter["End"] = trs_filter["case_trid"].str.split("_").str[2].astype(int)
+    trs_filter["motif"] = trs_filter["case_trid"].str.split("_").str[3] 
+    trs_filter = trs_filter[["Chromosome", "Start", "End", "z_score_len", "motif"]]
+    trs_pr = pr.PyRanges(trs_filter)
 
     return trs_pr
 
@@ -144,9 +176,35 @@ def find_closest_variant(
                 columns=["SVTYPE", GT_col, "CoLoRSdb_maxAF", "Distance"], inplace=True
             )
     elif suffix == "CNV":
-        outliers_variant.drop(
-            columns=["SVTYPE", f"{sample}|GT", "Distance"], inplace=True
-        )
+        try:
+            GT_col = [i for i in outliers_variant.columns if "GT" in i][0]
+            outliers_variant.drop(
+                columns=["SVTYPE", GT_col, "Distance"], inplace=True
+            )
+        except KeyError:
+            try:
+                participant = sample.replace("_DNA_", "").replace("_A1", "") # e.g. DSK_DNA_023_03_A1
+                sample_gt_col = [i for i in outliers_variant.columns if participant in i and "GT" in i][0]
+                GT_col = sample_gt_col
+                outliers_variant.drop(
+                    columns=["SVTYPE", GT_col, "Distance"], inplace=True
+                )
+            except KeyError:
+                try:
+                    participant = sample.replace("DSK_", "").replace("DSK", "") # e.g. DSK_021_03
+                    sample_gt_col = [i for i in outliers_variant.columns if participant in i and "GT" in i][0]
+                    GT_col = sample_gt_col
+                    outliers_variant.drop(
+                        columns=["SVTYPE", GT_col, "Distance"], inplace=True
+                    )
+                except KeyError:
+                    participant = sample.rsplit("_", 1)[0]  + "." + sample.rsplit("_", 1)[1] # e.g. DSK_007.03
+                    sample_gt_col = [i for i in outliers_variant.columns if participant in i and "GT" in i][0]
+                    GT_col = sample_gt_col
+                    outliers_variant.drop(
+                        columns=["SVTYPE", GT_col, "Distance"], inplace=True
+                    )
+                
     elif suffix == "TR":
         outliers_variant.drop(
             columns=["z_score_len", "motif", "Distance"], inplace=True
@@ -173,10 +231,30 @@ def collapse_variant_anno(row: pd.Series, variant: str, sample: str) -> str:
             try:
                 GT_col = [i for i in row.index if "GT" in i and sample in i][0]
             except IndexError:
-                sample_split = sample.rsplit("_", 1)
-                sample = sample_split[0].replace("_", "") + "_" + sample_split[1]
-                GT_col = [i for i in row.index if "GT" in i and sample in i][0]
-            if "cmh_maxAF" in row.index:
+                try:
+                    sample_split = sample.rsplit("_", 1)
+                    sample_split = sample_split[0].replace("_", "") + "_" + sample_split[1]
+                    GT_col = [i for i in row.index if "GT" in i and sample_split in i][0]
+                except IndexError:
+                    try:
+                        participant = sample.split("_")[1]
+                        sample_gt_col = [i for i in row.index if participant in i and "GT" in i][0]
+                        GT_col = sample_gt_col
+                    except IndexError:
+                        try:
+                            participant = sample.replace("_DNA_", "").replace("_A1", "") # e.g. DSK_DNA_023_03_A1
+                            sample_gt_col = [i for i in row.index if participant in i and "GT" in i][0]
+                            GT_col = sample_gt_col
+                        except IndexError:
+                            try:
+                                participant = sample.replace("DSK_", "").replace("DSK", "") # e.g. DSK_021_03
+                                sample_gt_col = [i for i in row.index if participant in i and "GT" in i][0]
+                                GT_col = sample_gt_col
+                            except IndexError:
+                                participant = sample.rsplit("_", 1)[0]  + "." + sample.rsplit("_", 1)[1] # e.g. DSK_007.03
+                                sample_gt_col = [i for i in row.index if participant in i and "GT" in i][0]
+                                GT_col = sample_gt_col
+            if "cmh_maxAF" in row.index: 
                 af_col = "cmh_maxAF"
             else:
                 af_col = "CoLoRSdb_maxAF"
@@ -198,7 +276,22 @@ def collapse_variant_anno(row: pd.Series, variant: str, sample: str) -> str:
                 + str(row.Distance)
             )
         elif variant == "CNV":
-            GT_col = [i for i in row.index if "GT" in i and sample in i][0]
+            try:
+                GT_col = [i for i in row.index if "GT" in i and sample in i][0]
+            except IndexError:
+                try:
+                    participant = sample.replace("_DNA_", "").replace("_A1", "") # e.g. DSK_DNA_023_03_A1
+                    sample_gt_col = [i for i in row.index if participant in i and "GT" in i][0]
+                    GT_col = sample_gt_col
+                except IndexError:
+                    try:
+                        participant = sample.replace("DSK_", "").replace("DSK", "") # e.g. DSK_021_03
+                        sample_gt_col = [i for i in row.index if participant in i and "GT" in i][0]
+                        GT_col = sample_gt_col
+                    except IndexError:
+                        participant = sample.rsplit("_", 1)[0]  + "." + sample.rsplit("_", 1)[1] # e.g. DSK_007.03
+                        sample_gt_col = [i for i in row.index if participant in i and "GT" in i][0]
+                        GT_col = sample_gt_col
             variant = (
                 "CNV"
                 + ":"
@@ -380,22 +473,46 @@ def main(
     outliers_pr = pr.PyRanges(outliers[["Chromosome", "Start", "End"]])
 
     # annotate with sample variants: SVs, CNVs, TRs, and small variants
-    SVs_pr = SVs_to_pr(SV_path, sample)
-    CNVs_pr = CNVs_to_pr(CNV_path, sample)
-    TRs_pr = TRs_to_pr(TR_outlier_path, sample)
-    SMVs_pr = small_variants_to_pr(SMV_path)
+    try:
+        SVs_pr = SVs_to_pr(SV_path, sample)
+        CNVs_pr = CNVs_to_pr(CNV_path, sample)
+        TRs_pr = TRs_to_pr(TR_outlier_path, sample)
+        SMVs_pr = small_variants_to_pr(SMV_path)
+    except KeyError:
+        try:
+            sample = f"{sample}_RLGS"
+            SVs_pr = SVs_to_pr(SV_path, sample)
+            CNVs_pr = CNVs_to_pr(CNV_path, sample)
+            TRs_pr = TRs_to_pr(TR_outlier_path, sample)
+            SMVs_pr = small_variants_to_pr(SMV_path)
+        except KeyError:
+            sample = sample.replace("RLGS", "RLGA")
+            SVs_pr = SVs_to_pr(SV_path, sample)
+            CNVs_pr = CNVs_to_pr(CNV_path, sample)
+            TRs_pr = TRs_to_pr(TR_outlier_path, sample)
+            SMVs_pr = small_variants_to_pr(SMV_path)
+
 
     outliers_sv = find_closest_variant(outliers_pr, SVs_pr, sample, "SV")
-    outliers_cnv = find_closest_variant(outliers_pr, CNVs_pr, sample, "CNV")
+    if CNVs_pr is not None:
+        outliers_cnv = find_closest_variant(outliers_pr, CNVs_pr, sample, "CNV")
     outliers_tr = find_closest_variant(outliers_pr, TRs_pr, sample, "TR")
     outliers_smv = find_closest_variant(outliers_pr, SMVs_pr, sample, "SMV")
 
-    outliers_variants = (
-        outliers.merge(outliers_sv, on=["Chromosome", "Start", "End"], how="left")
-        .merge(outliers_cnv, on=["Chromosome", "Start", "End"], how="left")
-        .merge(outliers_tr, on=["Chromosome", "Start", "End"], how="left")
-        .merge(outliers_smv, on=["Chromosome", "Start", "End"], how="left")
-    )
+    if CNVs_pr is not None:
+        outliers_variants = (
+            outliers.merge(outliers_sv, on=["Chromosome", "Start", "End"], how="left")
+            .merge(outliers_cnv, on=["Chromosome", "Start", "End"], how="left")
+            .merge(outliers_tr, on=["Chromosome", "Start", "End"], how="left")
+            .merge(outliers_smv, on=["Chromosome", "Start", "End"], how="left")
+        )
+    else:
+        outliers_variants = (
+            outliers.merge(outliers_sv, on=["Chromosome", "Start", "End"], how="left")
+            .merge(outliers_tr, on=["Chromosome", "Start", "End"], how="left")
+            .merge(outliers_smv, on=["Chromosome", "Start", "End"], how="left")
+        )
+        outliers_variants["closest_CNV"] = np.nan
 
     outliers_variants["nearby_variant"] = outliers_variants.apply(
         lambda x: (";").join(
