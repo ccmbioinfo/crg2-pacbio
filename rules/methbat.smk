@@ -125,7 +125,24 @@ rule filter_sample_smvs:
             participant=`echo {wildcards.sample}| cut -d'_' -f4`
             sample=`echo -e "${{family}}_${{participant}}"`
             bcftools query -s $sample -i '(INFO/gnomad_af_popmax <0.01 | INFO/gnomad_af_popmax == ".") & GT!="RR" & GT!="./." ' {input} -f '%CHROM\t%POS0\t%END\t%REF\t%ALT\t[%GT]\t%gnomad_af_popmax\n' > {output}
-        }}
+        }} || {{
+           # some samples from TCAG have RLGS suffix
+           sample="{wildcards.sample}_RLGS"
+           bcftools query -s $sample -i '(INFO/gnomad_af_popmax <0.01 | INFO/gnomad_af_popmax == ".") & GT!="RR" & GT!="./." ' {input} -f '%CHROM\t%POS0\t%END\t%REF\t%ALT\t[%GT]\t%gnomad_af_popmax\n' > {output}
+        }} || {{
+	       sample="{wildcards.sample}_RLGA"
+           bcftools query -s $sample -i '(INFO/gnomad_af_popmax <0.01 | INFO/gnomad_af_popmax == ".") & GT!="RR" & GT!="./." ' {input} -f '%CHROM\t%POS0\t%END\t%REF\t%ALT\t[%GT]\t%gnomad_af_popmax\n' > {output}
+        }} || {{
+           participant=`echo {wildcards.sample} | cut -d'_' -f2`
+           sample=`ls /hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/data/ | grep -v RNA | grep $participant`
+           bcftools query -s $sample -i '(INFO/gnomad_af_popmax <0.01 | INFO/gnomad_af_popmax == ".") & GT!="RR" & GT!="./." ' {input} -f '%CHROM\t%POS0\t%END\t%REF\t%ALT\t[%GT]\t%gnomad_af_popmax\n' > {output}
+        }} || {{
+           sample=`echo {wildcards.sample} | sed 's/_DNA_//' | sed 's/_A1//'`
+           bcftools query -s $sample -i '(INFO/gnomad_af_popmax <0.01 | INFO/gnomad_af_popmax == ".") & GT!="RR" & GT!="./." ' {input} -f '%CHROM\t%POS0\t%END\t%REF\t%ALT\t[%GT]\t%gnomad_af_popmax\n' > {output}
+}} || {{
+           sample=`echo {wildcards.sample} | sed 's/DSK_/DSK/'`
+           bcftools query -s $sample -i '(INFO/gnomad_af_popmax <0.01 | INFO/gnomad_af_popmax == ".") & GT!="RR" & GT!="./." ' {input} -f '%CHROM\t%POS0\t%END\t%REF\t%ALT\t[%GT]\t%gnomad_af_popmax\n' > {output}
+}}
         """
 
 rule methbat_annotate_outliers:
