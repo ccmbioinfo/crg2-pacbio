@@ -78,7 +78,7 @@ rule annotate_trgt_denovo:
       constraint = config["trgt"]["gnomad_constraint"],
       OMIM = config["annotation"]["omim_path"],
       segdup = config["trgt"]["segdup"],
-      controls = config["trgt"]["control_alleles"],
+      controls = config["trgt"]["control_alleles_tsv"],
       c4r = config["annotation"]["c4r"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
       c4r_outliers = config["trgt"]["C4R_outliers"]
