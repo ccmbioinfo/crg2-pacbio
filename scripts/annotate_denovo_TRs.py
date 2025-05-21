@@ -82,8 +82,8 @@ def main(
     print("Annotate against control distributions")
     controls = pd.read_csv(controls, sep="\t")
     controls.drop(columns=["MP_mean", "MP_std", "AM_mean", "AM_std"], inplace=True)
-    # controls["merge_key"] = controls["trid"].str.rsplit("_", n=1).str[0] # CMH TRIDs don't always have motif? Possible issue with mixed TRGT versions
-    # controls.drop(columns=["trid"], inplace=True)
+    controls["merge_key"] = controls["trid"].str.rsplit("_", n=1).str[0] # CMH TRIDs don't always have motif? Possible issue with mixed TRGT versions
+    controls.drop(columns=["trid"], inplace=True)
     controls.rename(columns={"trid": "merge_key"}, inplace=True)
     hits_gene_omim["merge_key"] = hits_gene_omim["trid"].str.rsplit("_", n=1).str[0]
     hits_gene_omim = hits_gene_omim.merge(controls, on="merge_key", how="left")
