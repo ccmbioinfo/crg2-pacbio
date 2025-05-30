@@ -115,7 +115,8 @@ rule find_repeat_outliers:
     input: 
         case_vcf = "repeat_outliers/{family}.trgt.vcf.gz",
         control_vcf = config["trgt"]["control_alleles"], 
-        lps = "repeat_outliers/{family}.trgt.lps.combined.tsv"
+        lps = "repeat_outliers/{family}.trgt.lps.combined.tsv",
+        control_lps = config["trgt"]["control_lps"]
     output: "repeat_outliers/{family}.repeat.outliers.tsv"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"]
@@ -129,6 +130,7 @@ rule find_repeat_outliers:
         (python3 {params.crg2_pacbio}/scripts/find_repeat_outliers.py --case_vcf {input.case_vcf} \
             --control_vcf {input.control_vcf} \
             --case_lps {input.lps} \
+            --control_lps {input.control_lps} \
             --output_file  {output}) > {log} 2>&1 
         """
 

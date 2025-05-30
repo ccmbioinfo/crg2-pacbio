@@ -1,4 +1,5 @@
 import argparse
+import ast
 import pandas as pd
 import numpy as np
 import pysam
@@ -50,6 +51,7 @@ def process_variant(variant, samples):
             allele_dict["long_AM"].append(AM[max_index])
             allele_dict["short_MP"].append(MP[min_index])
             allele_dict["long_MP"].append(MP[max_index])
+
     return allele_dict
 
 def calculate_stats(allele_dict):
@@ -131,20 +133,17 @@ def sample_vcf_to_dict(case_vcf, LPS_dict):
                 if sample_prefix not in sample_dict:
                     sample_dict[sample_prefix] = {}
 
-                sample_dict[sample_prefix][trid] = [short_allele_len, long_allele_len, short_allele_lps, long_allele_lps, AM_short_allele, AM_long_allele, MP_short_allele, MP_long_allele]
+                sample_dict[sample_prefix][trid] = [short_allele_len, long_allele_len, short_allele_lps, long_allele_lps, AM_short_allele, AM_long_allele, MP_short_allele, MP_long_allele, min_index, max_index]
     
     return sample_dict
 
-
-
-# iterate through background variants and compute allele stats
-# for each TRID, calculate stats
-# add TRID stats to sample dictionary (to output to df)
-def main(case_vcf, case_lps, control_vcf, output_file):
+def case_lps_to_dict(case_lps):
+    """
+    Convert case LPS TSV to dictionary {sample: {TRID: {allele1: lps_len, allele2: lps_len}}} 
+    """
     LPS_dict = {}
     case_lps = pd.read_csv(case_lps, sep="\t")
     for _, row in case_lps.iterrows(): 
-        # create dictionary in the format {sample: {TRID: {allele1: lps_len, allele2: lps_len}}} 
         sample = row["sample"]
         trid = row.trid
         if len(trid.split("_")) == 4: 
@@ -157,7 +156,44 @@ def main(case_vcf, case_lps, control_vcf, output_file):
             LPS_dict[sample][trid] = {allele: lps}
         else:
             LPS_dict[sample][trid][allele] = lps 
-    sample_dict = sample_vcf_to_dict(case_vcf, LPS_dict)
+    
+    return LPS_dict
+    
+def control_lps_to_dict(control_lps):
+    """
+    Convert control LPS TSV to dictionary {TRID: {allele1: [lps_len, mean, sd], allele2: [lps_len, mean, sd]}}
+    """
+    control_lps = pd.read_csv(control_lps, sep="\t")
+    control_LPS_dict = {}
+    for _, row in control_lps.iterrows():
+        trid = row.trid
+        allele = row.allele
+        lps = row.lps_len
+        
+        lps = [int(l) for l in ast.literal_eval(lps)]
+        mean = np.mean(lps)
+        sd = np.std(lps)
+        if trid not in control_LPS_dict:
+            control_LPS_dict[trid] = {}
+        control_LPS_dict[trid][allele] = [lps, mean, sd]
+    
+    return control_LPS_dict
+
+# iterate through background variants and compute allele stats
+# for each TRID, calculate stats
+# add TRID stats to sample dictionary (to output to df)
+def main(case_vcf, case_lps, control_vcf, control_lps, output_file):
+    # convert case LPS to dictionary
+    print("Converting case LPS to dictionary")
+    case_LPS_dict = case_lps_to_dict(case_lps)
+    # convert control LPS to dictionary
+    print("Converting control LPS to dictionary")
+    control_LPS_dict = control_lps_to_dict(control_lps)
+    # convert case vcf to dictionary
+    print("Converting case VCF to dictionary")
+    sample_dict = sample_vcf_to_dict(case_vcf, case_LPS_dict)
+    # now iterate through control VCF, calculate TR stats, and combine stats with case TR alleles and LPS values
+    print("Processing control VCF")
     with pysam.VariantFile(control_vcf, 'r') as vcf_in:
         samples = list(vcf_in.header.samples)
         sample_stat_dict = {
@@ -181,13 +217,17 @@ def main(case_vcf, case_lps, control_vcf, output_file):
             "MP_std": [],
             "z_score_MP": [],
             "LPS": [],
+            "LPS_mean": [],
+            "LPS_std": [],
+            "z_score_LPS": [],  
+            "z_score_LPS_rank": []
         }
 
         for variant in  vcf_in:
             trid = variant.info['TRID']
             if len(trid.split("_")) == 4: # older versions of TRGT include motif in TRID
                 trid = variant.info['TRID'].rsplit("_", 1)[0]
-            #print(f"Reading variant {trid}")
+            print(f"Reading variant {trid}")
             allele_dict = process_variant(variant, samples) # extract allele lengths, methylation, and motif purity for all samples at this locus
             
             try:
@@ -216,14 +256,22 @@ def main(case_vcf, case_lps, control_vcf, output_file):
                         LPS = sample_dict[case][trid][2]
                         AM =  sample_dict[case][trid][4]
                         MP = sample_dict[case][trid][6]
+                        min_index = sample_dict[case][trid][8] + 1
+                        control_LPS = control_LPS_dict[trid][min_index][0]
+                        LPS_mean = control_LPS_dict[trid][min_index][1]
+                        LPS_std = control_LPS_dict[trid][min_index][2]
+
                     else:
                         allele_len = sample_dict[case][trid][1]
                         LPS = sample_dict[case][trid][3]
                         AM =  sample_dict[case][trid][5]
                         MP = sample_dict[case][trid][7]
+                        max_index = sample_dict[case][trid][9] + 1
+                        control_LPS = control_LPS_dict[trid][max_index][0]
+                        LPS_mean = control_LPS_dict[trid][max_index][1]
+                        LPS_std = control_LPS_dict[trid][max_index][2]
 
                     sample_stat_dict["allele_len"].append(allele_len)
-                    sample_stat_dict["LPS"].append(LPS)
                     try:
                         zscore_len = (allele_len - allele_len_mean) / allele_len_std
                         dist_to_cutoff = allele_len - cutoff
@@ -260,6 +308,22 @@ def main(case_vcf, case_lps, control_vcf, output_file):
                     except: 
                         zscore_MP =  (MP - stats["MP_mean"]) / 0.1
                     sample_stat_dict["z_score_MP"].append(zscore_MP)
+                    # add LPS information
+                    sample_stat_dict["LPS"].append(LPS)
+                    sample_stat_dict["LPS_mean"].append(LPS_mean)
+                    sample_stat_dict["LPS_std"].append(LPS_std)
+                    try:
+                        zscore_LPS = (LPS - LPS_mean) / LPS_std
+                    except: 
+                        zscore_LPS =  (LPS - LPS_mean) / 0.1
+                    sample_stat_dict["z_score_LPS"].append(zscore_LPS)
+                    try:
+                        control_LPS.append(LPS)
+                        z_score_LPS_rank = get_rank(control_LPS, LPS)
+                    except: # no control z-scores available
+                        z_score_LPS_rank = np.nan
+                    sample_stat_dict["z_score_LPS_rank"].append(z_score_LPS_rank)
+
         sample_stat_df = pd.DataFrame.from_dict(sample_stat_dict).round(2)
         sample_stat_df.to_csv(output_file, sep="\t", index=False)
         return sample_stat_df
@@ -291,6 +355,12 @@ if __name__ == "__main__":
         help="Control multi-sample TRGT VCF",
     )
     parser.add_argument(
+        "--control_lps",
+        type=str,
+        required=True,
+        help="LPS values for controls calculated by TRGT-LPS",
+    )
+    parser.add_argument(
         "--output_file",
         type=str,
         required=True,
@@ -299,4 +369,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     print("Determining outlier repeats")
-    main(args.case_vcf, args.case_lps,  args.control_vcf, args.output_file)
+    main(args.case_vcf, args.case_lps,  args.control_vcf, args.control_lps, args.output_file)
