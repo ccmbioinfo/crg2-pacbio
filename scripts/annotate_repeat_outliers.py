@@ -61,7 +61,7 @@ def main(
     hits_pivot["min_z_score_len_rank"] = hits_pivot[z_score_len_rank_cols].min(axis=1)
 
     # make a column with maximum LPS across samples
-    lps_cols = [col for col in hits_pivot.columns if "LPS" in col]
+    lps_cols = [col for col in hits_pivot.columns if "LPS" in col and 'rank' not in col and 'z_score' not in col]
     for col in lps_cols:
         hits_pivot[col] = [
             lps if not pd.isnull(lps) else None

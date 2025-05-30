@@ -218,9 +218,9 @@ def main(case_vcf, case_lps, control_vcf, control_lps, output_file):
             "z_score_MP": [],
             "LPS": [],
             "LPS_mean": [],
-            "LPS_std": [],
-            "z_score_LPS": [],  
-            "z_score_LPS_rank": []
+            "LPS_std": [], 
+            "z_score_LPS": [],
+            "LPS_rank": []
         }
 
         for variant in  vcf_in:
@@ -319,10 +319,10 @@ def main(case_vcf, case_lps, control_vcf, control_lps, output_file):
                     sample_stat_dict["z_score_LPS"].append(zscore_LPS)
                     try:
                         control_LPS.append(LPS)
-                        z_score_LPS_rank = get_rank(control_LPS, LPS)
+                        LPS_rank = get_rank(control_LPS, LPS)
                     except: # no control z-scores available
-                        z_score_LPS_rank = np.nan
-                    sample_stat_dict["z_score_LPS_rank"].append(z_score_LPS_rank)
+                        LPS_rank = np.nan
+                    sample_stat_dict["LPS_rank"].append(LPS_rank)
 
         sample_stat_df = pd.DataFrame.from_dict(sample_stat_dict).round(2)
         sample_stat_df.to_csv(output_file, sep="\t", index=False)
