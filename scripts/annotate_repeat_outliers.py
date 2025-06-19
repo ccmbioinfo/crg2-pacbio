@@ -59,6 +59,8 @@ def main(
 
 
     hits_pivot["min_z_score_len_rank"] = hits_pivot[z_score_len_rank_cols].min(axis=1)
+    LPS_rank_cols = [col for col in hits_pivot.columns if "LPS_rank" in col]
+    hits_pivot["min_LPS_rank"] = hits_pivot[LPS_rank_cols].min(axis=1)
 
     # make a column with maximum LPS across samples
     lps_cols = [col for col in hits_pivot.columns if "LPS" in col and 'rank' not in col and 'z_score' not in col]
@@ -176,7 +178,7 @@ def main(
     am_cols = [col for col in hits_gene_omim.columns if "AM" in col]
     mp_cols = [col for col in hits_gene_omim.columns if "MP" in col]
     z_score_ranks_cols = [col for col in hits_gene_omim.columns if "z_score_len_rank" in col and 'min' not in col]
-    lps_cols = [col for col in hits_gene_omim.columns if "LPS" in col and 'max' not in col]
+    lps_cols = [col for col in hits_gene_omim.columns if "LPS" in col and 'max' not in col and 'min' not in col]
 
     hits_gene_omim = hits_gene_omim[
         ["Chromosome", "Start", "End", "trid", "motif", "gene_name", "gene_id", "gene_biotype", "Feature"]
@@ -184,9 +186,8 @@ def main(
         + ["gene", "lof.oe_ci.upper", "lof.pLI", "OE_len"]
         + ["ENCODE_promoter_ID", "ENCODE_promoter_coord", "range", "cutoff", "allele_len_std"]
         + c4r_col
-        + ["max_sample_allele_len", "max_z_score_len", "min_z_score_len_rank", "max_LPS"]
+        + ["max_sample_allele_len", "max_z_score_len", "min_z_score_len_rank", "num_outlier_samples", "max_LPS", "min_LPS_rank"]
         + lps_cols
-        + ["num_outlier_samples"]
         + al_cols
         + z_score_cols
         + z_score_ranks_cols
