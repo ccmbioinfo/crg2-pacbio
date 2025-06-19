@@ -84,7 +84,7 @@ rule calculate_lps:
 rule combine_lps: 
     input: 
         lps = expand("repeat_outliers/{{family}}_{sample}.trgt.lps.tsv", sample=samples.index)
-    output: "repeat_outliers/{family}.trgt.lps.combined.tsv"
+    output: "repeat_outliers/{family}.trgt.lps.combined.tsv.gz"
     log: "logs/repeat_outliers/{family}.trgt.lps.combined.log"
     run:
         import pandas as pd
@@ -97,7 +97,7 @@ rule combine_lps:
             df["sample"] = sample
             lps_list.append(df)
         lps_df = pd.concat(lps_list)
-        lps_df.to_csv(output[0], sep="\t", index=False)
+        lps_df.to_csv(output[0], sep="\t", index=False, compression="gzip")
 
 # rule sort_merged_trgt_vcf:
 #     input: "repeat_outliers/{family}.trgt.vcf.gz"
@@ -115,14 +115,14 @@ rule find_repeat_outliers:
     input: 
         case_vcf = "repeat_outliers/{family}.trgt.vcf.gz",
         control_vcf = config["trgt"]["control_alleles"], 
-        lps = "repeat_outliers/{family}.trgt.lps.combined.tsv",
+        lps = "repeat_outliers/{family}.trgt.lps.combined.tsv.gz",
         control_lps = config["trgt"]["control_lps"]
     output: "repeat_outliers/{family}.repeat.outliers.tsv"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"]
     log:  "logs/repeat_outliers/{family}.repeat.outliers.log"
     resources:
-        mem_mb = 100000
+        mem_mb = 300000
     conda: 
         "../envs/str_sv.yaml"
     shell: 
