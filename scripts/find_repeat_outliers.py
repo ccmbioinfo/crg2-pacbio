@@ -3,7 +3,7 @@ import ast
 import pandas as pd
 import numpy as np
 import pysam
-
+import gzip
 
 def resample_quantiles(counts, num_resamples=100):
     resamples = np.random.choice(counts, len(counts) * num_resamples).reshape(num_resamples, -1)
@@ -142,20 +142,25 @@ def case_lps_to_dict(case_lps):
     Convert case LPS TSV to dictionary {sample: {TRID: {allele1: lps_len, allele2: lps_len}}} 
     """
     LPS_dict = {}
-    case_lps = pd.read_csv(case_lps, sep="\t")
-    for _, row in case_lps.iterrows(): 
-        sample = row["sample"]
-        trid = row.trid
-        if len(trid.split("_")) == 4: 
-            trid = trid.rsplit("_", 1)[0]
-        allele = row.allele
-        lps = row.lps_len
-        if sample not in LPS_dict: 
-            LPS_dict[sample] = {}
-        if trid not in LPS_dict[sample]: 
-            LPS_dict[sample][trid] = {allele: lps}
-        else:
-            LPS_dict[sample][trid][allele] = lps 
+    with gzip.open(case_lps, 'r') as f:
+        for line in f: 
+            line = line.decode("utf8")
+            if line.startswith("trid"):
+                pass
+            else:
+                line_split = line.strip("\n").split("\t")
+                sample = line_split[4]
+                trid = line_split[0]
+                if len(trid.split("_")) == 4: 
+                    trid = trid.rsplit("_", 1)[0]
+                allele = int(line_split[1])
+                lps = int(line_split[3])
+                if sample not in LPS_dict: 
+                    LPS_dict[sample] = {}
+                if trid not in LPS_dict[sample]: 
+                    LPS_dict[sample][trid] = {allele: lps}
+                else:
+                    LPS_dict[sample][trid][allele] = lps 
     
     return LPS_dict
     
@@ -163,21 +168,27 @@ def control_lps_to_dict(control_lps):
     """
     Convert control LPS TSV to dictionary {TRID: {allele1: [lps_len, mean, sd], allele2: [lps_len, mean, sd]}}
     """
-    control_lps = pd.read_csv(control_lps, sep="\t")
     control_LPS_dict = {}
-    for _, row in control_lps.iterrows():
-        trid = row.trid
-        allele = row.allele
-        lps = row.lps_len
-        
-        lps = [int(l) for l in ast.literal_eval(lps)]
-        mean = np.mean(lps)
-        sd = np.std(lps)
-        if trid not in control_LPS_dict:
-            control_LPS_dict[trid] = {}
-        control_LPS_dict[trid][allele] = [lps, mean, sd]
+    with gzip.open(control_lps, 'r') as f:
+        for line in f: 
+            line = line.decode("utf8")
+            if line.startswith("trid"):
+                pass
+            else:
+                line_split = line.split("\t")
+                trid = line_split[0]
+                allele = int(line_split[1])
+                lps = line_split[2]
+                lps = [int(l) for l in ast.literal_eval(lps)]
+                mean = np.mean(lps)
+                sd = np.std(lps)
     
-    return control_LPS_dict
+                if trid not in control_LPS_dict:
+                    control_LPS_dict[trid] = {}
+                    
+                control_LPS_dict[trid][allele] = [lps, mean, sd]
+
+        return control_LPS_dict
 
 # iterate through background variants and compute allele stats
 # for each TRID, calculate stats
