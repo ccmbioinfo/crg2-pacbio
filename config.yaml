@@ -78,4 +78,4 @@ trgt:
   adotto_repeats: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/repeat_definitions/adotto_repeats.hg38.bed"
   promoters: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/GRCh38-PLS.bed"
   TR_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/Danzi_et_al_2025_supp_table_3.csv"
-  control_lps: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/CMH_LPS/CMH_combined_LPS.tsv"
+  control_lps: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/CMH_LPS/CMH_combined_LPS.tsv.gz"
