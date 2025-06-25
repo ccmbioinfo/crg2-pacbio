@@ -8,6 +8,7 @@
 set -e 
 
 module load python/3.7.1
+module load bedtools
 
 PROJECT=$1
 TODAY=`date +%Y-%m-%d`
