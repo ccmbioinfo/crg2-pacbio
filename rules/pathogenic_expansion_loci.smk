@@ -31,6 +31,7 @@ rule genotype_pathogenic_loci:
             --reads {input} \
             --repeats {params.path_repeats} \
             --output-prefix pathogenic_repeats/{wildcards.family}_{wildcards.sample}.trgt.unsorted \
+            --sample-name {wildcards.family}_{wildcards.sample} \
             --karyotype $sex
         """
 
