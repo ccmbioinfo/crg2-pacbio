@@ -21,6 +21,7 @@ tools:
   trgt: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/TRGTv1.1.0/trgt-v1.1.0-x86_64-unknown-linux-gnu/trgt"
   trgt-denovo: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/trgt-denovo-v0.2.0/trgt-denovo"
   mosdepth: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/mosdepth-0.3.11/mosdepth"
+  trgt-lps: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/TRGT-LPSv0.4.0/trgt-lps-v0.4.0"
 
 ref:
   name: GRCh38.86
@@ -77,3 +78,4 @@ trgt:
   adotto_repeats: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/repeat_definitions/adotto_repeats.hg38.bed"
   promoters: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/GRCh38-PLS.bed"
   TR_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/Danzi_et_al_2025_supp_table_3.csv"
+  control_lps: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/CMH_LPS/CMH_combined_LPS.tsv.gz"

@@ -15,7 +15,7 @@ def pivot_hits(df: pd.DataFrame) -> pd.DataFrame:
     hit_pivot = hits.pivot(
         index=["trid", "range", "cutoff", "allele_len_std"],
         columns="sample",
-        values=["allele_len", "z_score_len", "z_score_len_rank", "allele_len_std", "AM", "z_score_AM", "MP", "z_score_MP"],
+        values=["allele_len", "z_score_len", "z_score_len_rank", "AM", "z_score_AM", "MP", "z_score_MP", "LPS", "z_score_LPS", "LPS_rank"],
     ).reset_index()
 
     hit_pivot.columns = (
@@ -28,12 +28,15 @@ def pivot_hits(df: pd.DataFrame) -> pd.DataFrame:
             "_trid": "trid",
             "_range": "range",
             "_cutoff": "cutoff",
+            "_allele_len_std": "allele_len_std",
             "_AM": "AM",
             "_z_score_AM": "z_score_AM",
             "_MP": "MP",
             "_z_score_MP": "z_score_MP",
             "_z_score_len_rank": "z_score_len_rank",
-            "_allele_len_std": "allele_len_std",
+            "_LPS": "LPS",
+            "_z_score_LPS": "z_score_LPS",
+            "_z_score_LPS_rank": "LPS_rank"
         }
     )
 
@@ -49,6 +52,19 @@ def hits_to_pr(hits: pd.DataFrame) -> pr.PyRanges:
     hit_pr = pr.PyRanges(hits)
 
     return hit_pr
+
+def annotate_motif(hits: pd.DataFrame, repeat_catalog: str) -> pd.DataFrame:
+    """
+    Annotate TRID motif. These are stripped from the TRID in the outlier file to save space, especially for large families.
+    """
+    repeat_catalog = pd.read_csv(repeat_catalog, sep="\t", header=None, names=["chr", "pos", "end", "ID"])
+    repeat_catalog["trid_short"] = repeat_catalog["ID"].str.split(";").str[0].str.replace("ID=", "").str.rsplit("_",n=1).str[0]
+    repeat_catalog["motif"] = repeat_catalog["ID"].str.split(";").str[1].str.replace("MOTIFS=", "")
+    repeat_catalog = repeat_catalog[["trid_short", "motif"]]
+    hits["trid_short"] = hits["trid"].str.rsplit("_", n=1).str[0]
+    hits = hits.merge(repeat_catalog, on="trid_short", how="left").drop("trid_short", axis=1)
+
+    return hits
 
 def prepare_Ensembl_GTF(gtf_path: str, cols: list) -> pd.DataFrame:
     """
@@ -338,13 +354,14 @@ def filter_outliers(row: pd.Series, allele_len_cols: list) -> bool:
         return True # missing in control database
 
 
-def num_expanded(row: pd.Series, allele_len_cols: list) -> bool:
+def num_expanded(row: pd.Series, allele_len_cols: list, z_score_cols: list) -> bool:
     """
-    Sum number of individuals in whom repeat is expanded (i.e. allele length > cutoff)
+    Sum number of individuals in whom repeat is expanded (i.e. allele length > cutoff AND Z-score > 3)
     """
     allele_lens = [row[allele_len] for allele_len in allele_len_cols]
+    z_scores = [row[z_score] for z_score in z_score_cols]
     cutoff = row["cutoff"] if not pd.isna(row["cutoff"]) else 0
-    greater_than = sum([allele_len >= cutoff for allele_len in allele_lens])
+    greater_than = sum([allele_len >= cutoff and z_score >= 3 for allele_len, z_score in zip(allele_lens, z_scores)])
 
     return greater_than
 

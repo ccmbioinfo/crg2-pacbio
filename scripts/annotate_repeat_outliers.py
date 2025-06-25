@@ -8,7 +8,9 @@ from typing import Optional
 
 from annotation.annotate import (
     pivot_hits,
+    filter_outliers,
     hits_to_pr,
+    annotate_motif,
     annotate_genes,
     gene_set,
     num_expanded,
@@ -29,6 +31,7 @@ def main(
     promoters: str,
     TR_constraint: str,
     c4r: bool,
+    repeat_catalog: str,
     hpo: Optional[str] = None,
     c4r_counts: Optional[str] = None
 ) -> None:
@@ -38,21 +41,47 @@ def main(
 
     # make a column with maximum z score for allele length across samples
     z_score_cols = [col for col in hits_pivot.columns if "z_score_len" in col and "rank" not in col]
+    z_score_len_rank_cols = [col for col in hits_pivot.columns if "z_score_len_rank" in col]
     for col in z_score_cols:
         hits_pivot[col] = [
             round(score, 3) if not pd.isnull(score) else None
             for score in hits_pivot[col]
         ]
-    hits_pivot["max_z_score_len"] = hits_pivot[z_score_cols].max(axis=1)
-
     # filter out non-outliers
-    print("Filter outliers")
-    hits_pivot = hits_pivot[hits_pivot["max_z_score_len"].abs() >= 3]
+    print("Filter outliers by outlier cutoff and Z-score")
+    al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
+    hits_pivot["outlier"] = hits_pivot.apply(
+        lambda row: filter_outliers(row, al_cols), axis=1
+    )
+    hits_pivot = hits_pivot[hits_pivot["outlier"]]
+    hits_pivot["max_z_score_len"] = hits_pivot[z_score_cols].max(axis=1)
+    hits_pivot = hits_pivot[hits_pivot["max_z_score_len"] >= 3]
+
+
+    hits_pivot["min_z_score_len_rank"] = hits_pivot[z_score_len_rank_cols].min(axis=1)
+    LPS_rank_cols = [col for col in hits_pivot.columns if "LPS_rank" in col]
+    hits_pivot["min_LPS_rank"] = hits_pivot[LPS_rank_cols].min(axis=1)
+
+    # make a column with maximum LPS across samples
+    lps_cols = [col for col in hits_pivot.columns if "LPS" in col and 'rank' not in col and 'z_score' not in col]
+    for col in lps_cols:
+        hits_pivot[col] = [
+            lps if not pd.isnull(lps) else None
+            for lps in hits_pivot[col]
+        ]
+    hits_pivot["max_LPS"] = hits_pivot[lps_cols].max(axis=1)
+
+    # make a column with maximum allele length across samples
+    al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
+    hits_pivot["max_sample_allele_len"] = hits_pivot[al_cols].max(axis=1)
+
+    # annotate with motif
+    print("Annotate with motif")
+    hits_pivot = annotate_motif(hits_pivot, repeat_catalog)
 
     # make a column that sums the number of individuals carrying a particular repeat expansion
-    al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
-    hits_pivot["num_samples"] = hits_pivot.apply(
-        lambda row: num_expanded(row, al_cols), axis=1
+    hits_pivot["num_outlier_samples"] = hits_pivot.apply(
+        lambda row: num_expanded(row, al_cols, z_score_cols), axis=1
     )
 
     # convert hits to PyRanges object
@@ -92,25 +121,25 @@ def main(
      
     try: 
         c4r_counts = pd.read_csv(c4r_counts)
+        c4r_counts["TRID"] = c4r_counts["TRID"].str.rsplit("_", n=3).str[0] + "_" + c4r_counts["TRID"].str.split("_").str[4]
         hits_gene_omim = hits_gene_omim.merge(c4r_counts, left_on="trid", right_on="TRID", how="left")
         hits_gene_omim["count"] = hits_gene_omim["count"].replace(np.nan, 0)
-        hits_gene_omim = hits_gene_omim.rename({"count": "C4R_outlier_count", "samples": "C4R_outlier_samples"}, axis=1)
-        c4r_col = ["C4R_outlier_count", "C4R_outlier_samples"]
+        hits_gene_omim = hits_gene_omim.rename({"count": "C4R_outlier_count", "samples": "C4R_outlier_samples", "allele_lens": "C4R_outlier_allele_lens"}, axis=1)
+        c4r_col = ["C4R_outlier_count", "C4R_outlier_samples", "C4R_outlier_allele_lens"]
     except:
         print("Failed to add C4R counts") 
         c4r_col = []
     
     if c4r != "True": 
-        c4r_col = ["C4R_outlier_count"] # remove C4R sample IDs for non-C4R projects
+        c4r_col = ["C4R_outlier_count", "C4R_outlier_allele_lens"] # remove C4R sample IDs for non-C4R projects
 
-    # add motif
-    hits_gene_omim["motif"] = hits_gene_omim["TRID"].str.split("_").str[3]
 
     # add promoters
     promoters = pr.read_bed(promoters)
     hits_gene_omim_pr = pr.PyRanges(hits_gene_omim)
     hits_gene_omim = hits_gene_omim_pr.join(promoters, how="left", suffix="_promoter").df
-    hits_gene_omim["ENCODE_promoter_coord"] = hits_gene_omim["Chromosome"].astype(str) + ":" + hits_gene_omim["Start_promoter"].astype(str) + "-" + hits_gene_omim["End_promoter"].astype(str)
+    hits_gene_omim.loc[hits_gene_omim["Score"] == "-1", "ENCODE_promoter_coord"] = "."
+    hits_gene_omim.loc[hits_gene_omim["Score"] != "-1", "ENCODE_promoter_coord"] = hits_gene_omim["Chromosome"].astype(str) + ":" + hits_gene_omim["Start_promoter"].astype(str) + "-" + hits_gene_omim["End_promoter"].astype(str)
     hits_gene_omim.rename(columns={"Score": "ENCODE_promoter_ID"}, inplace=True)
     hits_gene_omim = hits_gene_omim.drop(columns=["Start_promoter", "End_promoter", "Name", "Strand"])
 
@@ -148,20 +177,20 @@ def main(
 
     am_cols = [col for col in hits_gene_omim.columns if "AM" in col]
     mp_cols = [col for col in hits_gene_omim.columns if "MP" in col]
-    z_score_ranks_cols = [col for col in hits_gene_omim.columns if "z_score_len_rank" in col]
-    
-    
+    z_score_ranks_cols = [col for col in hits_gene_omim.columns if "z_score_len_rank" in col and 'min' not in col]
+    lps_cols = [col for col in hits_gene_omim.columns if "LPS" in col and 'max' not in col and 'min' not in col]
+
     hits_gene_omim = hits_gene_omim[
         ["Chromosome", "Start", "End", "trid", "motif", "gene_name", "gene_id", "gene_biotype", "Feature"]
         + ["omim_phenotype","omim_inheritance", "HPO"]
         + ["gene", "lof.oe_ci.upper", "lof.pLI", "OE_len"]
-        + ["ENCODE_promoter_ID", "ENCODE_promoter_coord", "range", "cutoff"]
+        + ["ENCODE_promoter_ID", "ENCODE_promoter_coord", "range", "cutoff", "allele_len_std"]
         + c4r_col
-        + ["max_z_score_len", "num_samples"]
+        + ["max_sample_allele_len", "max_z_score_len", "min_z_score_len_rank", "num_outlier_samples", "max_LPS", "min_LPS_rank"]
+        + lps_cols
         + al_cols
         + z_score_cols
         + z_score_ranks_cols
-        + ["allele_len_std"]
         + am_cols
         + mp_cols
     ]
@@ -172,10 +201,16 @@ def main(
             "Start": "POS",
             "End": "END",
             "trid": "TRID",
-            "gene": "gnomad_constraint_gene",
-            "allele_len_std": "CMH_allele_len_std"
+            "gene": "gnomad_constraint_gene", 
+            "allele_len_std": "CMH_allele_len_std",
+            "range": "CMH_allele_len_range",
+            "cutoff": "CMH_outlier_cutoff",
+            "OE_len": "TR_constraint"
         }
     )
+
+    # sort by max_LPS
+    hits_gene_omim = hits_gene_omim.sort_values(by="max_LPS", ascending=False)
 
     # recode dtypes and missing values
     hits_gene_omim["CHROM"] = hits_gene_omim["CHROM"].astype(str)
@@ -184,10 +219,11 @@ def main(
     except KeyError:
         pass 
     hits_gene_omim.fillna(".", inplace=True)
-    hits_gene_omim.replace({"-1": ".", "1:-1--1": "."}, inplace=True)
+    hits_gene_omim.replace({"-1": ".", "1:-1--1": ".", " ": ".", "nan": "."}, inplace=True)
 
     # drop dups
     hits_gene_omim = hits_gene_omim.drop_duplicates()
+
     # write to file
     today = date.today()
     today = today.strftime("%Y-%m-%d")
@@ -249,6 +285,11 @@ if __name__ == "__main__":
         help="True if C4R project, otherwise false (C4R outlier sample IDs will be excluded from report)",
     )
     parser.add_argument(
+        "--repeat_catalog",
+        type=str,
+        help="Path to TRGT repeat catalog",
+    )
+    parser.add_argument(
         "--hpo",
         type=str,
         help="Path to HPO terms file",
@@ -270,6 +311,7 @@ if __name__ == "__main__":
         args.promoters,
         args.TR_constraint,
         args.c4r,
+        args.repeat_catalog,
         args.hpo,
         args.c4r_outliers
     )
