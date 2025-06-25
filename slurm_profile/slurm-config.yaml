@@ -32,3 +32,6 @@ vcf2db:
 methbat_build_cohort:
   mem: "600G"
 
+find_repeat_outliers:
+  mem: "100G"
+  time: "60:00:00"
