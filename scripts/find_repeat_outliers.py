@@ -205,139 +205,109 @@ def main(case_vcf, case_lps, control_vcf, control_lps, output_file):
     sample_dict = sample_vcf_to_dict(case_vcf, case_LPS_dict)
     # now iterate through control VCF, calculate TR stats, and combine stats with case TR alleles and LPS values
     print("Processing control VCF")
-    with pysam.VariantFile(control_vcf, 'r') as vcf_in:
-        samples = list(vcf_in.header.samples)
-        sample_stat_dict = {
-            "trid": [],
-            "sample": [],
-            "allele_type": [],
-            "allele_len": [], 
-            "z_score_len": [],
-            "z_score_len_rank": [], 
-            "allele_len_mean": [],
-            "allele_len_std": [], 
-            "cutoff": [], 
-            "range": [], 
-            "distance_to_cutoff": [],
-            "AM": [],
-            "AM_mean": [],
-            "AM_std": [],
-            "z_score_AM": [],
-            "MP": [],
-            "MP_mean": [],
-            "MP_std": [],
-            "z_score_MP": [],
-            "LPS": [],
-            "LPS_mean": [],
-            "LPS_std": [], 
-            "z_score_LPS": [],
-            "LPS_rank": []
-        }
+    
+    # Write header
+    header = ["trid", "sample", "allele_type", "allele_len", "z_score_len", "z_score_len_rank", 
+              "allele_len_mean", "allele_len_std", "cutoff", "range", "distance_to_cutoff",
+              "AM", "AM_mean", "AM_std", "z_score_AM", "MP", "MP_mean", "MP_std", "z_score_MP",
+              "LPS", "LPS_mean", "LPS_std", "z_score_LPS", "LPS_rank"]
+    
+    with open(output_file, 'w') as f:
+        f.write('\t'.join(header) + '\n')
+        
+        with pysam.VariantFile(control_vcf, 'r') as vcf_in:
+            samples = list(vcf_in.header.samples)
 
-        for variant in  vcf_in:
-            trid = variant.info['TRID']
-            if len(trid.split("_")) == 4: # older versions of TRGT include motif in TRID
-                trid = variant.info['TRID'].rsplit("_", 1)[0]
-            print(f"Reading variant {trid}")
-            allele_dict = process_variant(variant, samples) # extract allele lengths, methylation, and motif purity for all samples at this locus
-            
-            try:
-                stats = calculate_stats(allele_dict) # calculate allele length, methylation, and motif purity distributions
-            except IndexError:   # genotype is missing for every sample
-                stats_keys = 'short_allele_len_mean', 'short_allele_len_std', 'cutoff_short', 'range_short', 'short_allele_len_zscore', 'long_allele_len_mean', 'long_allele_len_std', 'cutoff_long', 'range_long', 'long_allele_len_zscore', 'AM_mean', 'AM_std', 'MP_mean', 'MP_std'
-                stats = {key: np.nan for key in stats_keys if key not in ["trid"]}
+            for variant in vcf_in:
+                trid = variant.info['TRID']
+                if len(trid.split("_")) == 4: # older versions of TRGT include motif in TRID
+                    trid = variant.info['TRID'].rsplit("_", 1)[0]
+                print(f"Reading variant {trid}")
+                allele_dict = process_variant(variant, samples) # extract allele lengths, methylation, and motif purity for all samples at this locus
                 
-            for case in sample_dict: # pull repeat stats from controls and calculate sample-specific allele length Z scores
-                for allele in ["short", "long"]:
-                    if trid not in sample_dict[case]:
-                        continue
-                    sample_stat_dict["trid"].append(trid)
-                    sample_stat_dict["sample"].append(case)
-                    sample_stat_dict["allele_type"].append(allele)
-                    allele_len_mean = stats[f"{allele}_allele_len_mean"]
-                    sample_stat_dict["allele_len_mean"].append(allele_len_mean)
-                    allele_len_std = stats[f"{allele}_allele_len_std"]
-                    sample_stat_dict["allele_len_std"].append(allele_len_std)
-                    cutoff = stats[f"cutoff_{allele}"]
-                    sample_stat_dict["cutoff"].append(cutoff)
-                    sample_stat_dict["range"].append(stats[f"range_{allele}"])
+                try:
+                    stats = calculate_stats(allele_dict) # calculate allele length, methylation, and motif purity distributions
+                except IndexError:   # genotype is missing for every sample
+                    stats_keys = 'short_allele_len_mean', 'short_allele_len_std', 'cutoff_short', 'range_short', 'short_allele_len_zscore', 'long_allele_len_mean', 'long_allele_len_std', 'cutoff_long', 'range_long', 'long_allele_len_zscore', 'AM_mean', 'AM_std', 'MP_mean', 'MP_std'
+                    stats = {key: np.nan for key in stats_keys if key not in ["trid"]}
                     
-                    if allele == "short":
-                        allele_len = sample_dict[case][trid][0]
-                        LPS = sample_dict[case][trid][2]
-                        AM =  sample_dict[case][trid][4]
-                        MP = sample_dict[case][trid][6]
-                        min_index = sample_dict[case][trid][8] + 1
-                        control_LPS = control_LPS_dict[trid][min_index][0]
-                        LPS_mean = control_LPS_dict[trid][min_index][1]
-                        LPS_std = control_LPS_dict[trid][min_index][2]
-
-                    else:
-                        allele_len = sample_dict[case][trid][1]
-                        LPS = sample_dict[case][trid][3]
-                        AM =  sample_dict[case][trid][5]
-                        MP = sample_dict[case][trid][7]
-                        max_index = sample_dict[case][trid][9] + 1
-                        control_LPS = control_LPS_dict[trid][max_index][0]
-                        LPS_mean = control_LPS_dict[trid][max_index][1]
-                        LPS_std = control_LPS_dict[trid][max_index][2]
-
-                    sample_stat_dict["allele_len"].append(allele_len)
-                    try:
-                        zscore_len = (allele_len - allele_len_mean) / allele_len_std
-                        dist_to_cutoff = allele_len - cutoff
-                    except TypeError: # no genotype information available in this sample for this allele
-                        zscore_len = np.nan
-                        dist_to_cutoff = np.nan
-                    except ZeroDivisionError: # allele length std is 0
-                        zscore_len = (allele_len - allele_len_mean) / 0.1
-                        dist_to_cutoff = allele_len - cutoff
+                for case in sample_dict: # pull repeat stats from controls and calculate sample-specific allele length Z scores
+                    for allele in ["short", "long"]:
+                        if trid not in sample_dict[case]:
+                            continue
+                            
+                        allele_len_mean = stats[f"{allele}_allele_len_mean"]
+                        allele_len_std = stats[f"{allele}_allele_len_std"]
+                        cutoff = stats[f"cutoff_{allele}"]
+                        range_val = stats[f"range_{allele}"]
                         
-                    sample_stat_dict["z_score_len"].append(zscore_len)
-                    control_z_scores = stats[f"{allele}_allele_len_zscore"]
-                    try:
-                        control_z_scores.append(zscore_len)
-                        z_score_len_rank = get_rank(control_z_scores, zscore_len)
-                    except AttributeError: # no control z-scores available
-                        z_score_len_rank = np.nan
-                    sample_stat_dict["z_score_len_rank"].append(z_score_len_rank)  
-                    sample_stat_dict["distance_to_cutoff"].append(dist_to_cutoff)  
-                    # add methylation and motif purity information 
-                    sample_stat_dict["AM"].append(AM)
-                    sample_stat_dict["AM_mean"].append(stats["AM_mean"])
-                    sample_stat_dict["AM_std"].append(stats["AM_std"])
-                    try:
-                        zscore_AM = (AM - stats["AM_mean"]) / stats["AM_std"]
-                    except: 
-                        zscore_AM =  (AM - stats["AM_mean"]) / 0.1
-                    sample_stat_dict["z_score_AM"].append(zscore_AM)
-                    sample_stat_dict["MP"].append(MP)
-                    sample_stat_dict["MP_mean"].append(stats["MP_mean"])
-                    sample_stat_dict["MP_std"].append(stats["MP_std"])
-                    try:
-                        zscore_MP = (MP - stats["MP_mean"]) / stats["MP_std"]
-                    except: 
-                        zscore_MP =  (MP - stats["MP_mean"]) / 0.1
-                    sample_stat_dict["z_score_MP"].append(zscore_MP)
-                    # add LPS information
-                    sample_stat_dict["LPS"].append(LPS)
-                    sample_stat_dict["LPS_mean"].append(LPS_mean)
-                    sample_stat_dict["LPS_std"].append(LPS_std)
-                    try:
-                        zscore_LPS = (LPS - LPS_mean) / LPS_std
-                    except: 
-                        zscore_LPS =  (LPS - LPS_mean) / 0.1
-                    sample_stat_dict["z_score_LPS"].append(zscore_LPS)
-                    try:
-                        control_LPS.append(LPS)
-                        LPS_rank = get_rank(control_LPS, LPS)
-                    except: # no control z-scores available
-                        LPS_rank = np.nan
-                    sample_stat_dict["LPS_rank"].append(LPS_rank)
+                        if allele == "short":
+                            allele_len = sample_dict[case][trid][0]
+                            LPS = sample_dict[case][trid][2]
+                            AM = sample_dict[case][trid][4]
+                            MP = sample_dict[case][trid][6]
+                            min_index = sample_dict[case][trid][8] + 1
+                            control_LPS = control_LPS_dict[trid][min_index][0]
+                            LPS_mean = control_LPS_dict[trid][min_index][1]
+                            LPS_std = control_LPS_dict[trid][min_index][2]
+                        else:
+                            allele_len = sample_dict[case][trid][1]
+                            LPS = sample_dict[case][trid][3]
+                            AM = sample_dict[case][trid][5]
+                            MP = sample_dict[case][trid][7]
+                            max_index = sample_dict[case][trid][9] + 1
+                            control_LPS = control_LPS_dict[trid][max_index][0]
+                            LPS_mean = control_LPS_dict[trid][max_index][1]
+                            LPS_std = control_LPS_dict[trid][max_index][2]
 
-        sample_stat_df = pd.DataFrame.from_dict(sample_stat_dict).round(2)
-        sample_stat_df.to_csv(output_file, sep="\t", index=False)
-        return sample_stat_df
+                        try:
+                            zscore_len = (allele_len - allele_len_mean) / allele_len_std
+                            dist_to_cutoff = allele_len - cutoff
+                        except TypeError: # no genotype information available in this sample for this allele
+                            zscore_len = np.nan
+                            dist_to_cutoff = np.nan
+                        except ZeroDivisionError: # allele length std is 0
+                            zscore_len = (allele_len - allele_len_mean) / 0.1
+                            dist_to_cutoff = allele_len - cutoff
+                            
+                        control_z_scores = stats[f"{allele}_allele_len_zscore"]
+                        try:
+                            control_z_scores.append(zscore_len)
+                            z_score_len_rank = get_rank(control_z_scores, zscore_len)
+                        except AttributeError: # no control z-scores available
+                            z_score_len_rank = np.nan
+
+                        try:
+                            zscore_AM = (AM - stats["AM_mean"]) / stats["AM_std"]
+                        except:
+                            zscore_AM = (AM - stats["AM_mean"]) / 0.1
+
+                        try:
+                            zscore_MP = (MP - stats["MP_mean"]) / stats["MP_std"]
+                        except:
+                            zscore_MP = (MP - stats["MP_mean"]) / 0.1
+
+                        try:
+                            zscore_LPS = (LPS - LPS_mean) / LPS_std
+                        except:
+                            zscore_LPS = (LPS - LPS_mean) / 0.1
+
+                        try:
+                            control_LPS.append(LPS)
+                            LPS_rank = get_rank(control_LPS, LPS)
+                        except: # no control z-scores available
+                            LPS_rank = np.nan
+
+                        # Write row to file
+                        row = [trid, case, allele, allele_len, zscore_len, z_score_len_rank,
+                              allele_len_mean, allele_len_std, cutoff, range_val, dist_to_cutoff,
+                              AM, stats["AM_mean"], stats["AM_std"], zscore_AM,
+                              MP, stats["MP_mean"], stats["MP_std"], zscore_MP,
+                              LPS, LPS_mean, LPS_std, zscore_LPS, LPS_rank]
+                        
+                        # Convert all values to strings and round floats to 2 decimal places
+                        row = [str(round(x, 2) if isinstance(x, float) else x) for x in row]
+                        f.write('\t'.join(row) + '\n')
 
 
 
