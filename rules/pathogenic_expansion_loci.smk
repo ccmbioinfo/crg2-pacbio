@@ -9,7 +9,7 @@ rule genotype_pathogenic_loci:
         path_repeats = config["annotation"]["pathogenic_repeats"]["trgt_catalog"]
     log: "logs/pathogenic_repeats/{family}_{sample}.trgt.log"
     conda:
-        "../envs/common.yaml"
+        "../envs/samtools.yaml"
     shell: 
         """
         # get sex, code from https://github.com/ccmbioinfo/crg/get_XY.sh

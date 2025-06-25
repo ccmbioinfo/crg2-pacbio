@@ -464,7 +464,7 @@ def compare_to_controls(allele_lens: str, genotype: int, mean: float, std: float
     except: 
         z_score = "."
 
-    outlier = denovo_allele_len >= float(cutoff) # is allele an outlier relative to controls?
+    outlier = (denovo_allele_len >= float(cutoff)) & (z_score >= 3) # is allele an outlier relative to controls?
 
     return (round(z_score, 3), outlier)
 

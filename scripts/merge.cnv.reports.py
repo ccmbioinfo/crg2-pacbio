@@ -12,12 +12,12 @@ class CNVGrouper:
             return col.apply(lambda x: ', '.join(x) if isinstance(x, list) else x)
 
         #key - dataframe col name : value - vcf field name
-        self.index_cols = ['CHROM', 'START', 'END', 'SVTYPE']
+        self.index_cols = ['CHROM', 'POS', 'END', 'ALT']
 
         all_sv, ann_df, sample_list = self._parse_reports(reports)
         assert len(sample_list) == len(set(sample_list)), "Duplicate sample names among input vcf's detected: %s" % sample_list
 
-        columns = ['CHROM', 'START', 'END', 'SVTYPE', 'N_SAMPLES']
+        columns = ['CHROM', 'POS', 'END', 'ALT', 'N_SAMPLES']
         columns.extend(sample_list)
         columns.extend(["%s_SV_DETAILS" % s for s in sample_list])
 
@@ -32,7 +32,7 @@ class CNVGrouper:
         # append annotation fields to final df
         print(ann_df.head())
         print(self.df.head())
-        ann_df = ann_df.set_index(keys=["CHROM", "START", "END", "SVTYPE"])
+        ann_df = ann_df.set_index(keys=["CHROM", "POS", "END", "ALT"])
         self.df = self.df.join(ann_df, how='left')
 
         # retrieve genotype and CN fields (won't appear in joined dataframe for all samples if CNV coordinates are different between samples)
@@ -50,12 +50,12 @@ class CNVGrouper:
         sample_names = []
         ann_dfs = []
 
-        sample_sv_fields =['CHROM', 'START', 'END', 'SVTYPE', 'samples', 'GT', 'CN']
+        sample_sv_fields =['CHROM', 'POS', 'END', 'ALT', 'samples', 'GT', 'CN']
 
         for report_path in report_paths:
             df = pd.read_csv(report_path, sep="\t") #use read_vcf because genotype field is not picked up with vcf_to_dataframe
-            gt_col = [col for col in df.columns if '|GT' in col][0]
-            cn_col = [col for col in df.columns if '|CN' in col][0]
+            gt_col = [col for col in df.columns if 'GT' in col][0]
+            cn_col = [col for col in df.columns if 'CN' in col][0]
             df.rename({gt_col: "GT", cn_col: "CN"}, axis=1, inplace=True)
             name = gt_col.split("|")[0]
             sample_names.append(name)
@@ -91,7 +91,7 @@ class CNVGrouper:
         #Get reference to row
         ref_interval_short = ref_interval[0:4]
         try:
-            self.df = self.df.set_index(keys=["CHROM", "START", "END", "SVTYPE"])
+            self.df = self.df.set_index(keys=["CHROM", "POS", "END", "ALT"])
         except: 
             pass
         if ref_interval_short not in self.df.index:

@@ -49,9 +49,19 @@ rule trgt_denovo:
         done < {input.ID_map}
 
         # Get BAM paths
-        child_bam=`cat {input.samples} | grep -P "{wildcards.child}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/' | sed 's/.haplotagged//'`
-        father_bam=`cat {input.samples} | grep -P "${{father_ID}}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/' | sed 's/.haplotagged//'`  
-        mother_bam=`cat {input.samples} | grep -P "${{mother_ID}}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/' | sed 's/.haplotagged//'`
+        child_bam=`cat {input.samples} | grep -P "{wildcards.child}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/'`
+        father_bam=`cat {input.samples} | grep -P "${{father_ID}}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/'`
+        mother_bam=`cat {input.samples} | grep -P "${{mother_ID}}\t" | awk '{{print $2}}' | sed 's/.bam/.trgt/'`
+        if [[ ! -f ${{child_bam}}.spanning.sorted.bam ]]; then # newer version of PacBio pipeline uses different filenames 
+            child_bam=`cat {input.samples} | grep -P "{wildcards.child}\t" | awk '{{print $2}}' | sed 's/.haplotagged.bam/.trgt/'`
+            father_bam=`cat {input.samples} | grep -P "${{father_ID}}\t" | awk '{{print $2}}' | sed 's/.haplotagged.bam/.trgt/'`
+            mother_bam=`cat {input.samples} | grep -P "${{mother_ID}}\t" | awk '{{print $2}}' | sed 's/.haplotagged.bam/.trgt/'`
+            for prefix in $child_bam $father_bam $mother_bam; do
+                ln -s ${{prefix}}.sorted.phased.vcf.gz ${{prefix}}.sorted.vcf.gz
+                ln -s ${{prefix}}.sorted.phased.vcf.gz.tbi ${{prefix}}.sorted.vcf.gz.tbi
+            done
+        fi 
+
 	echo         {params.trgt_denovo} trio --reference {params.ref} \
                 --bed {params.bed} \
                 --father $father_bam \
