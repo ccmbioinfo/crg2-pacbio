@@ -34,7 +34,7 @@ ref:
   
 annotation:
   c4r: True # if samples belong to C4R, leave C4R sample IDs in
-  omim_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations"
+  omim_path: "~/crg2-pacbio/scripts/cre/data/"
   pacbio.vcfanno:
     conf: "~/crg2-pacbio/vcfanno/pacbio.vcfanno.conf"
     lua_script: "~/crg2-pacbio/vcfanno/crg.vcfanno.lua"
