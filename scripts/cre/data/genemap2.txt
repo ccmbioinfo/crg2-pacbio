@@ -1,0 +1,18 @@
+Forbidden Access - OMIM
+
+Your IP address (192.75.158.166) has been blocked because we detected
+crawling activity originating from it.
+
+The OMIM Use Agreement and the robots.txt file disallows crawling of this site:
+
+    https://omim.org/help/agreement
+    https://omim.org/robots.txt
+
+If you wish to get your IP address unblocked please contact us and include your
+IP address (192.75.158.166) in the comments field along with any
+additional technical details that you think may be helpful.
+
+    https://omim.org/contact
+
+Please note that you must include your IP address otherwise we will not be able to help
+you.
