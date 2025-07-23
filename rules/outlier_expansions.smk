@@ -16,6 +16,7 @@ rule genotype_adotto_loci:
     shell: 
         """
         # get sex, code from https://github.com/ccmbioinfo/crg/get_XY.sh
+	module load samtools
         x=`samtools idxstats {input} | egrep  "X|chrX"`;
         y=`samtools idxstats {input} | egrep  "Y|chrY"`;
         xcov=`echo $x | awk '{{ printf("%0.5f", $3/$2); }}'`;
