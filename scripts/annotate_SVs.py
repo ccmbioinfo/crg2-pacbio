@@ -648,6 +648,14 @@ def main(
         # DECODER IDs
         sample_cols = [col for col in df.columns if "SK" in col]
     if len(sample_cols) == 0:
+        # genoderm IDs
+        for col in df.columns:
+            print(col)
+        sample_cols =  [col for col in df.columns if "GD" in col]
+    if len(sample_cols) == 0:
+       # ataxia IDS
+       sample_cols =  [col for col in df.columns if "GYM" in col or "HSC" in col]
+    if len(sample_cols) == 0:
         print("no sample cols identified")
         sys.exit(1)
                      
