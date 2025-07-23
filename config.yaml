@@ -33,7 +33,7 @@ ref:
   canon_bed: "/hpf/largeprojects/ccmbio/nhanafi/c4r/genomes/illumina/grch38_canon.bed"
   
 annotation:
-  c4r: True # if samples belong to C4R, leave C4R sample IDs in
+  c4r: False # if samples belong to C4R, leave C4R sample IDs in
   omim_path: "~/crg2-pacbio/scripts/cre/data/"
   pacbio.vcfanno:
     conf: "~/crg2-pacbio/vcfanno/pacbio.vcfanno.conf"
@@ -78,4 +78,4 @@ trgt:
   adotto_repeats: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/repeat_definitions/adotto_repeats.hg38.bed"
   promoters: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/GRCh38-PLS.bed"
   TR_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/Danzi_et_al_2025_supp_table_3.csv"
-  control_lps: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/CMH_LPS/CMH_combined_LPS.tsv.gz"
+  control_lps: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/CMH_LPS/combined/CMH_combined_LPS.tsv.gz"
