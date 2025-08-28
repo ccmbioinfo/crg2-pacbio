@@ -7,7 +7,7 @@
 #	family = [family_id] (=project_id=case_id=folder_name, main result file should be family/family-ensemble.db)
 #	cleanup= [0|1] default = 0
 #	make_report=[0|1] default = 1, don't make report for WGS analysis first
-# 	type = [ wes.regular (default) | wes.synonymous | wes.mosaic | wes.fast | rnaseq | wgs | annotate (only for cleaning) | 
+# 	type = [ wes.regular (default) | wes.synonymous | wes.mosaic | wes.fast | rnaseq | wgs | wgs.high.impact | annotate (only for cleaning) | 
 # 	    denovo (all rare variants in wgs, proband should have phenotype=2, parents=phenotype1 also sex for parents in gemini.db) ]
 #	max_af = af filter, default = 0.01
 #	database = path to folder where c4r count files and hgmd.csv are found.
@@ -89,7 +89,7 @@ function f_cleanup
 	       #validate bam files
             for f in *.bam;do  $cre/cre.bam.validate.sh $f;done;
     
-            if [ "$type" == "wes.fast" ] || [ "$type" == "wgs" ]
+            if [ "$type" == "wes.fast" ] || [ "$type" == "wgs" ] || [ "$type" == "wgs.high.impact" ]
             then
 	           ln -s ${family}-gatk-haplotype.db ${family}-ensemble.db
 	           ln -s ${family}-gatk-haplotype-annotated-decomposed.vcf.gz ${family}-ensemble-annotated-decomposed.vcf.gz
@@ -142,7 +142,7 @@ function f_make_report
 	   export depth_threshold=10
     fi
 
-    if [ "$type" == "wgs" ] || [ "$type" == "rnaseq" ] || [ "$type" == "denovo" ] || [ "$type" == "wes.all" ]
+    if [ "$type" == "wgs" ] || [ "$type" == "wgs.high.impact" ] || [ "$type" == "rnaseq" ] || [ "$type" == "denovo" ] || [ "$type" == "wes.all" ]
     then
 	   export severity_filter=ALL
     elif [ "$type" == "wes.synonymous" ]
@@ -241,7 +241,7 @@ function f_make_report
     cd ..
 
     # using Rscript from bcbio
-    if [ "$type" == "wgs" ] || [ "$type" == "rnaseq" ]
+    if [ "$type" == "wgs" ] || [ "$type" == "wgs.high.impact" ] || [ "$type" == "rnaseq" ]
     then
         noncoding="noncoding"
     else

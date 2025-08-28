@@ -460,6 +460,17 @@ select_and_write2 <- function(variants, samples, prefix, type)
   
     variants <- variants[order(variants$Position),]
 
+    # select high impact variants: SpliceAI_score >= 0.5 or Cadd_score >= 10 (or Cadd_score is missing; not all indels are scored)
+    if (type == 'wgs.high.impact'){
+        print("Selecting high impact variants")
+        # Convert Cadd_score to numeric, keeping NA for "None" values
+        variants$Cadd_score_num <- as.numeric(variants$Cadd_score)
+        # Filter based on SpliceAI_score or Cadd_score conditions
+        variants <- variants[variants$SpliceAI_score >= 0.5 | variants$Cadd_score == "None" | variants$Cadd_score_num >= 10,]
+        # Remove the temporary numeric column
+        variants$Cadd_score_num <- NULL
+    }
+
     write.csv(variants, paste0(prefix,".csv"), row.names = F)
 }
 
