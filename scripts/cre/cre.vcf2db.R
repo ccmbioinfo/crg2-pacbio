@@ -87,7 +87,7 @@ create_report <- function(family, samples, type){
     # Column3 = GNOMAD_Link
     variants$GNOMAD_POS <- with(variants, paste(Chrom,Pos,Ref,Alt, sep='-'))
     sGNOMAD1 <- "=HYPERLINK(\"http://gnomad.broadinstitute.org/variant/"
-    sGNOMAD2 <- "?dataset=gnomad_r3"
+    sGNOMAD2 <- "?dataset=gnomad_r4"
     sGNOMAD3 <- "\",\"GNOMAD_link\")"
     variants$GNOMAD_Link <- with(variants, paste(sGNOMAD1, GNOMAD_POS, sGNOMAD2, sGNOMAD3, sep = ''))
 
@@ -272,12 +272,19 @@ create_report <- function(family, samples, type){
 
     # population frequencies
     # Column34 = Gnomad_af
-    # Column35 = Gnomad_af_popmax
+    # Column35 = gnomad_af_grpmax
     
     # Gnomad gene constraint scores
     # Column36 = Gnomad_oe_lof_score
     # Column37 = Gnomad_oe_mis_score
-    gnomad_scores_file <- paste0(default_tables_path, "/gnomad_scores.csv")
+    # Column = Ensembl_transcript_id
+    # Column = Gnomad_oe_ci_lower
+    # Column = Gnomad_oe_ci_upper
+    # Column = Gnomad_pLI_score
+    # Column = Gnomad_pnull_score
+    # Column = Gnomad_prec_score
+    # Column = Gnomad_mis_z_score 
+    gnomad_scores_file <- paste0(default_tables_path, "/gnomad_scores_v4.1.csv")
     gnomad_scores <- read.csv(gnomad_scores_file, stringsAsFactors = F)
     variants <- merge(variants, gnomad_scores, all.x = T, all.y = F)
 
@@ -413,7 +420,7 @@ create_report <- function(family, samples, type){
     # Column 57: ENH_cellline_tissue
 
     # replace -1 with 0
-    for (field in c("Trio_coverage", "Gnomad_af", "Gnomad_af_popmax")){
+    for (field in c("Trio_coverage", "Gnomad_af", "Gnomad_af_grpmax", "Gnomad_fafmax_faf95_max")){
         variants[,field] <- with(variants, gsub("-1", "0", get(field), fixed = T))
         variants[,field] <- with(variants, gsub("None", "0", get(field), fixed = T))
     }
@@ -449,10 +456,10 @@ select_and_write2 <- function(variants, samples, prefix, type)
                           c("Trio_coverage", "Ensembl_gene_id", "Gene_description", "omim_phenotype", "omim_inheritance",
                             "Orphanet","Clinvar",
                             "HGMD_id", "HGMD_gene", "HGMD_tag", "HGMD_ref",
-                            "Gnomad_af_popmax", "Gnomad_af", "Gnomad_ac", "Gnomad_hom","Gnomad_male_ac",
+                            "Gnomad_af_grpmax", "Gnomad_af", "Gnomad_ac", "Gnomad_hom", "Gnomad_male_ac","Gnomad_fafmax_faf95_max", "Gnomad_filter",
                             "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt",
                             "Ensembl_transcript_id", "AA_position", "Exon", "Protein_domains", "rsIDs",
-                            "Gnomad_oe_lof_score", "Gnomad_oe_mis_score", "Exac_pli_score", "Exac_prec_score", "Exac_pnull_score",
+                            "Gnomad_oe_lof_score", "Gnomad_oe_ci_lower","Gnomad_oe_ci_upper","Gnomad_oe_mis_score", "Gnomad_mis_z_score","Gnomad_pLI_score","Gnomad_pnull_score","Gnomad_prec_score",
                             "Conserved_in_30_mammals", "SpliceAI_impact", "SpliceAI_score", "Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score", "Gerp_score", "AlphaMissense"),
                             noncoding_scores,
                             c("Imprinting_status", "Imprinting_expressed_allele", "Pseudoautosomal",
