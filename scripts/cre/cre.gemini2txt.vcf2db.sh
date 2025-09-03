@@ -43,7 +43,7 @@ else
 	caller_filter=""
 fi
 
-if [[ "$type" == 'wgs' || "$type" == 'denovo' ]]
+if [[ "$type" == 'wgs' || "$type" == 'denovo' || "$type" == 'wgs.high.impact' ]]
 then
     noncoding_anno="uce_100bp as UCE_100bp, uce_200bp as UCE_200bp,
             dnasei_hypersensitive_site as DNaseI_hypersensitive_site,
@@ -83,6 +83,8 @@ sQuery="select \
         colorsdb_ac as CoLoRSdb_AC,\
         colorsdb_ac_hemi as CoLoRSdb_AC_Hemi,\
         colorsdb_nhomalt as CoLoRSdb_nhomalt,\
+        tg_lrwgs_ac as TG_LRWGS_AC,\
+        tg_lrwgs_samples as TG_LRWGS_samples,\
         sift_score as Sift_score,\
         polyphen_score as Polyphen_score,\
         cadd_phred as Cadd_score,\

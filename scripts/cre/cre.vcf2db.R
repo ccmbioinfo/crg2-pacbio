@@ -430,14 +430,16 @@ create_report <- function(family, samples, type){
 select_and_write2 <- function(variants, samples, prefix, type)
 {
     print(colnames(variants))
-    if (type == 'wgs' || type == 'denovo'){
+    if (type == 'wgs' || type == 'denovo' || type == 'wgs.high.impact'){
         noncoding_cols <- c("DNaseI_hypersensitive_site", "CTCF_binding_site", "ENH_cellline_tissue", "TF_binding_sites")
         noncoding_scores <- c("ncER_score", "ReMM_score", "LINSIGHT_score")
+        coding_scores <- c("Cadd_score")
         }
     else {
         noncoding_cols <- c()
         noncoding_scores <- c()
         wgs_counts <- c()
+        coding_scores <- c("Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score", "Gerp_score", "AlphaMissense")
         }
     variants <- variants[c(c("Position", "UCSC_Link", "GNOMAD_Link", "Ref", "Alt"),
                           paste0("Zygosity.", samples),
@@ -451,9 +453,11 @@ select_and_write2 <- function(variants, samples, prefix, type)
                             "HGMD_id", "HGMD_gene", "HGMD_tag", "HGMD_ref",
                             "Gnomad_af_popmax", "Gnomad_af", "Gnomad_ac", "Gnomad_hom","Gnomad_male_ac",
                             "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt",
+                            "TG_LRWGS_samples", "TG_LRWGS_AC",
                             "Ensembl_transcript_id", "AA_position", "Exon", "Protein_domains", "rsIDs",
                             "Gnomad_oe_lof_score", "Gnomad_oe_mis_score", "Exac_pli_score", "Exac_prec_score", "Exac_pnull_score",
-                            "Conserved_in_30_mammals", "SpliceAI_impact", "SpliceAI_score", "Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score", "Gerp_score", "AlphaMissense"),
+                            "Conserved_in_30_mammals", "SpliceAI_impact", "SpliceAI_score"),
+                            coding_scores,
                             noncoding_scores,
                             c("Imprinting_status", "Imprinting_expressed_allele", "Pseudoautosomal",
                             "Old_multiallelic", "UCE_100bp", "UCE_200bp", "Dark_genes"), noncoding_cols)]
@@ -466,7 +470,7 @@ select_and_write2 <- function(variants, samples, prefix, type)
         # Convert Cadd_score to numeric, keeping NA for "None" values
         variants$Cadd_score_num <- as.numeric(variants$Cadd_score)
         # Filter based on SpliceAI_score or Cadd_score conditions
-        variants <- variants[variants$SpliceAI_score >= 0.5 | variants$Cadd_score == "None" | variants$Cadd_score_num >= 10,]
+        variants <- variants[variants$SpliceAI_score >= 0.2 | variants$Cadd_score == "None" | variants$Cadd_score_num >= 14,]
         # Remove the temporary numeric column
         variants$Cadd_score_num <- NULL
     }
