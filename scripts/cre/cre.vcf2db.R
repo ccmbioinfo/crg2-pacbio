@@ -47,6 +47,26 @@ genotype2zygocity <- function (genotype_str, ref, alt_depth, type){
     return(result)
 }
 
+# count how many noncoding scores predict an impact and return a fraction
+# e.g. 3/4 indicates that 3/4 scores predict an impact
+noncoding_pred <- function(cadd, ncer, remm, linsight){
+  cadd <- ifelse(cadd == "None", NA, cadd)
+  ncer <- ifelse(ncer == "None", NA, ncer)
+  remm <- ifelse(remm == "None", NA, remm)
+  linsight <- ifelse(linsight == "None", NA, linsight)
+  # https://doi.org/10.1016/j.gpb.2022.02.002 table 3 best threshold
+  cadd_pred <- cadd > 14.19 # paper used CADD v1.3, we use 1.6, so score here is from personal work
+  ncer_pred <- ncer > 95.95
+  remm_pred <- remm > 0.9585 
+  linsight_pred <- linsight > 0.9828
+  preds <- c(cadd_pred, ncer_pred, remm_pred, linsight_pred)
+  pred_impact <- sum(preds, na.rm = TRUE)
+  denominator <- sum(!is.na(preds))
+  fraction = paste(as.character(pred_impact), as.character(denominator), sep="/")
+
+  return(fraction)
+}
+
 # output : family.ensemble.txt
 create_report <- function(family, samples, type){
     file <- paste0(family, ".variants.txt")
@@ -397,6 +417,13 @@ create_report <- function(family, samples, type){
         }
     }else print("VEP MaxEntScan annotation is missing")
 
+
+    # count number of noncoding scores that predict an impact
+    if (type == 'wgs' || type == 'denovo' || type == 'wgs.high.impact'){
+        noncoding_agg <- mapply(noncoding_pred, variants[, "Cadd_score"], variants[,"ncER_score"], variants[,"ReMM_score"], variants[,"LINSIGHT_score"])
+        variants[, "Noncoding_path_pred"] <- unlist(noncoding_agg)
+    }
+    
     # Column 51: SpliceAI
 
     
@@ -432,14 +459,16 @@ select_and_write2 <- function(variants, samples, prefix, type)
     print(colnames(variants))
     if (type == 'wgs' || type == 'denovo' || type == 'wgs.high.impact'){
         noncoding_cols <- c("DNaseI_hypersensitive_site", "CTCF_binding_site", "ENH_cellline_tissue", "TF_binding_sites")
-        noncoding_scores <- c("ncER_score", "ReMM_score", "LINSIGHT_score")
+        noncoding_scores <- c("ncER_score", "ReMM_score", "LINSIGHT_score", "Noncoding_path_pred")
         coding_scores <- c("Cadd_score")
+        protein_cols <- c()
         }
     else {
         noncoding_cols <- c()
         noncoding_scores <- c()
         wgs_counts <- c()
         coding_scores <- c("Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score", "Gerp_score", "AlphaMissense")
+        protein_cols <- c("AA_position", "Exon", "Protein_domains")
         }
     variants <- variants[c(c("Position", "UCSC_Link", "GNOMAD_Link", "Ref", "Alt"),
                           paste0("Zygosity.", samples),
@@ -453,8 +482,9 @@ select_and_write2 <- function(variants, samples, prefix, type)
                             "HGMD_id", "HGMD_gene", "HGMD_tag", "HGMD_ref",
                             "Gnomad_af_popmax", "Gnomad_af", "Gnomad_ac", "Gnomad_hom","Gnomad_male_ac",
                             "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt",
-                            "TG_LRWGS_samples", "TG_LRWGS_AC",
-                            "Ensembl_transcript_id", "AA_position", "Exon", "Protein_domains", "rsIDs",
+                            "TG_LRWGS_AC", "TG_LRWGS_samples",
+                            "Ensembl_transcript_id", "rsIDs",
+                            protein_cols,
                             "Gnomad_oe_lof_score", "Gnomad_oe_mis_score", "Exac_pli_score", "Exac_prec_score", "Exac_pnull_score",
                             "Conserved_in_30_mammals", "SpliceAI_impact", "SpliceAI_score"),
                             coding_scores,
