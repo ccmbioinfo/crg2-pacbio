@@ -134,7 +134,12 @@ initialQuery=$sQuery # keep the field selection part for later use
 
 #max_aaf_all frequency is from gemini.conf and does not include gnomad WGS frequencing, gnomad WES only
 #gnomad_af includes gnomad WGS
-sQuery=$sQuery" where gnomad_af_popmax <= "${max_af}" "$caller_filter""${severity_filter}""
+if [[ "$type" == 'wgs.high.impact' ]]
+then
+    sQuery=$sQuery" where gnomad_af_popmax <= 0.001 "$caller_filter""${severity_filter}""
+else
+    sQuery=$sQuery" where gnomad_af_popmax <= "${max_af}" "$caller_filter""${severity_filter}""
+fi
 
 s_gt_filter=''
 # denovo 0/1 is exported in cre.sh

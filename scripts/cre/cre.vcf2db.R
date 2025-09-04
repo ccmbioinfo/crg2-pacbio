@@ -494,9 +494,13 @@ select_and_write2 <- function(variants, samples, prefix, type)
   
     variants <- variants[order(variants$Position),]
 
-    # select high impact variants: SpliceAI_score >= 0.5 or Cadd_score >= 10 (or Cadd_score is missing; not all indels are scored)
+    # select high impact variants: 
+    # OMIM phenotype is not missing and gnomAD AC <= 5
+    #SpliceAI_score >= 0.5 or Cadd_score >= 10 (or Cadd_score is missing; not all indels are scored)
     if (type == 'wgs.high.impact'){
         print("Selecting high impact variants")
+        # select variants in OMIM genes
+        variants <- variants[variants$omim_phenotype != "NA" & variants$omim_phenotype != "",]
         # Convert Cadd_score to numeric, keeping NA for "None" values
         variants$Cadd_score_num <- as.numeric(variants$Cadd_score)
         # Filter based on SpliceAI_score or Cadd_score conditions

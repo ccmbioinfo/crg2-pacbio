@@ -81,9 +81,14 @@ fi
 
 initialQuery=$sQuery" from variants v,variant_impacts i" #store field selection
 
-
-sQuery=$initialQuery" where "$severity_filter" v.gnomad_af_popmax <= "$max_af" and \
-v.variant_id=i.variant_id "$caller_filter""
+if [[ "$type" == 'wgs.high.impact' ]]
+then
+	sQuery=$initialQuery" where "$severity_filter" v.gnomad_af_popmax <= 0.001 and \
+	v.variant_id=i.variant_id "$caller_filter""
+else
+	sQuery=$initialQuery" where "$severity_filter" v.gnomad_af_popmax <= "$max_af" and \
+	v.variant_id=i.variant_id "$caller_filter""
+fi
 
 s_gt_filter=''
 
