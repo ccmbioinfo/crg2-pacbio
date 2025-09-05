@@ -43,7 +43,7 @@ else
 	caller_filter=""
 fi
 
-if [[ "$type" == 'wgs' || "$type" == 'denovo' ]]
+if [[ "$type" == 'wgs' || "$type" == 'denovo' || "$type" == 'wgs.high.impact' ]]
 then
     noncoding_anno="uce_100bp as UCE_100bp, uce_200bp as UCE_200bp,
             dnasei_hypersensitive_site as DNaseI_hypersensitive_site,
@@ -83,6 +83,8 @@ sQuery="select \
         colorsdb_ac as CoLoRSdb_AC,\
         colorsdb_ac_hemi as CoLoRSdb_AC_Hemi,\
         colorsdb_nhomalt as CoLoRSdb_nhomalt,\
+        tg_lrwgs_ac as TG_LRWGS_AC,\
+        tg_lrwgs_samples as TG_LRWGS_samples,\
         sift_score as Sift_score,\
         polyphen_score as Polyphen_score,\
         cadd_phred as Cadd_score,\
@@ -132,7 +134,12 @@ initialQuery=$sQuery # keep the field selection part for later use
 
 #max_aaf_all frequency is from gemini.conf and does not include gnomad WGS frequencing, gnomad WES only
 #gnomad_af includes gnomad WGS
-sQuery=$sQuery" where gnomad_af_popmax <= "${max_af}" "$caller_filter""${severity_filter}""
+if [[ "$type" == 'wgs.high.impact' ]]
+then
+    sQuery=$sQuery" where gnomad_af_popmax <= 0.001 "$caller_filter""${severity_filter}""
+else
+    sQuery=$sQuery" where gnomad_af_popmax <= "${max_af}" "$caller_filter""${severity_filter}""
+fi
 
 s_gt_filter=''
 # denovo 0/1 is exported in cre.sh

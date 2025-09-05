@@ -29,6 +29,7 @@ rule all:
         "small_variants/coding/{family}".format(family=project),
         "small_variants/panel/{family}".format(family=project),
         "small_variants/panel-flank/{family}".format(family=project),
+        "small_variants/wgs-high-impact/{family}".format(family=project),
         "sv/{family}.pbsv.csv".format(family=project),
         "repeat_outliers/{family}.repeat.outliers.annotated.csv".format(family=project),
         "pathogenic_repeats/{family}.known.path.str.loci.csv".format(family=project),
