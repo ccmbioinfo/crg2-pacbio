@@ -50,7 +50,7 @@ then
             ctcf_binding_site as CTCF_binding_site, 
             enh_cellline_tissue as ENH_cellline_tissue,
             tf_binding_sites as TF_binding_sites"
-    noncoding_scores="ncER as ncER_score, ReMM as ReMM_score, LinSight_Score as LINSIGHT_score"
+    noncoding_scores="ncER as ncER_score, ReMM as ReMM_score, LinSight_Score as LINSIGHT_score, promoterAI as promoterAI_score"
 else
     noncoding_anno="00 as noncoding"
     noncoding_scores="00 as noncoding_scores"
@@ -98,7 +98,6 @@ sQuery="select \
         "$callers" as Callers,\
         phylop30way_mammalian as Conserved_in_30_mammals,\
         COALESCE(spliceai_score, '') as SpliceAI_score, \
-        uce_100bp as UCE_100bp, uce_200bp as UCE_200bp, \
         Dark_genes as Dark_genes, \
         ps as PS, \
         $noncoding_anno, \
