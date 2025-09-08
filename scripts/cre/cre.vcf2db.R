@@ -115,6 +115,71 @@ create_report <- function(family, samples, type){
 
     # Column6 - Gene
     variants$Gene[variants$Gene == ""] <- NA
+
+    # SpliceAI score parsing
+    variants <- add_placeholder(variants, "SpliceAI_impact", "")
+    for (i in 1:nrow(variants)){
+        print(i)
+        if (variants[i,"SpliceAI_score"] == ""){
+            variants[i, "SpliceAI_impact"] <- "NA|NA|NA"
+            variants[i, "SpliceAI_score"] <- 0
+        } else {
+            spliceai <- strsplit(variants[i,"SpliceAI_score"], ",", fixed = T)[[1]]
+            score_list <- c("NA", "NA", 0, "NA")
+            names(score_list) <- c("gene", "impact", "score", "pos")
+            for (anno in spliceai){
+                anno <- strsplit(anno, "|", fixed = T)[[1]]
+                gene <- anno[2]
+                DS_AG <- anno[3]
+                DS_AL <- anno[4]	
+                DS_DG <- anno[5]	
+                DS_DL <- anno[6]	
+                DP_AG <- anno[7]	
+                DP_AL <- anno[8]	
+                DP_DG <- anno[9]	
+                DP_DL <- anno[10]	
+                scores <- c(as.numeric(DS_AG), as.numeric(DS_AL), as.numeric(DS_DG), as.numeric(DS_DL))
+                names(scores) <- c("acceptor_gain", "acceptor_loss", "donor_gain", "donor_loss")
+                max_score <- max(scores)        
+                for (name in names(scores)){
+                    if (scores[name] == max_score){name_max_score <- name}
+                }
+                if (name_max_score == 0){
+                    impact <- "NA"
+                } else {
+                    impact <- name_max_score
+                }
+                if (score_list["score"] < max_score){
+                    score_list["score"] <- max_score
+                    score_list["gene"] <- gene
+                    score_list["impact"] <- impact
+                    if (impact == "acceptor_gain"){
+                        score_list["pos"] <- DP_AG
+                        } else if (impact == "acceptor_loss"){
+                        score_list["pos"] <- DP_AL
+                        } else if (impact == "donor_gain"){
+                        score_list["pos"] <- DP_DG
+                        } else {
+                        score_list["pos"] <- DP_DL
+                        }
+                    }
+                }
+            variants[i, "SpliceAI_impact"] <- paste(score_list["gene"], score_list["impact"], score_list["pos"], sep="|")
+            variants[i, "SpliceAI_score"] <- score_list["score"]
+            }
+        }
+
+    # select high impact variants: 
+    #SpliceAI_score >= 0.5 or Cadd_score >= 10 (or Cadd_score is missing; not all indels are scored)
+    if (type == 'wgs.high.impact'){
+        print("Selecting high impact variants")
+        # Convert Cadd_score to numeric, keeping NA for "None" values
+        variants$Cadd_score_num <- as.numeric(variants$Cadd_score)
+        # Filter based on SpliceAI_score or Cadd_score conditions
+        variants <- variants[variants$SpliceAI_score >= 0.2 | variants$Cadd_score == "None" | variants$Cadd_score_num >= 14,]
+        # Remove the temporary numeric column
+        variants$Cadd_score_num <- NULL
+    }
     
     # Column 6 - Zygosity, column 8 - Burden
     # use new loader vcf2db.py - with flag  to load plain text
@@ -309,60 +374,7 @@ create_report <- function(family, samples, type){
     }
     
     # Column41 - Conserved_in_30_mammals
-    # Column 42? - SpliceAI (actually 47, these column indexes are no longer accurate)
-    variants <- add_placeholder(variants, "SpliceAI_impact", "")
-    for (i in 1:nrow(variants)){
-        print(i)
-        if (variants[i,"SpliceAI_score"] == ""){
-            variants[i, "SpliceAI_impact"] <- "NA|NA|NA"
-            variants[i, "SpliceAI_score"] <- 0
-        } else {
-            spliceai <- strsplit(variants[i,"SpliceAI_score"], ",", fixed = T)[[1]]
-            score_list <- c("NA", "NA", 0, "NA")
-            names(score_list) <- c("gene", "impact", "score", "pos")
-            for (anno in spliceai){
-                anno <- strsplit(anno, "|", fixed = T)[[1]]
-                gene <- anno[2]
-                DS_AG <- anno[3]
-                DS_AL <- anno[4]	
-                DS_DG <- anno[5]	
-                DS_DL <- anno[6]	
-                DP_AG <- anno[7]	
-                DP_AL <- anno[8]	
-                DP_DG <- anno[9]	
-                DP_DL <- anno[10]	
-                scores <- c(as.numeric(DS_AG), as.numeric(DS_AL), as.numeric(DS_DG), as.numeric(DS_DL))
-                names(scores) <- c("acceptor_gain", "acceptor_loss", "donor_gain", "donor_loss")
-                max_score <- max(scores)        
-                for (name in names(scores)){
-                    if (scores[name] == max_score){name_max_score <- name}
-                }
-                if (name_max_score == 0){
-                    impact <- "NA"
-                } else {
-                    impact <- name_max_score
-                }
-                if (score_list["score"] < max_score){
-                    score_list["score"] <- max_score
-                    score_list["gene"] <- gene
-                    score_list["impact"] <- impact
-                    if (impact == "acceptor_gain"){
-                        score_list["pos"] <- DP_AG
-                        } else if (impact == "acceptor_loss"){
-                        score_list["pos"] <- DP_AL
-                        } else if (impact == "donor_gain"){
-                        score_list["pos"] <- DP_DG
-                        } else {
-                        score_list["pos"] <- DP_DL
-                        }
-                    }
-                }
-            variants[i, "SpliceAI_impact"] <- paste(score_list["gene"], score_list["impact"], score_list["pos"], sep="|")
-            variants[i, "SpliceAI_score"] <- score_list["score"]
-            }
-        }
 
-    
     # pathogenicity scores
     # Column42 = sift
     # Column43 = polyphen
@@ -493,21 +505,6 @@ select_and_write2 <- function(variants, samples, prefix, type)
                             "Old_multiallelic", "UCE_100bp", "UCE_200bp", "Dark_genes"), noncoding_cols)]
   
     variants <- variants[order(variants$Position),]
-
-    # select high impact variants: 
-    # OMIM phenotype is not missing and gnomAD AC <= 5
-    #SpliceAI_score >= 0.5 or Cadd_score >= 10 (or Cadd_score is missing; not all indels are scored)
-    if (type == 'wgs.high.impact'){
-        print("Selecting high impact variants")
-        # select variants in OMIM genes
-        variants <- variants[variants$omim_phenotype != "NA" & variants$omim_phenotype != "",]
-        # Convert Cadd_score to numeric, keeping NA for "None" values
-        variants$Cadd_score_num <- as.numeric(variants$Cadd_score)
-        # Filter based on SpliceAI_score or Cadd_score conditions
-        variants <- variants[variants$SpliceAI_score >= 0.2 | variants$Cadd_score == "None" | variants$Cadd_score_num >= 14,]
-        # Remove the temporary numeric column
-        variants$Cadd_score_num <- NULL
-    }
 
     write.csv(variants, paste0(prefix,".csv"), row.names = F)
 }
