@@ -180,6 +180,14 @@ create_report <- function(family, samples, type){
         # Remove the temporary numeric column
         variants$Cadd_score_num <- NULL
     }
+
+     # count number of noncoding scores that predict an impact
+    if (type == 'wgs' || type == 'denovo' || type == 'wgs.high.impact'){
+        noncoding_agg <- mapply(noncoding_pred, variants[, "Cadd_score"], variants[,"ncER_score"], variants[,"ReMM_score"], variants[,"LINSIGHT_score"])
+        variants[, "Noncoding_path_pred"] <- unlist(noncoding_agg)
+        variants <- variants[variants$Noncoding_path_pred != "0/3",]
+    }
+
     
     # Column 6 - Zygosity, column 8 - Burden
     # use new loader vcf2db.py - with flag  to load plain text
@@ -428,13 +436,6 @@ create_report <- function(family, samples, type){
 	          variants[i,"Splicing"] <- s_splicing_field
         }
     }else print("VEP MaxEntScan annotation is missing")
-
-
-    # count number of noncoding scores that predict an impact
-    if (type == 'wgs' || type == 'denovo' || type == 'wgs.high.impact'){
-        noncoding_agg <- mapply(noncoding_pred, variants[, "Cadd_score"], variants[,"ncER_score"], variants[,"ReMM_score"], variants[,"LINSIGHT_score"])
-        variants[, "Noncoding_path_pred"] <- unlist(noncoding_agg)
-    }
     
     # Column 51: SpliceAI
 
