@@ -182,15 +182,6 @@ function f_make_report
     
     rm $family.tmp.vcf.gz $family.tmp.vcf.gz.tbi
 
-    #individual vcfs for uploading to phenome central
-    $cre/vcf.split_multi.sh $family.vcf.gz
-
-    if [ -z $reference ]
-    then
-        reference=/hpf/largeprojects/ccmbio/naumenko/tools/bcbio/genomes/Hsapiens/GRCh37/seq/GRCh37.fa
-    fi
-
-   # reference=$(readlink -f `which bcbio_nextgen.py`)
     reference=/hpf/largeprojects/ccmbio/nhanafi/c4r/genomes/Homo_sapiens_assembly38.fasta
     
     echo $reference
@@ -289,7 +280,7 @@ fi
 #default database path
 if [ -z $database ]
 then
-    database="/hpf/largeprojects/ccmbio/naumenko/tools/bcbio/genomes/Hsapiens/GRCh37/variation"
+    database="/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/"
 fi
 
 #no cleanup by default
