@@ -2,33 +2,35 @@
 
 crg2-pacbio is a research pipeline aimed at discovering clinically relevant variants from PacBio HiFi whole genome sequence data in a family-based manner. crg2-pacbio uses Snakemake and Conda to manage jobs and software dependencies.
 
-crg2-pacbio takes as input the following VCFs output by [PacBio's WGS pipeline](https://github.com/PacificBiosciences/HiFi-human-WGS-WDL):
+crg2-pacbio takes as input the following outputs from [PacBio's WGS pipeline](https://github.com/PacificBiosciences/HiFi-human-WGS-WDL):
+- [pbmm2](https://github.com/PacificBiosciences/pbmm2) aligned BAM files for each sample
 - [DeepVariant](https://github.com/google/deepvariant) joint-genotyped small variant VCF
 - [pbsv](https://github.com/PacificBiosciences/pbsv) joint-genotyped structural variant VCF
-- [TRGT](https://github.com/PacificBiosciences/trgt) VCFs, one per family member
-- aligned BAM files for each sample
+- [TRGT](https://github.com/PacificBiosciences/trgt) VCFs genotyped against the adotto repeat catalog (see 'Repeat expansion outlier report' section for more information), one per family member. [TRGT-denovo](https://github.com/PacificBiosciences/trgt-denovo) expects that these VCFs sit inside the same directory that the aligned BAMs are stored in. TRGT-denovo also expects that the TRGT spanning BAMs are in the same directory as aligned BAMs. If they are stored elsewhere, you can create softlinks to these files in the directory storing the aligned BAMs. 
 
-crg2-pacbio also has a module for identifying, filtering, and annotation methylation outliers, see 'Methylation outlier report' below.
+crg2-pacbio also has a module for identifying, filtering, and annotating methylation outliers, see 'Methylation outlier report' below.
+
+Clone crg2-pacbio: `git clone https://github.com/ccmbioinfo/crg2-pacbio/`. Note that two files, `crg2-pacbio/crg2-pacbio.sh` and `crg2-pacbio/config.yaml`, assume you have cloned crg2-pacbio to your home directory. **If this is NOT the case, please update the paths in these files.** 
 
 ## How to run the pipeline
-1. Make a folder in a directory with sufficient space. Copy over the template files crg2-pacbio/samples.tsv, crg2-pacbio/units.tsv, crg2-pacbio/config.yaml, crg2-pacbio/crg2-pacbio.sh, crg2-pacbio/slurm_profile/slurm-config.yaml.  Note that 'slurm-config.yaml' is for submitting each rule as cluster jobs, so ignore this if not running on cluster.
+1. Make a folder in a directory with sufficient space. Copy over the template files `crg2-pacbio/samples.tsv`, `crg2-pacbio/units.tsv`, `crg2-pacbio/config.yaml`, `crg2-pacbio/crg2-pacbio.sh`, `crg2-pacbio/slurm_profile/slurm-config.yaml`.  Note that `slurm-config.yaml` is for submitting each rule as cluster jobs, so ignore this if not running on cluster.
 ```
-mkdir NA12878
-cp crg2-pacbio/samples.tsv crg2-pacbio/units.tsv crg2-pacbio/config.yaml crg2-pacbio/crg2-pacbio.sh crg2-pacbio/slurm_profile/slurm-config.yaml NA12878
-cd NA12878
+$ mkdir NA12878
+$ cp crg2-pacbio/samples.tsv crg2-pacbio/units.tsv crg2-pacbio/config.yaml crg2-pacbio/crg2-pacbio.$ $ sh crg2-pacbio/slurm_profile/slurm-config.yaml NA12878
+$ cd NA12878
 ```
-2. Set up pipeline run
-- Reconfigure 'samples.tsv' and 'units.tsv' to reflect sample names and input files. Note that because several of the inputs are joint-genotyped, one row in the units.tsv file corresponds to one family, not one sample. 'units.tsv' must be configured with the path to the joint-genotyped deepvariant `small_variant_vcf`, the path to a directory containing per-sample genome-wide TRGT VCFs `trgt_vcf_dir`, and the joint-genotyped pbsv `pbsv_vcf`. The `trgt_vcf_dir` must ALSO contain the TRGT spanning BAMs to successfully run the denovo tandem repeat report. The 'samples.tsv' file should contain one row per family member, with the `sample` column corresponding to the family member ID and the `BAM` column corresponding to the path to the BAM file for that sample. 
-units.tsv example:
+2. Set up pipeline run: 
+- reconfigure `samples.tsv` and `units.tsv` to reflect sample names and input files. Note that because several of the inputs are joint-genotyped, one row in the units.tsv file corresponds to one family, not one sample. `units.tsv` must be configured with the path to the joint-genotyped (or singleton, if no family members were sequenced) deepvariant `small_variant_vcf`, and the joint-genotyped (or singleton) pbsv `pbsv_vcf`. The `samples.tsv` file should contain one row per family member, with the `sample` column corresponding to the sample ID and the `BAM` column corresponding to the path to the BAM file for that sample. 
+`units.tsv` example:
 ```
-family	platform	small_variant_vcf	trgt_vcf_dir	pbsv_vcf	trgt_pathogenic_vcf_dir
-1042	PACBIO	/hpf/largeprojects/ccmbio/ccmmarvin_tcag_shared/PacBio/MEA26290/1042_TR0246.joint/1042_TR0246.joint.GRCh38.deepvariant.glnexus.phased.vcf.gz	trgt	/hpf/largeprojects/ccmbio/ccmmarvin_tcag_shared/PacBio/MEA26290/1042_TR0246.joint/1042_TR0246.joint.GRCh38.pbsv.phased.vcf.gz
+family	platform	small_variant_vcf	pbsv_vcf
+FAM01	PACBIO	/path/to/FAM01.joint.GRCh38.small_variants.phased.vcf.gz   /path/to/FAM01.joint.GRCh38.structural_variants.phased.vcf.gz
 ```
-samples.tsv example (not that the case_or_control field is ONLY required for the methylation outlier workflow, see below):
+`samples.tsv` example (note that the case_or_control field is ONLY required for the methylation outlier workflow, see below):
 ```
 sample	BAM	case_or_control
-01	/hpf/largeprojects/ccmbio/ccmmarvin_tcag_shared/PacBio/MEA26290/1042_TR0246/01.m84090_240206_172710_s2.hifi_reads.bc2010.KL.GRCh38.aligned.haplotagged.bam  
-02	/hpf/largeprojects/ccmbio/ccmmarvin_tcag_shared/PacBio/MEA26290/1042_TR0247/02.m84090_240206_192642_s3.hifi_reads.bc2011.KL.GRCh38.aligned.haplotagged.bam  
+01	/path/to/FAM01_01.GRCh38.aligned.haplotagged.bam  
+02	/path/to/FAM01_02.GRCh38.aligned.haplotagged.bam 
 ```
 - Add paths to the HPO term file and pedigree file to config.yaml. 
 - Do a dry run: add a `-n` flag to the Snakemake command in crg2-pacbio.sh. This will print out the rules that will be run, but not actually run them.
@@ -63,8 +65,8 @@ snakemake --use-conda -s ${SF} --cores 4 --conda-prefix ${CP} --configfile ${CON
 
 ## Small variant panel report: small_variants/panel/{family}/{family}.wgs.regular.{date}.csv, small_variants/panel-flank/{family}/{family}.wgs.regular.{date}.csv
 - The annotation pipeline is the same as above, but only variants in a gene panel are considered. The panel report includes variants of any impact (i.e. it includes non-coding variants and intronic variants).
-- To generate a gene panel from an HPO text file exported from PhenomeCentral or G4RD, add the HPO filepath to `config["run"]["hpo"]`.
-- The first time you run the pipeline, you will also need to generate Ensembl and RefSeq gene files as well as an HGNC gene mapping file.
+- To generate a gene panel from an HPO term to gene text file exported from Phenotips ('Suggested genes'), add the HPO filepath to `config["run"]["hpo"]`.
+- The first time you run the pipeline (NOTE- not required if you're running this on SickKids HPC4Health), you will also need to generate Ensembl and RefSeq gene files as well as an HGNC gene mapping file.
 - Download and unzip Ensembl gtf: ```wget -qO- https://ftp.ensembl.org/pub/release-112/gtf/homo_sapiens/Homo_sapiens.GRCh38.112.gtf.gz  | gunzip -c > Homo_sapiens.GRCh38.112.gtf```
 - Download and unzip RefSeq gff: ```wget https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh38_latest/refseq_identifiers/GRCh38_latest_genomic.gff.gz | gunzip -c > GRCh38_latest_genomic.gff```
 - Download RefSeq chromosome mapping file: ```wget https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh38_latest/refseq_identifiers/GRCh38_latest_assembly_report.txt```
@@ -79,19 +81,21 @@ snakemake --use-conda -s ${SF} --cores 4 --conda-prefix ${CP} --configfile ${CON
 - a description of the report and fields can be found [here](https://sickkidsca.sharepoint.com/:w:/r/sites/thecenterforcomputationalmedicineworkspace/_layouts/15/Doc.aspx?sourcedoc=%7B531618A5-B617-4444-B496-5A9D239C4B91%7D&file=PacBio_SV_report.docx&action=default&mobileredirect=true)
 
 ## Repeat expansion outlier report: repeat_outliers/{family}.repeat.outliers.annotated.csv
-- TRGT must have previously been run on each sample against the [937,122](https://zenodo.org/record/7987365#.ZHY9TOzMJAc) repeats originally released by the Genome in a Bottle tandem repeat benchmarking project
-- this module is derived from the [find-outlier-expansions workflow](https://github.com/tandem-repeat-workflows/find-outlier-expansions/blob/main/find-outlier-expansions.ipynb) developed by Egor Dolzhenko (PacBio), Adam English (Baylor College of Medicine), Tom Mokveld (PacBio), Giulia Del Gobbo (CHEO), and Madeline Couse (SickKids)
-- construct a repeat database from 98 HPRC samples and the individuals from the family of interest
+- this module is modified from the [find-outlier-expansions workflow](https://github.com/tandem-repeat-workflows/find-outlier-expansions/blob/main/find-outlier-expansions.ipynb) developed by Egor Dolzhenko (PacBio), Adam English (Baylor College of Medicine), Tom Mokveld (PacBio), Giulia Del Gobbo (CHEO), and Madeline Couse (SickKids) 
+- genotype repeats per-sample using TRGTv1.1.0 against [937,122](https://zenodo.org/record/7987365#.ZHY9TOzMJAc) repeats originally released by the Genome in a Bottle tandem repeat benchmarking project
+- compute length of longest pure segment (LPS) in repeat alleles using [TRGT-LPS v0.4.0](https://github.com/PacificBiosciences/trgt-lps)
+merge sample TRGT VCFs into multi-sample VCF
+- compute repeat allele length and LPS Z-scores relative to background distribution (Children's Mercy Hospital cohort, n=1436)
 - identify repeats with outlying size in family members
 - annnotate repeat outliers with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_repeat_outliers.py)
 
 ## De novo tandem repeat variant report: TRGT_denovo/{family}_{child}.TRGT.denovo.annotated.csv
 - identify de novo tandem repeats in probands using [TRGT-denovo](https://github.com/PacificBiosciences/trgt-denovo) v0.2.0
-- note that the `trgt_vcf_dir` must contain the TRGT spanning BAMs to successfully run the denovo tandem repeat report
+- note that the sample TRGT spanning BAM files must reside in the same directories as the BAMs specified per-sample in `samples.tsv` to successfully run the denovo tandem repeat report
 - filter annotate de novo repeats with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_denovo_repeats.py)
 
 ## Pathogenic repeat loci report: pathogenic_repeats/{family}.known.path.str.loci.csv
-- genotype repeats per-sample using TRGTv1.0.0 against the union of the [pathogenic repeat loci BED file](https://github.com/PacificBiosciences/trgt/blob/main/repeats/pathogenic_repeats.hg38.bed) provided by TRGT and the disease catalog provided by [STRchive](https://strchive.org/_astro/STRchive-disease-loci.hg38.TRGT.B2FLLAlV.bed) (a total of 77 loci). Note that TRGT requires BAMs; these must be added to the samples.tsv file
+- genotype repeats per-sample using TRGTv1.1.0 against the union of the [pathogenic repeat loci BED file](https://github.com/PacificBiosciences/trgt/blob/main/repeats/pathogenic_repeats.hg38.bed) provided by TRGT and the disease catalog provided by [STRchive](https://strchive.org/_astro/STRchive-disease-loci.hg38.TRGT.B2FLLAlV.bed) (a total of 77 loci). 
 - merge sample VCFs into multi-sample family VCF
 - annotate repeat loci with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_path_str_loci.py)
 
