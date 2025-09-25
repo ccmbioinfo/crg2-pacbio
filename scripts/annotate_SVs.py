@@ -816,6 +816,7 @@ def main(
             "SVTYPE",
             "ID",
             "INFO",
+            "FILTER",
             "GENE_NAME",
             "ENSEMBL_GENE",
             "VARIANT",
