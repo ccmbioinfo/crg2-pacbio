@@ -62,6 +62,7 @@ rule vep:
         dir=config["annotation"]["vep"]["dir"],
         dir_cache=config["annotation"]["vep"]["dir_cache"],
         ref=config["ref"]["genome"],
+        phyloP100way=config["annotation"]["vep"]["phyloP100way"], 
     wrapper:
         get_wrapper_path("vep")
 

@@ -499,7 +499,7 @@ select_and_write2 <- function(variants, samples, prefix, type)
                             "Ensembl_transcript_id", "rsIDs",
                             protein_cols,
                             "Gnomad_oe_lof_score", "Gnomad_oe_mis_score", "Exac_pli_score", "Exac_prec_score", "Exac_pnull_score",
-                            "Conserved_in_30_mammals", "SpliceAI_impact", "SpliceAI_score"),
+                            "phylop100way", "SpliceAI_impact", "SpliceAI_score"),
                             coding_scores,
                             noncoding_scores,
                             c("Imprinting_status", "Imprinting_expressed_allele", "Pseudoautosomal",

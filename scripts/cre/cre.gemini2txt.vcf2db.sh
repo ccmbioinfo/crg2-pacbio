@@ -96,7 +96,7 @@ sQuery="select \
         aa_change as AA_change,\
         hgvsc as Codon_change,\
         "$callers" as Callers,\
-        phylop30way_mammalian as Conserved_in_30_mammals,\
+        phyloP100way,\
         COALESCE(spliceai_score, '') as SpliceAI_score, \
         Dark_genes as Dark_genes, \
         ps as PS, \
