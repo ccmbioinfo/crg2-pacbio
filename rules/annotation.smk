@@ -3,6 +3,8 @@ def get_filt_vcf(wildcards):
         return "filtered/{family}.vcf.gz"
     elif wildcards.p == "denovo":
         return "filtered/{family}.vcf.gz"
+    elif wildcards.p == "wgs-high-impact":
+        return "filtered/{family}.vcf.gz"
     else:
         return "filtered/{p}/{family}.{p}.vcf.gz".format(p=wildcards.p,family=project)
 
@@ -60,6 +62,7 @@ rule vep:
         dir=config["annotation"]["vep"]["dir"],
         dir_cache=config["annotation"]["vep"]["dir_cache"],
         ref=config["ref"]["genome"],
+        phyloP100way=config["annotation"]["vep"]["phyloP100way"], 
     wrapper:
         get_wrapper_path("vep")
 
