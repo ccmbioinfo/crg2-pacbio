@@ -80,6 +80,8 @@ sQuery="select \
 	    gnomad_male_ac as Gnomad_male_ac, \
         gnomad_fafmax_faf95_max as Gnomad_fafmax_faf95_max, \
         gnomad_filter as Gnomad_filter, \
+        regeneron_exome_AF as Regeneron_exome_AF, \
+        regeneron_exome_AC as Regeneron_exome_AC, \
         colorsdb_af as CoLoRSdb_AF,\
         colorsdb_ac as CoLoRSdb_AC,\
         colorsdb_ac_hemi as CoLoRSdb_AC_Hemi,\
