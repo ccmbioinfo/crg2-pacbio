@@ -62,7 +62,7 @@ noncoding_pred <- function(cadd, ncer, remm, linsight){
   preds <- c(cadd_pred, ncer_pred, remm_pred, linsight_pred)
   pred_impact <- sum(preds, na.rm = TRUE)
   denominator <- sum(!is.na(preds))
-  fraction = paste(as.character(pred_impact), as.character(denominator), sep="/")
+  fraction = paste(as.character(pred_impact), as.character(denominator), sep="//")
 
   return(fraction)
 }
@@ -185,7 +185,11 @@ create_report <- function(family, samples, type){
     if (type == 'wgs' || type == 'denovo' || type == 'wgs.high.impact'){
         noncoding_agg <- mapply(noncoding_pred, variants[, "Cadd_score"], variants[,"ncER_score"], variants[,"ReMM_score"], variants[,"LINSIGHT_score"])
         variants[, "Noncoding_path_pred"] <- unlist(noncoding_agg)
-        variants <- variants[variants$Noncoding_path_pred != "0/3" & variants$Noncoding_path_pred != "0/4",]
+    }
+
+    if (type == 'wgs.high.impact'){
+        variants <- variants[variants$Noncoding_path_pred != "0//3" & variants$Noncoding_path_pred != "0//4",]
+        variants <- variants[variants$Variation != "intergenic_variant",]
     }
 
     
