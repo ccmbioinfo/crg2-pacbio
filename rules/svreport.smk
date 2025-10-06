@@ -45,7 +45,9 @@ rule sv_report:
         omim = config["annotation"]["omim_path"],
         exon = config["annotation"]["sv_report"]["exon"],
         anno_path = config["annotation"]["sv_report"]["anno_path"],
+        repeats = config["trgt"]["adotto_repeats"],
         inhouse = config["annotation"]["sv_report"]["inhouse"],
+        gnomad_SV = config["annotation"]["sv_report"]["gnomad_SV"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
     conda:
@@ -60,7 +62,7 @@ rule sv_report:
                         -vcf {input.pbsv_vcf} \
                         -omim {params.omim} \
                         -exon {params.exon} \
-                        -gnomad {params.anno_path}/gnomad_v2_sv.sites_hg38_liftover_FINAL_drop_cols.bed \
+                        -gnomad {params.gnomad_SV} \
                         -inhouse {params.inhouse} \
                         -colorsdb {params.colorsdb} \
                         -odd_regions {params.anno_path}/GRCh38.oddRegions.bed \
@@ -78,7 +80,7 @@ rule sv_report:
                     -omim {params.omim} \
                     -hpo {params.HPO} \
                     -exon {params.exon} \
-                    -gnomad {params.anno_path}/gnomad_v2_sv.sites_hg38_liftover_FINAL_drop_cols.bed \
+                    -gnomad {params.gnomad_SV} \
                     -inhouse {params.inhouse} \
                     -colorsdb {params.colorsdb} \
                     -odd_regions {params.anno_path}/GRCh38.oddRegions.bed \
