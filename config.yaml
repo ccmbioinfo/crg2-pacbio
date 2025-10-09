@@ -49,6 +49,7 @@ annotation:
   sv_report:
       exon: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/genes/MANE.GRCh38.v1.0.ensembl_genomic.bed"
       inhouse: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/SV_database/pbsv.allsamples.counts.2022-04-19.bed"
+      inhouse_tg: "/hpf/largeprojects/tgnode/sandbox/mcouse_analysis/results/LRWGS_SV_db/pbsv.allsamples.counts.2025-10-06.bed"
       anno_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/annotations/"
       colorsdb: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/data/CoLoRSdb/v1.1.0/CoLoRSdb.GRCh38.v1.1.0.pbsv.jasmine.bed"
   pathogenic_repeats:
