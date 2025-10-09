@@ -18,7 +18,7 @@ tools:
   crg: "~/crg"
   crg2_pacbio: "~/crg2-pacbio"
   annotSV: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/tools/AnnotSV-3.1.1"
-  trgt: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/TRGTv1.1.0/trgt-v1.1.0-x86_64-unknown-linux-gnu/trgt"
+  trgt: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/TRGTv2.1.0/trgt-v2.1.0-x86_64-unknown-linux-gnu/trgt"
   trgt-denovo: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/trgt-denovo-v0.2.0/trgt-denovo"
   mosdepth: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/mosdepth-0.3.11/mosdepth"
   trgt-lps: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/TRGT-LPSv0.4.0/trgt-lps-v0.4.0"
