@@ -346,12 +346,21 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols):
         cols.append(f"{pop_name}_maxAF")
     # get max allele counts for C4R
     except IndexError:
-        count_cols = ["C4R_AC", "seen_in_C4R_count"]
-        for col in count_cols:
-            intersect[f"{col}_max"] = intersect[col].apply(
-                lambda x: max([int(ac) for ac in x.split("; ")])
-            )
-        cols.append(f"{col}_max")
+        try:
+            count_cols = ["C4R_AC", "seen_in_C4R_count"]
+            for col in count_cols:
+                intersect[f"{col}_max"] = intersect[col].apply(
+                    lambda x: max([int(ac) for ac in x.split("; ")])
+                )
+                cols.append(f"{col}_max")
+        # get max allele counts for TG
+        except KeyError:
+            count_cols = ["TG_AC", "seen_in_TG_count", "TG_nhomalt"]
+            for col in count_cols:
+                intersect[f"{col}_max"] = intersect[col].apply(
+                    lambda x: max([int(ac) for ac in x.split("; ")])
+                )
+                cols.append(f"{col}_max")
 
     # merge population AF dataframe with annotSV df
     annotsv_pop_svs = pd.merge(
@@ -637,6 +646,7 @@ def main(
     exon_bed,
     gnomad,
     inhouse,
+    tg,
     colorsdb,
     dark_regions,
     odd_regions,
@@ -753,6 +763,21 @@ def main(
     ]
 
     df_merge = annotate_pop_svs(df_merge, inhouse, inhouse_cols)
+    inhouse_cols = [col for col in inhouse_cols if col != "C4R_ID"]
+
+    # add TG inhouse db SV counts
+    tg_cols = [
+        "TG_ID",
+        "TG_REF",
+        "TG_ALT",
+        "TG_AC",
+        "TG_nhomalt",
+        "seen_in_TG",
+        "seen_in_TG_count",
+    ]
+
+    df_merge  = annotate_pop_svs(df_merge, tg, tg_cols)
+    tg_cols = [col for col in tg_cols if col != "TG_ID"]
 
     # add CoLoRSdb SVs
     colorsdb_cols = ["CoLoRSdb_SVLEN", "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt"]
@@ -817,6 +842,7 @@ def main(
             "SVTYPE",
             "ID",
             "INFO",
+            "FILTER",
             "GENE_NAME",
             "ENSEMBL_GENE",
             "VARIANT",
@@ -841,6 +867,7 @@ def main(
         + ["Tx", "Frameshift", "EXONS_SPANNED", "Nearest_SS_type", "Dist_nearest_SS"]
         + gnomad_cols
         + inhouse_cols
+        + tg_cols
         + colorsdb_cols
         + [
             "ExAC_delZ",
@@ -870,8 +897,7 @@ def main(
     )
 
     df_merge = df_merge[report_columns]
-    if c4r == "True":
-        df_merge = df_merge.drop(columns=["C4R_REF", "C4R_ALT"])
+    df_merge = df_merge.drop(columns=["C4R_REF", "C4R_ALT", "TG_REF", "TG_ALT"])
     df_merge["GENE_NAME"] = df_merge["GENE_NAME"].replace("nan", ".")
     df_merge["omim_phenotype"].fillna("nan", inplace=True)
     df_merge["omim_inheritance"].fillna("nan", inplace=True)
@@ -940,6 +966,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "-inhouse",
         help="C4R inhouse database",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "-tg",
+        help="TG inhouse database",
         type=str,
         required=True,
     )
@@ -1042,6 +1074,7 @@ if __name__ == "__main__":
         args.exon,
         args.gnomad,
         args.inhouse,
+        args.tg,
         args.colorsdb,
         args.dark_regions,
         args.odd_regions,

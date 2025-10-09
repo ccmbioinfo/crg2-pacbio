@@ -48,6 +48,7 @@ rule sv_report:
         repeats = config["trgt"]["adotto_repeats"],
         inhouse = config["annotation"]["sv_report"]["inhouse"],
         gnomad_SV = config["annotation"]["sv_report"]["gnomad_SV"],
+        tg = config["annotation"]["sv_report"]["inhouse_tg"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
     conda:
@@ -64,6 +65,7 @@ rule sv_report:
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
                         -inhouse {params.inhouse} \
+                        -tg {params.tg} \
                         -colorsdb {params.colorsdb} \
                         -odd_regions {params.anno_path}/GRCh38.oddRegions.bed \
                         -repeats {params.anno_path}/human_GRCh38_no_alt_analysis_set.trgt.bed \
@@ -82,6 +84,7 @@ rule sv_report:
                     -exon {params.exon} \
                     -gnomad {params.gnomad_SV} \
                     -inhouse {params.inhouse} \
+                    -tg {params.tg} \
                     -colorsdb {params.colorsdb} \
                     -odd_regions {params.anno_path}/GRCh38.oddRegions.bed \
                     -repeats {params.anno_path}/human_GRCh38_no_alt_analysis_set.trgt.bed \
