@@ -330,15 +330,15 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols):
                 intersect[f"{col}_max"] = intersect[col].apply(
                     lambda x: max([int(ac) for ac in x.split("; ")])
                 )
-            cols.append(f"{col}_max")
+                cols.append(f"{col}_max")
         # get max allele counts for TG
         except KeyError:
-            count_cols = ["TG_AC", "seen_in_TG_count"]
+            count_cols = ["TG_AC", "seen_in_TG_count", "TG_nhomalt"]
             for col in count_cols:
                 intersect[f"{col}_max"] = intersect[col].apply(
                     lambda x: max([int(ac) for ac in x.split("; ")])
                 )
-            cols.append(f"{col}_max")
+                cols.append(f"{col}_max")
 
     # merge population AF dataframe with annotSV df
     annotsv_pop_svs = pd.merge(
@@ -347,7 +347,7 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols):
         how="left",
         on=["CHROM", "POS", "END", "SVTYPE", "ID"],
     ).fillna(value={col: 0 for col in cols})
-    return annotsv_pop_svs
+    return annotsv_pop_svs, cols
 
 
 def annotate_UCSC(chr, pos, end):
@@ -727,7 +727,7 @@ def main(
         "gnomad_AC",
         "gnomad_HOM",
     ]
-    df_merge = annotate_pop_svs(df_merge, gnomad, gnomad_cols)
+    df_merge, gnomad_cols = annotate_pop_svs(df_merge, gnomad, gnomad_cols)
 
     # add C4R inhouse db SV counts
     inhouse_cols = [
@@ -739,7 +739,9 @@ def main(
         "seen_in_C4R_count",
     ]
 
-    df_merge = annotate_pop_svs(df_merge, inhouse, inhouse_cols)
+    df_merge, inhouse_cols = annotate_pop_svs(df_merge, inhouse, inhouse_cols)
+    inhouse_cols = [col for col in inhouse_cols if col != "C4R_ID"]
+    print(inhouse_cols)
 
     # add TG inhouse db SV counts
     tg_cols = [
@@ -747,15 +749,18 @@ def main(
         "TG_REF",
         "TG_ALT",
         "TG_AC",
+        "TG_nhomalt",
         "seen_in_TG",
         "seen_in_TG_count",
     ]
 
-    df_merge = annotate_pop_svs(df_merge, tg, tg_cols)
+    df_merge, tg_cols = annotate_pop_svs(df_merge, tg, tg_cols)
+    tg_cols = [col for col in tg_cols if col != "TG_ID"]
+    print(tg_cols)
 
     # add CoLoRSdb SVs
     colorsdb_cols = ["CoLoRSdb_SVLEN", "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt"]
-    df_merge = annotate_pop_svs(df_merge, colorsdb, colorsdb_cols)
+    df_merge, colorsdb_cols = annotate_pop_svs(df_merge, colorsdb, colorsdb_cols)
     df_merge = df_merge.drop(columns=["CoLoRSdb_SVLEN"])
     colorsdb_cols = [col for col in colorsdb_cols if col != "CoLoRSdb_SVLEN"]
 
