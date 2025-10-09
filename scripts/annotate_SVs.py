@@ -273,12 +273,29 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols):
     # intersect annotsv and population SV bed file
     annotsv_bed = annotsv_df_to_bed(annotsv_df)
     pop_svs = pd.read_csv(pop_svs, sep="\t")
-    # pad population SV insertion calls to account for uncertainty in position
-    pop_svs.loc[pop_svs['SVTYPE'] == 'INS', 'POS'] -= 1 
-    pop_svs.loc[pop_svs['SVTYPE'] == 'INS', 'END'] += 1    
-    pop_svs_bed = BedTool.from_dataframe(pop_svs)
+    # separate out INS and BND calls for window-based matching, DEL, DUP, and INV calls for SVLEN-based matching
+    pop_svs_ins_bnd = pop_svs[(pop_svs['SVTYPE'] == 'INS') | (pop_svs['SVTYPE'] == 'BND')]
+    pop_svs_del_dup_inv = pop_svs[(pop_svs['SVTYPE'] == 'DEL') | (pop_svs['SVTYPE'] == 'DUP') | (pop_svs['SVTYPE'] == 'INV')]
+
+    # look for population INS or BND calls within 10 bp of sample INS or BND calls
+    pop_svs_ins_bnd_bed = BedTool.from_dataframe(pop_svs_ins_bnd)
+    window_ins_bnd = annotsv_bed.window(pop_svs_ins_bnd_bed, w=10).to_dataframe()
+    window_ins_bnd.columns = [
+        "CHROM",
+        "POS",
+        "END",
+        "SVTYPE",
+        "ID",
+        "CHROM_pop",
+        "POS_pop",
+        "END_pop",
+        "SVTYPE_pop",
+    ] + cols
+
+   # look for population DEL, DUP, and INV calls with 50% reciprocal overlap with sample DEL, DUP, and INV calls
+    pop_svs_del_dup_inv_bed = BedTool.from_dataframe(pop_svs_del_dup_inv)
     intersect = annotsv_bed.intersect(
-        pop_svs_bed, wa=True, wb=True, F=0.5, f=0.5
+        pop_svs_del_dup_inv_bed, wa=True, wb=True, F=0.5, f=0.5
     ).to_dataframe()
     intersect.columns = [
         "CHROM",
@@ -291,10 +308,15 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols):
         "END_pop",
         "SVTYPE_pop",
     ] + cols
+
+
+    # now concatenate the window and SVLEN-based matches
+    intersect = pd.concat([window_ins_bnd, intersect])
     # popSV and sample SV must be same type
     intersect = intersect[intersect["SVTYPE"] == intersect["SVTYPE_pop"]]
+
+    # make a column with SV details, e.g DEL:1:25266309-25324509
     pop_name = cols[0].split("_")[0]
-    # e.g. make a column with SV details, e.g DEL:1:25266309-25324509
     intersect[f"{pop_name}_SV"] = intersect[
         ["CHROM_pop", "POS_pop", "END_pop", "SVTYPE_pop"]
     ].apply(lambda x: f"{x[3]}:{x[0]}:{x[1]}-{x[2]}", axis=1)
@@ -324,12 +346,21 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols):
         cols.append(f"{pop_name}_maxAF")
     # get max allele counts for C4R
     except IndexError:
-        count_cols = ["C4R_AC", "seen_in_C4R_count"]
-        for col in count_cols:
-            intersect[f"{col}_max"] = intersect[col].apply(
-                lambda x: max([int(ac) for ac in x.split("; ")])
-            )
-        cols.append(f"{col}_max")
+        try:
+            count_cols = ["C4R_AC", "seen_in_C4R_count"]
+            for col in count_cols:
+                intersect[f"{col}_max"] = intersect[col].apply(
+                    lambda x: max([int(ac) for ac in x.split("; ")])
+                )
+                cols.append(f"{col}_max")
+        # get max allele counts for TG
+        except KeyError:
+            count_cols = ["TG_AC", "seen_in_TG_count", "TG_nhomalt"]
+            for col in count_cols:
+                intersect[f"{col}_max"] = intersect[col].apply(
+                    lambda x: max([int(ac) for ac in x.split("; ")])
+                )
+                cols.append(f"{col}_max")
 
     # merge population AF dataframe with annotSV df
     annotsv_pop_svs = pd.merge(
@@ -408,7 +439,8 @@ def annotate_pb_regions(annotsv_df, regions, region_name):
 def annotate_repeats(annotsv_df, repeats):
     #  sample SV must be fully encompassed by repeat
     annotsv_bed = annotsv_df_to_bed(annotsv_df)
-    repeats = pd.read_csv(repeats, sep="\t")
+    repeats = pd.read_csv(repeats, sep="\t", header=None, names=["CHROM", "POS", "END", "Adotto_tandem_repeat"])
+    repeats["CHROM"] = repeats["CHROM"].astype(str).apply(lambda x: x.replace("chr", ""))
     repeats_bed = BedTool.from_dataframe(repeats)
     intersect = annotsv_bed.intersect(
         repeats_bed,
@@ -425,7 +457,7 @@ def annotate_repeats(annotsv_df, repeats):
         "CHROM_repeat",
         "POS_repeat",
         "END_repeat",
-        "PB_repeat_type",
+        "Adotto_tandem_repeat",
     ]
     intersect = intersect[
         [
@@ -434,10 +466,10 @@ def annotate_repeats(annotsv_df, repeats):
             "END",
             "SVTYPE",
             "ID",
-            "PB_repeat_type",
+            "Adotto_tandem_repeat",
         ]
     ]
-    cols = [col for col in intersect.columns if "PB" in col]
+
     # merge repeat dataframe with annotSV df
     intersect = intersect.astype(str)
     annotsv_repeat_svs = pd.merge(
@@ -445,7 +477,7 @@ def annotate_repeats(annotsv_df, repeats):
         intersect,
         how="left",
         on=["CHROM", "POS", "END", "SVTYPE", "ID"],
-    ).fillna(value={col: "." for col in cols})
+    ).fillna(value={"Adotto_tandem_repeat": "."})
     return annotsv_repeat_svs
 
 
@@ -614,6 +646,7 @@ def main(
     exon_bed,
     gnomad,
     inhouse,
+    tg,
     colorsdb,
     dark_regions,
     odd_regions,
@@ -713,7 +746,7 @@ def main(
     # add gnomAD SVs
     gnomad_cols = [
         "gnomad_NAME",
-        "gnomad_POPMAX_AF",
+        "gnomad_GRPMAX_AF",
         "gnomad_AC",
         "gnomad_HOM",
     ]
@@ -730,6 +763,21 @@ def main(
     ]
 
     df_merge = annotate_pop_svs(df_merge, inhouse, inhouse_cols)
+    inhouse_cols = [col for col in inhouse_cols if col != "C4R_ID"]
+
+    # add TG inhouse db SV counts
+    tg_cols = [
+        "TG_ID",
+        "TG_REF",
+        "TG_ALT",
+        "TG_AC",
+        "TG_nhomalt",
+        "seen_in_TG",
+        "seen_in_TG_count",
+    ]
+
+    df_merge  = annotate_pop_svs(df_merge, tg, tg_cols)
+    tg_cols = [col for col in tg_cols if col != "TG_ID"]
 
     # add CoLoRSdb SVs
     colorsdb_cols = ["CoLoRSdb_SVLEN", "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt"]
@@ -794,6 +842,7 @@ def main(
             "SVTYPE",
             "ID",
             "INFO",
+            "FILTER",
             "GENE_NAME",
             "ENSEMBL_GENE",
             "VARIANT",
@@ -818,6 +867,7 @@ def main(
         + ["Tx", "Frameshift", "EXONS_SPANNED", "Nearest_SS_type", "Dist_nearest_SS"]
         + gnomad_cols
         + inhouse_cols
+        + tg_cols
         + colorsdb_cols
         + [
             "ExAC_delZ",
@@ -840,15 +890,14 @@ def main(
             "PB_odd_region_type",
             "PB_odd_region",
             "PB_odd_region_perc_overlap",
-            "PB_repeat_type",
+            "Adotto_tandem_repeat",
             "ENCODE_blacklist_characteristics_left",
             "ENCODE_blacklist_characteristics_right",
         ]
     )
 
     df_merge = df_merge[report_columns]
-    if c4r == "True":
-        df_merge = df_merge.drop(columns=["C4R_REF", "C4R_ALT"])
+    df_merge = df_merge.drop(columns=["C4R_REF", "C4R_ALT", "TG_REF", "TG_ALT"])
     df_merge["GENE_NAME"] = df_merge["GENE_NAME"].replace("nan", ".")
     df_merge["omim_phenotype"].fillna("nan", inplace=True)
     df_merge["omim_inheritance"].fillna("nan", inplace=True)
@@ -921,6 +970,12 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
+        "-tg",
+        help="TG inhouse database",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
         "-colorsdb",
         help="CoLoRSdb SVs in bed format",
         type=str,
@@ -940,7 +995,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-repeats",
-        help="PacBio repeats",
+        help="Adotto repeats",
         type=str,
         required=True,
     )
@@ -1019,6 +1074,7 @@ if __name__ == "__main__":
         args.exon,
         args.gnomad,
         args.inhouse,
+        args.tg,
         args.colorsdb,
         args.dark_regions,
         args.odd_regions,
