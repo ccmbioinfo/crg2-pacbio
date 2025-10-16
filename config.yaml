@@ -40,8 +40,9 @@ annotation:
     lua_script: "~/crg2-pacbio/vcfanno/crg.vcfanno.lua"
     base_path: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/"
   vep:
-    dir: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/executables/ensembl-vep/"
+    dir: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/snakemake/499f2ad2/share/ensembl-vep-115.2-0/"
     dir_cache: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/vep"
+    phyloP100way: "/hpf/largeprojects/tgnode/sandbox/mcouse_analysis/tools/PhyloP100way/hg38.phyloP100way.bw"
   cre:
      database_path: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/"
   snpeff:
