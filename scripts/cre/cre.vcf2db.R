@@ -190,6 +190,7 @@ create_report <- function(family, samples, type){
     if (type == 'wgs.high.impact'){
         variants <- variants[variants$Noncoding_path_pred != "0//3" & variants$Noncoding_path_pred != "0//4",]
         variants <- variants[variants$Variation != "intergenic_variant",]
+        variants <- variants[!is.na(variants$Gene),]
     }
 
     
@@ -482,7 +483,7 @@ select_and_write2 <- function(variants, samples, prefix, type)
 {
     print(colnames(variants))
     if (type == 'wgs' || type == 'denovo' || type == 'wgs.high.impact'){
-        noncoding_cols <- c("DNaseI_hypersensitive_site", "CTCF_binding_site", "ENH_cellline_tissue", "TF_binding_sites")
+        noncoding_cols <- c("UCE_100bp", "UCE_200bp", "DNaseI_hypersensitive_site", "CTCF_binding_site", "ENH_cellline_tissue", "TF_binding_sites")
         noncoding_scores <- c("ncER_score", "ReMM_score", "LINSIGHT_score", "Noncoding_path_pred", "promoterAI_score")
         coding_scores <- c("Cadd_score")
         protein_cols <- c()
@@ -515,7 +516,7 @@ select_and_write2 <- function(variants, samples, prefix, type)
                             c("phylop100way", "SpliceAI_impact", "SpliceAI_score"),
                             noncoding_scores,
                             c("Imprinting_status", "Imprinting_expressed_allele", "Pseudoautosomal",
-                            "Old_multiallelic", "UCE_100bp", "UCE_200bp", "Dark_genes"), noncoding_cols)]
+                            "Old_multiallelic", "Dark_genes"), noncoding_cols)]
   
     variants <- variants[order(variants$Position),]
 
