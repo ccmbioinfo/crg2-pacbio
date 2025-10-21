@@ -26,7 +26,7 @@ def rename_SV_cols(annotsv_df):
 
 
 def annotsv_df_to_bed(annotsv_df):
-    annotsv_df = annotsv_df[["CHROM", "POS", "END", "SVTYPE", "ID"]]
+    annotsv_df = annotsv_df[["CHROM", "POS", "END", "SVTYPE", "SVLEN", "ID"]]
     bed = BedTool.from_dataframe(annotsv_df)
     return bed
 
@@ -271,47 +271,61 @@ def get_exon_counts(annotsv_df, exon_bed):
 
 def annotate_pop_svs(annotsv_df, pop_svs, cols):
     # intersect annotsv and population SV bed file
-    annotsv_bed = annotsv_df_to_bed(annotsv_df)
-    pop_svs = pd.read_csv(pop_svs, sep="\t")
     # separate out INS and BND calls for window-based matching, DEL, DUP, and INV calls for SVLEN-based matching
-    pop_svs_ins_bnd = pop_svs[(pop_svs['SVTYPE'] == 'INS') | (pop_svs['SVTYPE'] == 'BND')]
-    pop_svs_del_dup_inv = pop_svs[(pop_svs['SVTYPE'] == 'DEL') | (pop_svs['SVTYPE'] == 'DUP') | (pop_svs['SVTYPE'] == 'INV')]
+    annotsv_INS_BND_bed = annotsv_df_to_bed(annotsv_df[(annotsv_df['SVTYPE'] == 'INS') | (annotsv_df['SVTYPE'] == 'BND')])
+    annotsv_DEL_DUP_INV_bed = annotsv_df_to_bed(annotsv_df[(annotsv_df['SVTYPE'] == 'DEL') | (annotsv_df['SVTYPE'] == 'DUP') | (annotsv_df['SVTYPE'] == 'INV')])
 
-    # look for population INS or BND calls within 10 bp of sample INS or BND calls
-    pop_svs_ins_bnd_bed = BedTool.from_dataframe(pop_svs_ins_bnd)
-    window_ins_bnd = annotsv_bed.window(pop_svs_ins_bnd_bed, w=10).to_dataframe()
-    window_ins_bnd.columns = [
+    pop_svs = pd.read_csv(pop_svs, sep="\t")
+    pop_svs_INS_BND = pop_svs[(pop_svs['SVTYPE'] == 'INS') | (pop_svs['SVTYPE'] == 'BND')]
+    pop_svs_INS_BND_bed = BedTool.from_dataframe(pop_svs_INS_BND)
+    pop_svs_DEL_DUP_INV = pop_svs[(pop_svs['SVTYPE'] == 'DEL') | (pop_svs['SVTYPE'] == 'DUP') | (pop_svs['SVTYPE'] == 'INV')]
+    pop_svs_DEL_DUP_INV_bed = BedTool.from_dataframe(pop_svs_DEL_DUP_INV)
+
+    # look for population INS/BND within 50 bp of sample INS/BND 
+    window_INS_BND = annotsv_INS_BND_bed.window(pop_svs_INS_BND_bed, w=50).to_dataframe()
+    window_INS_BND.columns = [
         "CHROM",
         "POS",
         "END",
         "SVTYPE",
+        "SVLEN",
         "ID",
         "CHROM_pop",
         "POS_pop",
         "END_pop",
         "SVTYPE_pop",
+        "SVLEN_pop"
     ] + cols
+    # only keep matches where the size fraction is greater than 0.8, e.g.  an insertion of 1000bp will not be matched to a 100bp insertion at the same position
+    window_INS_BND["SVLEN"] = window_INS_BND["SVLEN"].abs()
+    window_INS_BND["size_fraction"] = window_INS_BND.apply(lambda x: (min([x["SVLEN"], x["SVLEN_pop"]]))/(max([x["SVLEN"], x["SVLEN_pop"]])), axis=1)
+    window_INS_BND = window_INS_BND[window_INS_BND["size_fraction"] >= 0.8]
+    window_INS_BND = window_INS_BND.drop(columns=["size_fraction"])
 
-   # look for population DEL, DUP, and INV calls with 50% reciprocal overlap with sample DEL, DUP, and INV calls
-    pop_svs_del_dup_inv_bed = BedTool.from_dataframe(pop_svs_del_dup_inv)
-    intersect = annotsv_bed.intersect(
-        pop_svs_del_dup_inv_bed, wa=True, wb=True, F=0.5, f=0.5
+
+   # look for population DEL, DUP, and INV calls with 80% reciprocal overlap with sample DEL, DUP, and INV calls
+    print(annotsv_DEL_DUP_INV_bed.head())
+    print(pop_svs_DEL_DUP_INV_bed.head())
+    intersect_DEL_DUP_INV = annotsv_DEL_DUP_INV_bed.intersect(
+        pop_svs_DEL_DUP_INV_bed, wa=True, wb=True, F=0.8, f=0.8
     ).to_dataframe()
-    intersect.columns = [
+    intersect_DEL_DUP_INV.columns = [
         "CHROM",
         "POS",
         "END",
         "SVTYPE",
+        "SVLEN",
         "ID",
         "CHROM_pop",
         "POS_pop",
         "END_pop",
         "SVTYPE_pop",
+        "SVLEN_pop"
     ] + cols
 
 
     # now concatenate the window and SVLEN-based matches
-    intersect = pd.concat([window_ins_bnd, intersect])
+    intersect = pd.concat([window_INS_BND, intersect_DEL_DUP_INV])
     # popSV and sample SV must be same type
     intersect = intersect[intersect["SVTYPE"] == intersect["SVTYPE_pop"]]
 
@@ -347,7 +361,7 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols):
     # get max allele counts for C4R
     except IndexError:
         try:
-            count_cols = ["C4R_AC", "seen_in_C4R_count"]
+            count_cols = ["C4R_AC", "seen_in_C4R_count", "C4R_nhomalt"]
             for col in count_cols:
                 intersect[f"{col}_max"] = intersect[col].apply(
                     lambda x: max([int(ac) for ac in x.split("; ")])
@@ -397,6 +411,7 @@ def annotate_pb_regions(annotsv_df, regions, region_name):
         "POS",
         "END",
         "SVTYPE",
+        "SVLEN",
         "ID",
         "CHROM_region",
         "POS_region",
@@ -453,6 +468,7 @@ def annotate_repeats(annotsv_df, repeats):
         "POS",
         "END",
         "SVTYPE",
+        "SVLEN",
         "ID",
         "CHROM_repeat",
         "POS_repeat",
@@ -744,6 +760,7 @@ def main(
     ]
 
     # add gnomAD SVs
+    print("Adding gnomAD SV frequencies")
     gnomad_cols = [
         "gnomad_NAME",
         "gnomad_GRPMAX_AF",
@@ -753,11 +770,11 @@ def main(
     df_merge = annotate_pop_svs(df_merge, gnomad, gnomad_cols)
 
     # add C4R inhouse db SV counts
+    print("Adding C4R SV frequencies")
     inhouse_cols = [
         "C4R_ID",
-        "C4R_REF",
-        "C4R_ALT",
         "C4R_AC",
+        "C4R_nhomalt",
         "seen_in_C4R",
         "seen_in_C4R_count",
     ]
@@ -766,10 +783,9 @@ def main(
     inhouse_cols = [col for col in inhouse_cols if col != "C4R_ID"]
 
     # add TG inhouse db SV counts
+    print("Adding TG SV frequencies")
     tg_cols = [
         "TG_ID",
-        "TG_REF",
-        "TG_ALT",
         "TG_AC",
         "TG_nhomalt",
         "seen_in_TG",
@@ -780,10 +796,9 @@ def main(
     tg_cols = [col for col in tg_cols if col != "TG_ID"]
 
     # add CoLoRSdb SVs
-    colorsdb_cols = ["CoLoRSdb_SVLEN", "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt"]
+    print("Adding CoLoRSdb SV frequencies")
+    colorsdb_cols = ["CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt"]
     df_merge = annotate_pop_svs(df_merge, colorsdb, colorsdb_cols)
-    df_merge = df_merge.drop(columns=["CoLoRSdb_SVLEN"])
-    colorsdb_cols = [col for col in colorsdb_cols if col != "CoLoRSdb_SVLEN"]
 
     # add exon counts
     df_merge = get_exon_counts(df_merge, exon_bed)
@@ -897,7 +912,6 @@ def main(
     )
 
     df_merge = df_merge[report_columns]
-    df_merge = df_merge.drop(columns=["C4R_REF", "C4R_ALT", "TG_REF", "TG_ALT"])
     df_merge["GENE_NAME"] = df_merge["GENE_NAME"].replace("nan", ".")
     df_merge["omim_phenotype"].fillna("nan", inplace=True)
     df_merge["omim_inheritance"].fillna("nan", inplace=True)
