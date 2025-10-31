@@ -6,9 +6,9 @@ rule pbcpgtools:
         pbcpgtools = config["pbcpgtools"]["binary"], 
         model = config["pbcpgtools"]["model"] 
     output:
-        combined = "pb-cpg-tools/{sample}/{sample}.combined.bed",
-        hap1 = "pb-cpg-tools/{sample}/{sample}.hap1.bed",
-        hap2 = "pb-cpg-tools/{sample}/{sample}.hap2.bed"
+        combined = "pb-cpg-tools/{sample}/{sample}.GRCh38.cpg_pileup.combined.bed",
+        hap1 = "pb-cpg-tools/{sample}/{sample}.GRCh38.cpg_pileup.hap1.bed",
+        hap2 = "pb-cpg-tools/{sample}/{sample}.GRCh38.cpg_pileup.hap2.bed"
     log:
         "logs/pbcpgtools/{sample}.log"
     resources:
@@ -21,7 +21,7 @@ rule pbcpgtools:
             --threads {resources.threads} \
             --bam $BAM \
             --ref {params.ref} \
-            --output-prefix pb-cpg-tools/{wildcards.sample}/{wildcards.sample} \
+            --output-prefix pb-cpg-tools/{wildcards.sample}/{wildcards.sample}.GRCh38.cpg_pileup \
             --min-mapq 1 \
             --min-coverage 5 \
             --model {params.model}
@@ -47,7 +47,9 @@ rule mosdepth_tiles:
         """
 
 rule methbat_profile:
-    input: "pb-cpg-tools/{sample}/{sample}.combined.bed"
+    input: 
+        bed = "pb-cpg-tools/{sample}/{sample}.GRCh38.cpg_pileup.combined.bed.gz",
+        index = "pb-cpg-tools/{sample}/{sample}.GRCh38.cpg_pileup.combined.bed.gz.tbi"
     params: 
         regions = config["methbat"]["regions"]
     output: "methbat/profiles/{sample}.profile.tsv"
@@ -58,7 +60,7 @@ rule methbat_profile:
         mem_mb = 40000
     shell:
         """
-        input=`echo {input} | sed 's/.combined.bed//'`
+        input=`echo {input.bed} | sed 's/.combined.bed.gz//'`
         methbat profile \
         --input-prefix $input \
         --input-regions {params.regions} \
@@ -90,7 +92,8 @@ rule methbat_build_cohort:
 
 rule methbat_call_outliers:
     input:
-        meth_probs = "pb-cpg-tools/{sample}/{sample}.combined.bed",
+        meth_probs = "pb-cpg-tools/{sample}/{sample}.GRCh38.cpg_pileup.combined.bed.gz",
+        index = "pb-cpg-tools/{sample}/{sample}.GRCh38.cpg_pileup.combined.bed.gz.tbi",
         cohort = "methbat/cohort_methylation_distributions.tsv"
     output:
         "methbat/outliers/{sample}.outliers.tsv"
@@ -101,7 +104,7 @@ rule methbat_call_outliers:
         mem_mb = 40000
     shell:
         """
-        input=`echo {input.meth_probs} | sed 's/.combined.bed//'`
+        input=`echo {input.meth_probs} | sed 's/.combined.bed.gz//'`
         methbat profile \
         --input-prefix $input \
         --input-regions {input.cohort} \
