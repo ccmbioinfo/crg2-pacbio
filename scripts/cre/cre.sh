@@ -7,7 +7,7 @@
 #	family = [family_id] (=project_id=case_id=folder_name, main result file should be family/family-ensemble.db)
 #	cleanup= [0|1] default = 0
 #	make_report=[0|1] default = 1, don't make report for WGS analysis first
-# 	type = [ wes.regular (default) | wes.synonymous | wes.mosaic | wes.fast | rnaseq | wgs | wgs.high.impact | annotate (only for cleaning) | 
+# 	type = [ wgs.coding (default) | wgs | wgs.high.impact | denovo | 
 # 	    denovo (all rare variants in wgs, proband should have phenotype=2, parents=phenotype1 also sex for parents in gemini.db) ]
 #	max_af = af filter, default = 0.01
 #	database = path to folder where c4r count files and hgmd.csv are found.
@@ -251,10 +251,10 @@ then
     export severity_filter=ALL
 fi
 
-# set wes.regular as default type
+# set wgs.coding as default type
 if [ -z $type ]
 then
-    type="wes.regular"
+    type="wgs.coding"
 fi
 
 #default database path
@@ -293,7 +293,7 @@ then
 fi
 
 #if cleanup set, also make the synonymous report
-if [ $cleanup -eq 1 ] && [ "$type" == "wes.regular" ]
+if [ $cleanup -eq 1 ] && [ "$type" == "wgs.coding" ]
 then
     type="wes.synonymous"
     f_make_report
