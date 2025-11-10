@@ -47,6 +47,26 @@ genotype2zygocity <- function (genotype_str, ref, alt_depth, type){
     return(result)
 }
 
+# count how many noncoding scores predict an impact and return a fraction
+# e.g. 3/4 indicates that 3/4 scores predict an impact
+noncoding_pred <- function(cadd, ncer, remm, linsight){
+  cadd <- ifelse(cadd == "None", NA, cadd)
+  ncer <- ifelse(ncer == "None", NA, ncer)
+  remm <- ifelse(remm == "None", NA, remm)
+  linsight <- ifelse(linsight == "None", NA, linsight)
+  # https://doi.org/10.1016/j.gpb.2022.02.002 table 3 best threshold
+  cadd_pred <- cadd > 14.19 # paper used CADD v1.3, we use 1.6, so score here is from personal work
+  ncer_pred <- ncer > 95.95
+  remm_pred <- remm > 0.9585 
+  linsight_pred <- linsight > 0.9828
+  preds <- c(cadd_pred, ncer_pred, remm_pred, linsight_pred)
+  pred_impact <- sum(preds, na.rm = TRUE)
+  denominator <- sum(!is.na(preds))
+  fraction = paste(as.character(pred_impact), as.character(denominator), sep="//")
+
+  return(fraction)
+}
+
 # output : family.ensemble.txt
 create_report <- function(family, samples, type){
     file <- paste0(family, ".variants.txt")
@@ -95,6 +115,84 @@ create_report <- function(family, samples, type){
 
     # Column6 - Gene
     variants$Gene[variants$Gene == ""] <- NA
+
+    # SpliceAI score parsing
+    variants <- add_placeholder(variants, "SpliceAI_impact", "")
+    for (i in 1:nrow(variants)){
+        print(i)
+        if (variants[i,"SpliceAI_score"] == ""){
+            variants[i, "SpliceAI_impact"] <- "NA|NA|NA"
+            variants[i, "SpliceAI_score"] <- 0
+        } else {
+            spliceai <- strsplit(variants[i,"SpliceAI_score"], ",", fixed = T)[[1]]
+            score_list <- c("NA", "NA", 0, "NA")
+            names(score_list) <- c("gene", "impact", "score", "pos")
+            for (anno in spliceai){
+                anno <- strsplit(anno, "|", fixed = T)[[1]]
+                gene <- anno[2]
+                DS_AG <- anno[3]
+                DS_AL <- anno[4]	
+                DS_DG <- anno[5]	
+                DS_DL <- anno[6]	
+                DP_AG <- anno[7]	
+                DP_AL <- anno[8]	
+                DP_DG <- anno[9]	
+                DP_DL <- anno[10]	
+                scores <- c(as.numeric(DS_AG), as.numeric(DS_AL), as.numeric(DS_DG), as.numeric(DS_DL))
+                names(scores) <- c("acceptor_gain", "acceptor_loss", "donor_gain", "donor_loss")
+                max_score <- max(scores)        
+                for (name in names(scores)){
+                    if (scores[name] == max_score){name_max_score <- name}
+                }
+                if (name_max_score == 0){
+                    impact <- "NA"
+                } else {
+                    impact <- name_max_score
+                }
+                if (score_list["score"] < max_score){
+                    score_list["score"] <- max_score
+                    score_list["gene"] <- gene
+                    score_list["impact"] <- impact
+                    if (impact == "acceptor_gain"){
+                        score_list["pos"] <- DP_AG
+                        } else if (impact == "acceptor_loss"){
+                        score_list["pos"] <- DP_AL
+                        } else if (impact == "donor_gain"){
+                        score_list["pos"] <- DP_DG
+                        } else {
+                        score_list["pos"] <- DP_DL
+                        }
+                    }
+                }
+            variants[i, "SpliceAI_impact"] <- paste(score_list["gene"], score_list["impact"], score_list["pos"], sep="|")
+            variants[i, "SpliceAI_score"] <- score_list["score"]
+            }
+        }
+
+    # select high impact variants: 
+    #SpliceAI_score >= 0.5 or Cadd_score >= 10 (or Cadd_score is missing; not all indels are scored)
+    if (type == 'wgs.high.impact'){
+        print("Selecting high impact variants")
+        # Convert Cadd_score to numeric, keeping NA for "None" values
+        variants$Cadd_score_num <- as.numeric(variants$Cadd_score)
+        # Filter based on SpliceAI_score or Cadd_score conditions
+        variants <- variants[variants$SpliceAI_score >= 0.2 | variants$Cadd_score == "None" | variants$Cadd_score_num >= 14,]
+        # Remove the temporary numeric column
+        variants$Cadd_score_num <- NULL
+    }
+
+     # count number of noncoding scores that predict an impact
+    if (type == 'wgs' || type == 'denovo' || type == 'wgs.high.impact'){
+        noncoding_agg <- mapply(noncoding_pred, variants[, "Cadd_score"], variants[,"ncER_score"], variants[,"ReMM_score"], variants[,"LINSIGHT_score"])
+        variants[, "Noncoding_path_pred"] <- unlist(noncoding_agg)
+    }
+
+    if (type == 'wgs.high.impact'){
+        variants <- variants[variants$Noncoding_path_pred != "0//3" & variants$Noncoding_path_pred != "0//4",]
+        variants <- variants[variants$Variation != "intergenic_variant",]
+        variants <- variants[!is.na(variants$Gene),]
+    }
+
     
     # Column 6 - Zygosity, column 8 - Burden
     # use new loader vcf2db.py - with flag  to load plain text
@@ -296,60 +394,7 @@ create_report <- function(family, samples, type){
     }
     
     # Column41 - Conserved_in_30_mammals
-    # Column 42? - SpliceAI (actually 47, these column indexes are no longer accurate)
-    variants <- add_placeholder(variants, "SpliceAI_impact", "")
-    for (i in 1:nrow(variants)){
-        print(i)
-        if (variants[i,"SpliceAI_score"] == ""){
-            variants[i, "SpliceAI_impact"] <- "NA|NA|NA"
-            variants[i, "SpliceAI_score"] <- 0
-        } else {
-            spliceai <- strsplit(variants[i,"SpliceAI_score"], ",", fixed = T)[[1]]
-            score_list <- c("NA", "NA", 0, "NA")
-            names(score_list) <- c("gene", "impact", "score", "pos")
-            for (anno in spliceai){
-                anno <- strsplit(anno, "|", fixed = T)[[1]]
-                gene <- anno[2]
-                DS_AG <- anno[3]
-                DS_AL <- anno[4]	
-                DS_DG <- anno[5]	
-                DS_DL <- anno[6]	
-                DP_AG <- anno[7]	
-                DP_AL <- anno[8]	
-                DP_DG <- anno[9]	
-                DP_DL <- anno[10]	
-                scores <- c(as.numeric(DS_AG), as.numeric(DS_AL), as.numeric(DS_DG), as.numeric(DS_DL))
-                names(scores) <- c("acceptor_gain", "acceptor_loss", "donor_gain", "donor_loss")
-                max_score <- max(scores)        
-                for (name in names(scores)){
-                    if (scores[name] == max_score){name_max_score <- name}
-                }
-                if (name_max_score == 0){
-                    impact <- "NA"
-                } else {
-                    impact <- name_max_score
-                }
-                if (score_list["score"] < max_score){
-                    score_list["score"] <- max_score
-                    score_list["gene"] <- gene
-                    score_list["impact"] <- impact
-                    if (impact == "acceptor_gain"){
-                        score_list["pos"] <- DP_AG
-                        } else if (impact == "acceptor_loss"){
-                        score_list["pos"] <- DP_AL
-                        } else if (impact == "donor_gain"){
-                        score_list["pos"] <- DP_DG
-                        } else {
-                        score_list["pos"] <- DP_DL
-                        }
-                    }
-                }
-            variants[i, "SpliceAI_impact"] <- paste(score_list["gene"], score_list["impact"], score_list["pos"], sep="|")
-            variants[i, "SpliceAI_score"] <- score_list["score"]
-            }
-        }
 
-    
     # pathogenicity scores
     # Column42 = sift
     # Column43 = polyphen
@@ -403,7 +448,7 @@ create_report <- function(family, samples, type){
 	          variants[i,"Splicing"] <- s_splicing_field
         }
     }else print("VEP MaxEntScan annotation is missing")
-
+    
     # Column 51: SpliceAI
 
     
@@ -437,14 +482,18 @@ create_report <- function(family, samples, type){
 select_and_write2 <- function(variants, samples, prefix, type)
 {
     print(colnames(variants))
-    if (type == 'wgs' || type == 'denovo'){
-        noncoding_cols <- c("DNaseI_hypersensitive_site", "CTCF_binding_site", "ENH_cellline_tissue", "TF_binding_sites")
-        noncoding_scores <- c("ncER_score", "ReMM_score", "LINSIGHT_score")
+    if (type == 'wgs' || type == 'denovo' || type == 'wgs.high.impact'){
+        noncoding_cols <- c("UCE_100bp", "UCE_200bp", "DNaseI_hypersensitive_site", "CTCF_binding_site", "ENH_cellline_tissue", "TF_binding_sites")
+        noncoding_scores <- c("ncER_score", "ReMM_score", "LINSIGHT_score", "Noncoding_path_pred", "promoterAI_score")
+        coding_scores <- c("Cadd_score")
+        protein_cols <- c()
         }
     else {
         noncoding_cols <- c()
         noncoding_scores <- c()
         wgs_counts <- c()
+        coding_scores <- c("Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score", "Gerp_score", "AlphaMissense")
+        protein_cols <- c("AA_position", "Exon", "Protein_domains")
         }
     variants <- variants[c(c("Position", "UCSC_Link", "GNOMAD_Link", "Ref", "Alt"),
                           paste0("Zygosity.", samples),
@@ -459,12 +508,15 @@ select_and_write2 <- function(variants, samples, prefix, type)
                             "Gnomad_af_grpmax", "Gnomad_af", "Gnomad_ac", "Gnomad_hom", "Gnomad_male_ac","Gnomad_fafmax_faf95_max", "Gnomad_filter",
                             "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt",
                             "Regeneron_exome_AF", "Regeneron_exome_AC",
-                            "Ensembl_transcript_id", "AA_position", "Exon", "Protein_domains", "rsIDs",
-                            "Gnomad_oe_lof_score", "Gnomad_oe_ci_lower","Gnomad_oe_ci_upper","Gnomad_oe_mis_score", "Gnomad_mis_z_score","Gnomad_pLI_score","Gnomad_pnull_score","Gnomad_prec_score",
-                            "Conserved_in_30_mammals", "SpliceAI_impact", "SpliceAI_score", "Sift_score", "Polyphen_score", "Cadd_score", "Vest4_score", "Revel_score", "Gerp_score", "AlphaMissense"),
+                            "TG_LRWGS_AC", "TG_LRWGS_samples",
+                            "Ensembl_transcript_id", "rsIDs"),
+                            protein_cols,
+                            c("Gnomad_oe_lof_score", "Gnomad_oe_ci_lower","Gnomad_oe_ci_upper","Gnomad_oe_mis_score", "Gnomad_mis_z_score","Gnomad_pLI_score","Gnomad_pnull_score","Gnomad_prec_score"),
+                            coding_scores,
+                            c("phylop100way", "SpliceAI_impact", "SpliceAI_score"),
                             noncoding_scores,
                             c("Imprinting_status", "Imprinting_expressed_allele", "Pseudoautosomal",
-                            "Old_multiallelic", "UCE_100bp", "UCE_200bp", "Dark_genes"), noncoding_cols)]
+                            "Old_multiallelic", "Dark_genes"), noncoding_cols)]
   
     variants <- variants[order(variants$Position),]
 

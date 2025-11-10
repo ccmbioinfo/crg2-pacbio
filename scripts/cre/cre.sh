@@ -7,7 +7,7 @@
 #	family = [family_id] (=project_id=case_id=folder_name, main result file should be family/family-ensemble.db)
 #	cleanup= [0|1] default = 0
 #	make_report=[0|1] default = 1, don't make report for WGS analysis first
-# 	type = [ wes.regular (default) | wes.synonymous | wes.mosaic | wes.fast | rnaseq | wgs | annotate (only for cleaning) | 
+# 	type = [ wgs.coding (default) | wgs | wgs.high.impact | denovo | 
 # 	    denovo (all rare variants in wgs, proband should have phenotype=2, parents=phenotype1 also sex for parents in gemini.db) ]
 #	max_af = af filter, default = 0.01
 #	database = path to folder where c4r count files and hgmd.csv are found.
@@ -89,7 +89,7 @@ function f_cleanup
 	       #validate bam files
             for f in *.bam;do  $cre/cre.bam.validate.sh $f;done;
     
-            if [ "$type" == "wes.fast" ] || [ "$type" == "wgs" ]
+            if [ "$type" == "wes.fast" ] || [ "$type" == "wgs" ] || [ "$type" == "wgs.high.impact" ]
             then
 	           ln -s ${family}-gatk-haplotype.db ${family}-ensemble.db
 	           ln -s ${family}-gatk-haplotype-annotated-decomposed.vcf.gz ${family}-ensemble-annotated-decomposed.vcf.gz
@@ -142,7 +142,7 @@ function f_make_report
 	   export depth_threshold=10
     fi
 
-    if [ "$type" == "wgs" ] || [ "$type" == "rnaseq" ] || [ "$type" == "denovo" ] || [ "$type" == "wes.all" ]
+    if [ "$type" == "wgs" ] || [ "$type" == "wgs.high.impact" ] || [ "$type" == "rnaseq" ] || [ "$type" == "denovo" ] || [ "$type" == "wes.all" ]
     then
 	   export severity_filter=ALL
     elif [ "$type" == "wes.synonymous" ]
@@ -182,15 +182,6 @@ function f_make_report
     
     rm $family.tmp.vcf.gz $family.tmp.vcf.gz.tbi
 
-    #individual vcfs for uploading to phenome central
-    $cre/vcf.split_multi.sh $family.vcf.gz
-
-    if [ -z $reference ]
-    then
-        reference=/hpf/largeprojects/ccmbio/naumenko/tools/bcbio/genomes/Hsapiens/GRCh37/seq/GRCh37.fa
-    fi
-
-   # reference=$(readlink -f `which bcbio_nextgen.py`)
     reference=/hpf/largeprojects/ccmbio/nhanafi/c4r/genomes/Homo_sapiens_assembly38.fasta
     
     echo $reference
@@ -205,17 +196,6 @@ function f_make_report
 	fi
     done
 
-    #decompose first for the old version of bcbio!
-    #gemini.decompose.sh ${family}-freebayes.vcf.gz
-    fprefix=${family}-freebayes-annotated-decomposed
-    if [ -f $fprefix.vcf.gz ]
-    then
-        bcftools view -R ${family}-ensemble.db.txt.positions $fprefix.vcf.gz | bcftools sort | vt decompose -s - | vt uniq - -o $fprefix.subset.vcf.gz
-        tabix $fprefix.subset.vcf.gz
-	
-        f_fix_sample_names $fprefix
-         $cre/vcf.freebayes.getAO.sh $fprefix.subset.vcf.gz $reference
-    fi
 
     #gemini.decompose.sh ${family}-gatk-haplotype.vcf.gz
     fprefix=${family}-gatk-haplotype-annotated-decomposed
@@ -228,20 +208,11 @@ function f_make_report
          $cre/vcf.gatk.get_depth.sh $fprefix.subset.vcf.gz $reference
     fi
 
-    #gemini.decompose.sh ${family}-platypus.vcf.gz
-    fprefix=${family}-platypus-annotated-decomposed
-    if [ -f $fprefix.vcf.gz ]
-    then
-        bcftools view -R ${family}-ensemble.db.txt.positions $fprefix.vcf.gz | bcftools sort | vt decompose -s - | vt uniq - -o $fprefix.subset.vcf.gz
-        tabix $fprefix.subset.vcf.gz
-        f_fix_sample_names $fprefix
-         $cre/vcf.platypus.getNV.gatk3.sh $fprefix.subset.vcf.gz $reference
-    fi
 
     cd ..
 
     # using Rscript from bcbio
-    if [ "$type" == "wgs" ] || [ "$type" == "rnaseq" ]
+    if [ "$type" == "wgs" ] || [ "$type" == "wgs.high.impact" ] || [ "$type" == "rnaseq" ]
     then
         noncoding="noncoding"
     else
@@ -280,16 +251,16 @@ then
     export severity_filter=ALL
 fi
 
-# set wes.regular as default type
+# set wgs.coding as default type
 if [ -z $type ]
 then
-    type="wes.regular"
+    type="wgs.coding"
 fi
 
 #default database path
 if [ -z $database ]
 then
-    database="/hpf/largeprojects/ccmbio/naumenko/tools/bcbio/genomes/Hsapiens/GRCh37/variation"
+    database="/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/"
 fi
 
 #no cleanup by default
@@ -322,7 +293,7 @@ then
 fi
 
 #if cleanup set, also make the synonymous report
-if [ $cleanup -eq 1 ] && [ "$type" == "wes.regular" ]
+if [ $cleanup -eq 1 ] && [ "$type" == "wgs.coding" ]
 then
     type="wes.synonymous"
     f_make_report

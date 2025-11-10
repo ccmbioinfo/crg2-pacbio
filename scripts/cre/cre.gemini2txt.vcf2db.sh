@@ -42,14 +42,14 @@ else
 	caller_filter=""
 fi
 
-if [[ "$type" == 'wgs' || "$type" == 'denovo' ]]
+if [[ "$type" == 'wgs' || "$type" == 'denovo' || "$type" == 'wgs.high.impact' ]]
 then
     noncoding_anno="uce_100bp as UCE_100bp, uce_200bp as UCE_200bp,
             dnasei_hypersensitive_site as DNaseI_hypersensitive_site,
             ctcf_binding_site as CTCF_binding_site, 
             enh_cellline_tissue as ENH_cellline_tissue,
             tf_binding_sites as TF_binding_sites"
-    noncoding_scores="ncER as ncER_score, ReMM as ReMM_score, LinSight_Score as LINSIGHT_score"
+    noncoding_scores="ncER as ncER_score, ReMM as ReMM_score, LinSight_Score as LINSIGHT_score, promoterAI as promoterAI_score"
 else
     noncoding_anno="00 as noncoding"
     noncoding_scores="00 as noncoding_scores"
@@ -86,6 +86,8 @@ sQuery="select \
         colorsdb_ac as CoLoRSdb_AC,\
         colorsdb_ac_hemi as CoLoRSdb_AC_Hemi,\
         colorsdb_nhomalt as CoLoRSdb_nhomalt,\
+        tg_lrwgs_ac as TG_LRWGS_AC,\
+        tg_lrwgs_samples as TG_LRWGS_samples,\
         sift_score as Sift_score,\
         polyphen_score as Polyphen_score,\
         cadd_phred as Cadd_score,\
@@ -97,9 +99,8 @@ sQuery="select \
         aa_change as AA_change,\
         hgvsc as Codon_change,\
         "$callers" as Callers,\
-        phylop30way_mammalian as Conserved_in_30_mammals,\
+        phyloP100way,\
         COALESCE(spliceai_score, '') as SpliceAI_score, \
-        uce_100bp as UCE_100bp, uce_200bp as UCE_200bp, \
         Dark_genes as Dark_genes, \
         ps as PS, \
         $noncoding_anno, \
@@ -133,9 +134,14 @@ sQuery=$sQuery"hgvsc as Nucleotide_change_ensembl,\
 
 initialQuery=$sQuery # keep the field selection part for later use
 
-#max_aaf_all frequency is from gemini.conf and does not include gnomad WGS frequency, gnomad WES only
-#gnomad_fafmax_faf95_max is joint gnomad FAF
-sQuery=$sQuery" where gnomad_fafmax_faf95_max <= "${max_af}" "$caller_filter""${severity_filter}""
+#max_aaf_all frequency is from gemini.conf and does not include gnomad WGS frequencing, gnomad WES only
+#gnomad_af includes gnomad WGS
+if [[ "$type" == 'wgs.high.impact' ]]
+then
+    sQuery=$sQuery" where gnomad_fafmax_faf95_max <= 0.001 and colorsdb_af <= 0.01 "$caller_filter""${severity_filter}""
+else
+    sQuery=$sQuery" where gnomad_fafmax_faf95_max <= "${max_af}" "$caller_filter""${severity_filter}""
+fi
 
 s_gt_filter=''
 # denovo 0/1 is exported in cre.sh

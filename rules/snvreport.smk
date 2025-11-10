@@ -29,6 +29,8 @@ rule allsnvreport:
          cre={params.cre} reference={params.ref} database={params.database_path} {params.cre}/cre.sh {project} 
          elif [ {wildcards.p} == "denovo" ]; then  
          cre={params.cre} reference={params.ref} database={params.database_path} type=denovo {params.cre}/cre.sh {project} 
+         elif [ {wildcards.p} == "wgs-high-impact" ]; then  
+         cre={params.cre} reference={params.ref} database={params.database_path} type=wgs.high.impact {params.cre}/cre.sh {project}
          else
          cre={params.cre} reference={params.ref} database={params.database_path} type=wgs {params.cre}/cre.sh {project}
          unset type
