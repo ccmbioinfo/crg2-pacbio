@@ -178,13 +178,16 @@ def melt_sample_columns(df: pd.DataFrame, id_col: str, prefix: str, value_name: 
 
     return melted 
 
-def get_compound_het_variants(high_impact: pd.DataFrame, variant_to_gene: pd.DataFrame, compound_het_status: pd.DataFrame) -> pd.DataFrame:
-    """Get compound het variants for a given gene.
+def get_compound_het_variants(high_impact: pd.DataFrame, variant_to_gene: pd.DataFrame, compound_het_status: pd.DataFrame, proband_id: str, sample_ids: list) -> pd.DataFrame:
+    # TODO: may want to export all SNVs for cross-variant type CH analysis
+    """Get all heterozygous variants for a given proband in genes with compound het status.
     
     Args:
         high_impact (pd.DataFrame): DataFrame with high impact variants
         variant_to_gene (pd.DataFrame): DataFrame mapping variant IDs to gene IDs
-        gene_counts (pd.DataFrame): DataFrame with gene counts
+        compound_het_status (pd.DataFrame): DataFrame with compound het status for each gene
+        proband_id (str): ID of the proband
+        sample_ids (list): List of sample IDs
     
     Returns:
         pd.DataFrame: DataFrame with high impact variants that are compound het
@@ -192,8 +195,32 @@ def get_compound_het_variants(high_impact: pd.DataFrame, variant_to_gene: pd.Dat
     ch_genes = compound_het_status[compound_het_status["compound_het_status"] == "True"].index.tolist()
     ch_variants = variant_to_gene[variant_to_gene["Ensembl_gene_id"].isin(ch_genes)]["Variant_id"].values.tolist()
     ch_variants_df = high_impact[high_impact["Variant_id"].isin(ch_variants)].copy()
+    # add zygosity column 
+    for sample in sample_ids:
+        gt_type_col = f"gt_types.{sample}"
+        zygosity_col = f"zygosity.{sample}"
+        if gt_type_col in ch_variants_df.columns:
+            ch_variants_df[zygosity_col] = ch_variants_df[gt_type_col].map(
+                lambda x: "hom" if x == 3 
+                        else "het" if x == 1 
+                        else "-" if x == 0 
+                        else "missing"
+                        )
+    ch_variants_df = ch_variants_df[ch_variants_df[f"zygosity.{proband_id}"] == "het"]
+    # format dataframe for export
     ch_variants_df["Gnomad_af_popmax"] = ch_variants_df["Gnomad_af_popmax"].replace(-1, 0)
-    ch_variants_df.drop(columns=["variant_type", "sum_ref_alt_length"])
+    ch_variants_df.drop(columns=["Variant_id", "variant_type", "sum_ref_alt_length", "GT_qual_max"], inplace=True)
+    gt_type_drop = [col for col in ch_variants_df.columns if col.startswith("gt_types.")]
+    gt_phases_drop = [col for col in ch_variants_df.columns if col.startswith("gt_phases.")]
+    ch_variants_df.drop(columns=gt_type_drop + gt_phases_drop, inplace=True)
+    ch_variants_df = ch_variants_df[["Chrom", "Pos", "Ref", "Alt"] +
+     ["zygosity." + sample for sample in sample_ids] + 
+     ["Variation", "Depth", "Quality", "Gene", "Clinvar", "Ensembl_gene_id", "Gnomad_af_popmax", "Cadd_score", "SpliceAI_score"] + 
+     [f"gts.{sample}" for sample in sample_ids] + 
+     [f"gt_alt_depths.{sample}" for sample in sample_ids] + 
+     [f"gt_depths.{sample}" for sample in sample_ids] + 
+     [f"gt_quals.{sample}" for sample in sample_ids] + 
+     [f"PS.{sample}" for sample in sample_ids]]
 
     return ch_variants_df
 
@@ -279,7 +306,7 @@ def main():
     print(f"CH gene status after parental phasing:\n {compound_het_status.compound_het_status.value_counts()}")
 
     # export table of variants in genes with compound het status
-    ch_variants_df = get_compound_het_variants(high_impact, variant_to_gene, compound_het_status)
+    ch_variants_df = get_compound_het_variants(high_impact, variant_to_gene, compound_het_status, proband_id, sample_ids)
     ch_variants_df.to_csv(f"{family}_compound_het_variants.csv", index=False)
 
     # add compound het status to coding report
