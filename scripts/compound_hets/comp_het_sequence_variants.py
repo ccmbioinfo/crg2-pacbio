@@ -84,20 +84,21 @@ def count_gene_variants_by_parental_haplotype(variant_to_gene: pd.DataFrame, var
             father_zygosity = variant_gt_details.loc[variant, fam_dict["father"]]["Zygosity"]
             if not (proband_zygosity == "homozygous_ref" or proband_zygosity == "missing" or proband_zygosity == "homozygous_alt"):
                 if not (mother_zygosity == "homozygous_alt" or father_zygosity == "homozygous_alt"):
-                    if mother_zygosity == "heterozygous":
-                        if father_zygosity == "homozygous_ref": # clear maternal inheritance
-                            maternal_haplotype_count += 1
-                        elif father_zygosity == "missing": # assume maternal inheritance
+                    if not (mother_zygosity == "heterozygous" and father_zygosity == "heterozygous"): # if both parents are heterozygous, we are probably not interested in this variant
+                        if mother_zygosity == "heterozygous":
+                            if father_zygosity == "homozygous_ref": # clear maternal inheritance
+                                maternal_haplotype_count += 1
+                            elif father_zygosity == "missing": # assume maternal inheritance
+                                unknown_haplotype_count += 1
+                        elif father_zygosity == "heterozygous":
+                            if mother_zygosity == "homozygous_ref": # clear paternal inheritance
+                                paternal_haplotype_count += 1
+                            elif mother_zygosity == "missing": # assume paternal inheritance
+                                unknown_haplotype_count += 1
+                        elif mother_zygosity == "homozygous_ref" and father_zygosity == "homozygous_ref": # can later use phase set and phase to determine which haplotype to add to?
                             unknown_haplotype_count += 1
-                    elif father_zygosity == "heterozygous":
-                        if mother_zygosity == "homozygous_ref": # clear paternal inheritance
-                            paternal_haplotype_count += 1
-                        elif mother_zygosity == "missing": # assume paternal inheritance
+                        elif mother_zygosity == "missing" and father_zygosity == "missing": # can later use phase set and phase to determine which haplotype to add to?
                             unknown_haplotype_count += 1
-                    elif mother_zygosity == "homozygous_ref" and father_zygosity == "homozygous_ref": # can later use phase set and phase to determine which haplotype to add to?
-                        unknown_haplotype_count += 1
-                    elif mother_zygosity == "missing" and father_zygosity == "missing": # can later use phase set and phase to determine which haplotype to add to?
-                        unknown_haplotype_count += 1
 
         gene_to_haplotype_counts[gene] = [maternal_haplotype_count, paternal_haplotype_count, unknown_haplotype_count]
     gene_to_haplotype_counts = pd.DataFrame.from_dict(gene_to_haplotype_counts, orient="index")
