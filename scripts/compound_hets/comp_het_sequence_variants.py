@@ -180,7 +180,8 @@ def melt_sample_columns(df: pd.DataFrame, id_col: str, prefix: str, value_name: 
 
 def get_compound_het_variants(high_impact: pd.DataFrame, variant_to_gene: pd.DataFrame, compound_het_status: pd.DataFrame, proband_id: str, sample_ids: list) -> pd.DataFrame:
     # TODO: may want to export all SNVs for cross-variant type CH analysis
-    """Get all heterozygous variants for a given proband in genes with compound het status.
+    """Get all heterozygous high impactvariants for a given proband in genes annotatedwith compound het status.
+    This will be used for cross-variant type CH analysis.
     
     Args:
         high_impact (pd.DataFrame): DataFrame with high impact variants
@@ -192,7 +193,7 @@ def get_compound_het_variants(high_impact: pd.DataFrame, variant_to_gene: pd.Dat
     Returns:
         pd.DataFrame: DataFrame with high impact variants that are compound het
     """
-    ch_genes = compound_het_status[compound_het_status["compound_het_status"] == "True"].index.tolist()
+    ch_genes = compound_het_status.index.tolist()
     ch_variants = variant_to_gene[variant_to_gene["Ensembl_gene_id"].isin(ch_genes)]["Variant_id"].values.tolist()
     ch_variants_df = high_impact[high_impact["Variant_id"].isin(ch_variants)].copy()
     # add zygosity column 
@@ -313,6 +314,7 @@ def main():
     coding_report = pd.read_csv(args.coding_report)
     compound_het_status = compound_het_status.reset_index()
     coding_report = coding_report.merge(compound_het_status, left_on="Ensembl_gene_id", right_on="Ensembl_gene_id", how="left")
+    coding_report.replace({np.nan: "."}, inplace=True)
     output_filename = args.coding_report.split("/")[-1].replace(".csv", "_CH.csv")
     coding_report.to_csv(output_filename, index=False)
 
