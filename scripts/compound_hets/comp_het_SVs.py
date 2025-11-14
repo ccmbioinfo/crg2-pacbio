@@ -33,6 +33,7 @@ def infer_pedigree_roles(pedigree: str) -> dict:
     ]["individual_ID"].values[0]
     fam_dict = {"child": child, "father": father, "mother": mother}
 
+    return fam_dict
 
 def determine_compound_het_status_no_parents(
     variant_to_gene: pd.DataFrame, variant_gt_details: pd.DataFrame
@@ -311,7 +312,6 @@ def main():
 
     # extract family and proband information
     family = args.pedigree.split("/")[-1].split(".")[0].split("_")[0]
-    pedigree = pd.read_csv(args.pedigree, sep="\t", low_memory=False)
     fam_dict = infer_pedigree_roles(args.pedigree)
     proband_id = fam_dict["child"]
 
@@ -395,7 +395,7 @@ def main():
         ),
         axis=1,
         )
-        compound_het_status = compound_het_status_no_parents.copy().set_index(
+    compound_het_status = compound_het_status_no_parents.copy().set_index(
         "Ensembl_gene_id"
     )
     for gene in gene_haplotype_counts.index:
@@ -419,5 +419,5 @@ def main():
     SV["compound_het_status_SNV"] = SV.apply(lambda x: SV_SNV_comp_het_status(x["ENSEMBL_GENE"], x["VARIANT"], SNV_SV_CH), axis=1)
 
 
-
+main()
 
