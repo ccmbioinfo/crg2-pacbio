@@ -103,7 +103,7 @@ def abstract_gt(ref, alt, gt):
 
 
 def count_gene_variants_by_parental_haplotype(
-    variant_to_gene: pd.DataFrame, variant_gt_details: pd.DataFrame, fam_dict: dict
+    variant_gt_details: pd.DataFrame, fam_dict: dict
 ) -> pd.DataFrame:
     """Count variants by parental haplotype for a given gene.
 
@@ -115,7 +115,6 @@ def count_gene_variants_by_parental_haplotype(
     - If both parents are reference or missing, counts as unknown
 
     Args:
-        variant_to_gene (pd.DataFrame): DataFrame mapping variant IDs to gene IDs
         variant_gt_details (pd.DataFrame): DataFrame with variant genotype details including
             zygosity for proband and parents
         fam_dict (dict): Dictionary with family roles
@@ -126,22 +125,16 @@ def count_gene_variants_by_parental_haplotype(
 
     gene_to_haplotype_counts = {}
 
-    for gene in variant_to_gene["Ensembl_gene_id"].unique():
+    for gene in variant_gt_details["Ensembl_gene_id"].unique():
         maternal_haplotype_count = 0
         paternal_haplotype_count = 0
         unknown_haplotype_count = 0
-        for variant in variant_to_gene[variant_to_gene["Ensembl_gene_id"] == gene][
+        for variant in variant_gt_details[variant_gt_details["Ensembl_gene_id"] == gene][
             "Variant_id"
         ]:
-            proband_zygosity = variant_gt_details.loc[variant, fam_dict["child"]][
-                "Zygosity"
-            ]
-            mother_zygosity = variant_gt_details.loc[variant, fam_dict["mother"]][
-                "Zygosity"
-            ]
-            father_zygosity = variant_gt_details.loc[variant, fam_dict["father"]][
-                "Zygosity"
-            ]
+            proband_zygosity = variant_gt_details[(variant_gt_details["Variant_id"] == variant) & (variant_gt_details["Sample"] == fam_dict["child"])]["Zygosity"].values[0]
+            mother_zygosity = variant_gt_details[(variant_gt_details["Variant_id"] == variant) & (variant_gt_details["Sample"] == fam_dict["mother"])]["Zygosity"].values[0]
+            father_zygosity = variant_gt_details[(variant_gt_details["Variant_id"] == variant) & (variant_gt_details["Sample"] == fam_dict["father"])]["Zygosity"].values[0]
             if not (
                 proband_zygosity == "homozygous_ref"
                 or proband_zygosity == "missing"
@@ -476,16 +469,17 @@ def main():
     # restrict variants to those that are het in the proband
     fam_dict = infer_pedigree_roles(args.pedigree)
     proband_id = fam_dict["child"]
+    # abstract the genotype to be "ref|alt" or "alt|ref" to facilitate compound het status determination
+    variant_gt_details["GT_abstracted"] = variant_gt_details.apply(
+        lambda x: abstract_gt(x["Ref"], x["Alt"], x["GT"]), axis=1
+    )
+
     variant_gt_details_proband = variant_gt_details[
         variant_gt_details["Sample"] == proband_id
     ]
     variant_gt_details_proband = variant_gt_details_proband[
         variant_gt_details_proband["Zygosity"] == "heterozygous"
     ]
-    # abstract the genotype to be "ref|alt" or "alt|ref" to facilitate compound het status determination
-    variant_gt_details_proband["GT_abstracted"] = variant_gt_details_proband.apply(
-        lambda x: abstract_gt(x["Ref"], x["Alt"], x["GT"]), axis=1
-    )
 
     # determine gene compound het status using only long-read phasing information
     compound_het_status_no_parents = determine_compound_het_status_no_parents(
@@ -504,14 +498,10 @@ def main():
     )
     unknown_variants = variant_gt_details[
         variant_gt_details["Ensembl_gene_id"].isin(unknown_gene["Ensembl_gene_id"])
-    ]
-    unknown_variant_to_gene = variant_to_gene[
-        variant_to_gene["Variant_id"].isin(unknown_variants["Variant_id"])
-    ]
-    unknown_variants.set_index(["Variant_id", "Sample"], inplace=True)
+    ].copy().drop_duplicates()
     # use parental genotypes to determine compound het status
     gene_haplotype_counts = count_gene_variants_by_parental_haplotype(
-        unknown_variant_to_gene, unknown_variants, fam_dict
+        unknown_variants, fam_dict
     )
     gene_haplotype_counts["compound_het_status"] = gene_haplotype_counts.apply(
         lambda x: is_compound_het(
@@ -537,10 +527,14 @@ def main():
     )
 
     # export table of variants in genes with compound het status
-    ch_variants_df = get_compound_het_variants(
-        high_impact, variant_to_gene, compound_het_status, proband_id, sample_ids
-    )
-    ch_variants_df.to_csv(f"{family}_compound_het_variants.csv", index=False)
+    # ch_variants_df = get_compound_het_variants(
+    #     high_impact, variant_to_gene, compound_het_status, proband_id, sample_ids
+    # )
+    # ch_variants_df.to_csv(f"{family}_compound_het_variants.csv", index=False)
+    variant_gt_details = variant_gt_details.merge(compound_het_status, on="Ensembl_gene_id", how="left")
+    variant_gt_details.drop(columns=["GT_type", "Phase", "GT_qual"], inplace=True)
+    variant_gt_details.to_csv(f"{family}_compound_het_variants.csv", index=False)
+
 
     # add compound het status to coding report
     coding_report = pd.read_csv(args.coding_report)

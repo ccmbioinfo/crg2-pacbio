@@ -142,7 +142,7 @@ def is_compound_het(
         return "False"
 
 def count_gene_variants_by_parental_haplotype(
-    variant_to_gene: pd.DataFrame, variant_gt_details: pd.DataFrame, fam_dict: dict
+    variant_gt_details: pd.DataFrame, fam_dict: dict
 ) -> pd.DataFrame:
     """Count variants by parental haplotype for a given gene.
 
@@ -154,7 +154,6 @@ def count_gene_variants_by_parental_haplotype(
     - If both parents are reference or missing, counts as unknown
 
     Args:
-        variant_to_gene (pd.DataFrame): DataFrame mapping variant IDs to gene IDs
         variant_gt_details (pd.DataFrame): DataFrame with variant genotype details including
             zygosity for proband and parents
         fam_dict (dict): Dictionary with family roles
@@ -165,22 +164,16 @@ def count_gene_variants_by_parental_haplotype(
 
     gene_to_haplotype_counts = {}
 
-    for gene in variant_to_gene["Ensembl_gene_id"].unique():
+    for gene in variant_gt_details["Ensembl_gene_id"].unique():
         maternal_haplotype_count = 0
         paternal_haplotype_count = 0
         unknown_haplotype_count = 0
-        for variant in variant_to_gene[variant_to_gene["Ensembl_gene_id"] == gene][
+        for variant in variant_gt_details[variant_gt_details["Ensembl_gene_id"] == gene][
             "Variant_id"
         ]:
-            proband_zygosity = variant_gt_details.loc[variant, fam_dict["child"]][
-                "Zygosity"
-            ].values[0]
-            mother_zygosity = variant_gt_details.loc[variant, fam_dict["mother"]][
-                "Zygosity"
-            ].values[0]
-            father_zygosity = variant_gt_details.loc[variant, fam_dict["father"]][
-                "Zygosity"
-            ].values[0]
+            proband_zygosity = variant_gt_details[(variant_gt_details["Variant_id"] == variant) & (variant_gt_details["Sample"] == fam_dict["child"])]["Zygosity"].values[0]
+            mother_zygosity = variant_gt_details[(variant_gt_details["Variant_id"] == variant) & (variant_gt_details["Sample"] == fam_dict["mother"])]["Zygosity"].values[0]
+            father_zygosity = variant_gt_details[(variant_gt_details["Variant_id"] == variant) & (variant_gt_details["Sample"] == fam_dict["father"])]["Zygosity"].values[0]
             if not (
                 proband_zygosity == "homozygous_ref"
                 or proband_zygosity == "missing"
@@ -303,9 +296,6 @@ def main():
         "--sv", type=str, required=True, help="Path to SV file"
     )
     parser.add_argument(
-        "--snvs", type=str, required=True, help="Path to SNV file"
-    )
-    parser.add_argument(
         "--pedigree", type=str, required=True, help="Path to pedigree file"
     )
     args = parser.parse_args()
@@ -357,15 +347,13 @@ def main():
     )
     # recode zygosity to be consistent with SNV CH functions
     variant_gt_details.replace({"het": "heterozygous", "hom": "homozygous_alt", "-": "homozygous_ref", "./.": "missing"}, inplace=True)
+    variant_gt_details["GT_abstracted"] = variant_gt_details["GT"].replace({"0|1": "ref|alt", "1|0": "alt|ref"})
     # restrict variants to those that are het in the proband
     variant_gt_details_proband = variant_gt_details[
-        variant_gt_details["Sample"] == proband_id
-    ]
-    variant_gt_details_proband = variant_gt_details_proband[
-        variant_gt_details_proband["Zygosity"] == "heterozygous"
+        (variant_gt_details["Sample"] == proband_id)
+        & (variant_gt_details["Zygosity"] == "heterozygous")
     ]
     
-    variant_gt_details_proband["GT_abstracted"] = variant_gt_details_proband["GT"].replace({"0|1": "ref|alt", "1|0": "alt|ref"})
     # determine gene compound het status using only long-read phasing information
     compound_het_status_no_parents = determine_compound_het_status_no_parents(
         variant_to_gene, variant_gt_details_proband
@@ -378,14 +366,11 @@ def main():
     ]
     unknown_variants = variant_gt_details[
         variant_gt_details["Ensembl_gene_id"].isin(unknown_gene["Ensembl_gene_id"])
-    ]
-    unknown_variant_to_gene = variant_to_gene[
-        variant_to_gene["Variant_id"].isin(unknown_variants["Variant_id"])
-    ]
-    unknown_variants.set_index(["Variant_id", "Sample"], inplace=True)
+    ].copy().drop_duplicates()
+
     # use parental genotypes to determine compound het status
     gene_haplotype_counts = count_gene_variants_by_parental_haplotype(
-        unknown_variant_to_gene, unknown_variants, fam_dict
+        unknown_variants, fam_dict
     )
     gene_haplotype_counts["compound_het_status"] = gene_haplotype_counts.apply(
         lambda x: is_compound_het(
@@ -405,19 +390,22 @@ def main():
     compound_het_status.compound_het_status.value_counts()
 
     # TODO:export table of variants in genes with compound het status
+    variant_gt_details = variant_gt_details.merge(compound_het_status, on="Ensembl_gene_id", how="left")
+    variant_gt_details.to_csv(f"{family}_compound_het_SVs.csv", index=False)
 
     # add compound het status to SV report
     # TODO: check if variants are in cis or in trans using phased GTs
-    SV["compound_het_status_SV"] = SV_rare_high_impact.apply(lambda x: SV_comp_het_status(x["Ensembl_gene_id"], x["VARIANT"], compound_het_status), axis=1)
-    SNVs = pd.read_csv(args.snvs)
-    SNV_SV_CH = {}
-    for gene in variant_gt_details_proband["Ensembl_gene_id"].unique(): 
-        if gene in SNVs["Ensembl_gene_id"].values: 
-            SNV_SV_CH[gene] = "True"
-        else:
-            SNV_SV_CH[gene] = "False"
-    SV["compound_het_status_SNV"] = SV.apply(lambda x: SV_SNV_comp_het_status(x["ENSEMBL_GENE"], x["VARIANT"], SNV_SV_CH), axis=1)
+    # SV["compound_het_status_SV"] = SV_rare_high_impact.apply(lambda x: SV_comp_het_status(x["Ensembl_gene_id"], x["VARIANT"], compound_het_status), axis=1)
+    # SNVs = pd.read_csv(args.snvs)
+    # SNV_SV_CH = {}
+    # for gene in variant_gt_details_proband["Ensembl_gene_id"].unique(): 
+    #     if gene in SNVs["Ensembl_gene_id"].values: 
+    #         SNV_SV_CH[gene] = "True"
+    #     else:
+    #         SNV_SV_CH[gene] = "False"
+    # SV["compound_het_status_SNV"] = SV.apply(lambda x: SV_SNV_comp_het_status(x["ENSEMBL_GENE"], x["VARIANT"], SNV_SV_CH), axis=1)
 
 
 main()
 
+ 
