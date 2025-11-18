@@ -389,22 +389,9 @@ def main():
         )
     compound_het_status.compound_het_status.value_counts()
 
-    # TODO:export table of variants in genes with compound het status
+    # export table of variants in genes with compound het status
     variant_gt_details = variant_gt_details.merge(compound_het_status, on="Ensembl_gene_id", how="left")
     variant_gt_details.to_csv(f"{family}_compound_het_SVs.csv", index=False)
-
-    # add compound het status to SV report
-    # TODO: check if variants are in cis or in trans using phased GTs
-    # SV["compound_het_status_SV"] = SV_rare_high_impact.apply(lambda x: SV_comp_het_status(x["Ensembl_gene_id"], x["VARIANT"], compound_het_status), axis=1)
-    # SNVs = pd.read_csv(args.snvs)
-    # SNV_SV_CH = {}
-    # for gene in variant_gt_details_proband["Ensembl_gene_id"].unique(): 
-    #     if gene in SNVs["Ensembl_gene_id"].values: 
-    #         SNV_SV_CH[gene] = "True"
-    #     else:
-    #         SNV_SV_CH[gene] = "False"
-    # SV["compound_het_status_SNV"] = SV.apply(lambda x: SV_SNV_comp_het_status(x["ENSEMBL_GENE"], x["VARIANT"], SNV_SV_CH), axis=1)
-
 
 main()
 

@@ -377,9 +377,7 @@ def main():
     parser.add_argument(
         "--pedigree", type=str, required=True, help="Path to pedigree file"
     )
-    parser.add_argument(
-        "--coding_report", type=str, required=True, help="Path to coding report file"
-    )
+
     args = parser.parse_args()
 
     family = args.pedigree.split("/")[-1].split(".")[0].split("_")[0]
@@ -536,20 +534,5 @@ def main():
     variant_gt_details = variant_gt_details.merge(compound_het_status, on="Ensembl_gene_id", how="left")
     variant_gt_details.drop(columns=["GT_type", "Phase", "GT_qual"], inplace=True)
     variant_gt_details.to_csv(f"{family}_compound_het_sequence_variants.csv", index=False)
-
-
-    # add compound het status to coding report
-    coding_report = pd.read_csv(args.coding_report)
-    compound_het_status = compound_het_status.reset_index()
-    coding_report = coding_report.merge(
-        compound_het_status,
-        left_on="Ensembl_gene_id",
-        right_on="Ensembl_gene_id",
-        how="left",
-    )
-    coding_report.replace({np.nan: "."}, inplace=True)
-    output_filename = args.coding_report.split("/")[-1].replace(".csv", "_CH.csv")
-    coding_report.to_csv(output_filename, index=False)
-
 
 main()
