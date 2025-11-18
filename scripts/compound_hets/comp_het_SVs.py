@@ -310,6 +310,8 @@ def main():
     SV["Variant_id"] = SV["CHROM"] + "-" + SV["POS"].astype(str) + "-" + SV["END"].astype(str) +  "-" + SV["SVTYPE"] + "-" + SV["ID"]
     SV_rare_high_impact = SV[(SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01)].copy()
     SV_rare_high_impact.rename(columns={"ENSEMBL_GENE": "Ensembl_gene_id"}, inplace=True) # for compatibility with SNV CH functions
+    # filter for variants that are het in the proband
+    SV_rare_high_impact = SV_rare_high_impact[SV_rare_high_impact[f"{proband_id}_zyg"] == "het"]
 
     # get per-sample SV genotype status
     # extract all sample IDs based on genotype columns
