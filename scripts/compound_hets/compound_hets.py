@@ -210,7 +210,7 @@ def is_compound_het(
 
 
 def determine_compound_het_status_no_parents(
-    variant_to_gene: pd.DataFrame, variant_gt_details: pd.DataFrame
+    variant_gt_details: pd.DataFrame
 ) -> pd.DataFrame:
     """Determine compound het status for a given gene using only long-read phasing information.
 
@@ -222,7 +222,7 @@ def determine_compound_het_status_no_parents(
         pd.DataFrame: DataFrame with compound het status for each gene
     """
     gene_to_compound_hets = {}
-    for gene in variant_to_gene["Ensembl_gene_id"].unique():
+    for gene in variant_gt_details["Ensembl_gene_id"].unique():
         variants = variant_gt_details[variant_gt_details["Ensembl_gene_id"] == gene]
         num_variants = len(variants)  # total number of het variants in the gene
         true_compound_hets = 0
