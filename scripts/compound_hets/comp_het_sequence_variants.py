@@ -391,6 +391,8 @@ def main():
     # create high_impact table: genic damaging noncoding variants and nonsynonymous variants
     high_impact = pd.concat([low_impact_var_filter_scores, high_med])
     # de-duplicate (may be LOW impact variants in high_med that are also in low_impact if they have ClinVar annotations)
+    high_impact["Variant_id"] = high_impact["Chrom"] + "-" + high_impact["Pos"].astype(str) + "-" + high_impact["Ref"].astype(str) + "-" + high_impact["Alt"].astype(str)
+    high_impact["Variant_id"] = high_impact["Variant_id"].apply(lambda x: x.replace("chr", ""))
     high_impact = high_impact.drop_duplicates(subset=["Variant_id"])
     # extract max genotype quality score for each variant
     qual_cols = [col for col in high_impact.columns if col.startswith("gt_quals.")]
@@ -533,7 +535,7 @@ def main():
     # ch_variants_df.to_csv(f"{family}_compound_het_variants.csv", index=False)
     variant_gt_details = variant_gt_details.merge(compound_het_status, on="Ensembl_gene_id", how="left")
     variant_gt_details.drop(columns=["GT_type", "Phase", "GT_qual"], inplace=True)
-    variant_gt_details.to_csv(f"{family}_compound_het_variants.csv", index=False)
+    variant_gt_details.to_csv(f"{family}_compound_het_sequence_variants.csv", index=False)
 
 
     # add compound het status to coding report
