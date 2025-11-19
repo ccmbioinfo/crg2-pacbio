@@ -198,15 +198,15 @@ def is_compound_het(
 ):
     """Determine if a gene is compound het based on maternal and paternal haplotype counts and unknown haplotype count."""
     if maternal_haplotype_count > 0 and paternal_haplotype_count > 0:
-        return "True"
+        return "TRUE"
     elif unknown_haplotype_count == 1 and (
         maternal_haplotype_count > 0 or paternal_haplotype_count > 0
     ):
-        return "Unknown"
+        return "UNKNOWN"
     elif unknown_haplotype_count > 1:
-        return "Unknown"
+        return "UNKNOWN"
     else:
-        return "False"
+        return "FALSE"
 
 
 def determine_compound_het_status_no_parents(
@@ -254,12 +254,12 @@ def determine_compound_het_status_no_parents(
                             true_compound_hets += 1
 
         if true_compound_hets > 0:
-            compound_het_status = "True"
+            compound_het_status = "TRUE"
         else:
             if unknown_compound_hets > 0:
-                compound_het_status = "Unknown"
+                compound_het_status = "UNKNOWN"
             else:
-                compound_het_status = "False"
+                compound_het_status = "FALSE"
         gene_to_compound_hets[gene] = compound_het_status
     gene_to_compound_hets = pd.DataFrame.from_dict(
         gene_to_compound_hets, orient="index"
@@ -387,19 +387,21 @@ def SV_comp_het_status(genes, variant_impact, compound_het_status):
         compound_het_status (pd.DataFrame): DataFrame of compound het status for genes
 
     Returns:
-        str: Compound het status for the genes impacted by the SV
+        dict: Dictionary with CH_status and CH_variant_types for the genes impacted by the SV
     """
     gene_compound_het_statuses = []
+    gene_compound_het_variant_types = []
     if pd.isna(genes): 
-        return "."
+        return {"CH_status": ".", "CH_variant_types": "."}
     elif variant_impact == "intergenic_region":
-        return "."
+        return {"CH_status": ".", "CH_variant_types": "."}
     else:
         genes = re.split(';|-', genes)
         for gene in genes: 
             try:
-                gene_compound_het_statuses.append(compound_het_status.loc[gene, "compound_het_status"])
-            except:
+                gene_compound_het_statuses.append(compound_het_status.loc[gene, "CH_status"])
+                gene_compound_het_variant_types.append(compound_het_status.loc[gene, "CH_variant_types"])
+            except KeyError:
                 gene_compound_het_statuses.append(".")
-                
-        return ";".join(gene_compound_het_statuses)
+                gene_compound_het_variant_types.append(".")
+        return  {"CH_status": "|".join(gene_compound_het_statuses), "CH_variant_types": "|".join(gene_compound_het_variant_types)} # return a dictionary with CH_status and CH_variant_types
