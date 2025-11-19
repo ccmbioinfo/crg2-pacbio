@@ -209,11 +209,11 @@ def main():
     sequence_variant_report.fillna(".", inplace=True)
     sequence_variant_report.to_csv(f"{family}_sequence_variant_report_CH.csv", index=False)
 
-    result_series = SV.apply(
+    CH_status_series = SV.apply(
         lambda x: compound_hets.SV_comp_het_status(x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id")), 
         axis=1
     )
-    SV[["CH_status", "CH_variant_types"]] = pd.DataFrame(result_series.tolist(), index=SV.index)
+    SV[["CH_status", "CH_variant_types"]] = pd.DataFrame(CH_status_series.tolist(), index=SV.index)
     SV.fillna(".", inplace=True)
     SV.to_csv(f"{family}_SV_report_CH.csv", index=False)
 
