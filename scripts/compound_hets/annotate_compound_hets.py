@@ -17,6 +17,9 @@ def main():
         "--low", type=str, required=True, help="Path to LOW sequence variants TSV"
     )
     parser.add_argument(
+        "--sequence_variant_report", type=str, required=True, help="Path to sequence variant report CSV"
+    )
+    parser.add_argument(
         "--sv", type=str, required=True, help="Path to SV report TSV"
     )
     parser.add_argument(
@@ -104,15 +107,12 @@ def main():
     sequence_variant_gt_details["GT_abstracted"] = sequence_variant_gt_details.apply(
         lambda x: compound_hets.abstract_gt(x["Ref"], x["Alt"], x["GT"]), axis=1
     )
-    print(sequence_variant_gt_details.head())
-
-
 
     # now process SVs
     # read in SV file and filter for rare genic variants
     SV = pd.read_csv(args.sv, low_memory=False)
-    SV["Variant_id"] = SV["CHROM"] + "-" + SV["POS"].astype(str) + "-" + SV["END"].astype(str) +  "-" + SV["SVTYPE"] + "-" + SV["ID"]
     SV_rare_high_impact = SV[(SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01)].copy()
+    SV_rare_high_impact["Variant_id"] = SV_rare_high_impact["CHROM"] + "-" + SV_rare_high_impact["POS"].astype(str) + "-" + SV_rare_high_impact["END"].astype(str) +  "-" + SV_rare_high_impact["SVTYPE"] + "-" + SV_rare_high_impact["ID"]
     SV_rare_high_impact.rename(columns={"ENSEMBL_GENE": "Ensembl_gene_id"}, inplace=True) # for compatibility with SNV CH functions
     # filter for variants that are het in the proband
     SV_rare_high_impact = SV_rare_high_impact[SV_rare_high_impact[f"{proband_id}_zyg"] == "het"]
@@ -155,8 +155,6 @@ def main():
     SV_gt_details["GT_abstracted"] = SV_gt_details["GT"].replace({"0|1": "ref|alt", "1|0": "alt|ref"})
 
 
-
-
     # now combine SNV and SV dataframes and identify compound het status for each gene
     sequence_variant_gt_details = sequence_variant_gt_details[["Variant_id", "Sample", "PS", "GT_abstracted", "Zygosity", "Ensembl_gene_id"]]
     sequence_variant_gt_details["Variant_type"] = "sequence_variant"
@@ -174,7 +172,7 @@ def main():
     # now if any gene has unknown compound het status, we attempt to determine the compound het status using parental genotypes
     # first, get genes with unknown compound het status
     unknown_gene = compound_het_status_no_parents[
-        compound_het_status_no_parents["compound_het_status"] == "Unknown"
+        compound_het_status_no_parents["compound_het_status"] == "UNKNOWN"
     ]
     unknown_variants = all_variants[
         all_variants["Ensembl_gene_id"].isin(unknown_gene["Ensembl_gene_id"])
@@ -200,6 +198,25 @@ def main():
     # add cross-variant compound het status to variants 
     all_variants = all_variants.merge(compound_het_status_no_parents, on="Ensembl_gene_id", how="left").sort_values(by=["Ensembl_gene_id", "Sample"])
     all_variants.to_csv(f"{family}_compound_het_variants.csv", index=False)
+    
+    gene_CH_status = all_variants[["Ensembl_gene_id", "Variant_type", "compound_het_status"]].drop_duplicates()
+    gene_CH_status = gene_CH_status.groupby("Ensembl_gene_id").agg({"Variant_type": ";".join, "compound_het_status": "first"}).reset_index()
+    gene_CH_status.rename(columns={"Variant_type": "CH_variant_types", "compound_het_status": "CH_status"}, inplace=True)
+
+    # now annotate variant reports with compound het status 
+    sequence_variant_report = pd.read_csv(args.sequence_variant_report)
+    sequence_variant_report = sequence_variant_report.merge(gene_CH_status, on="Ensembl_gene_id", how="left")
+    sequence_variant_report.fillna(".", inplace=True)
+    sequence_variant_report.to_csv(f"{family}_sequence_variant_report_CH.csv", index=False)
+
+    result_series = SV.apply(
+        lambda x: compound_hets.SV_comp_het_status(x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id")), 
+        axis=1
+    )
+    SV[["CH_status", "CH_variant_types"]] = pd.DataFrame(result_series.tolist(), index=SV.index)
+    SV.fillna(".", inplace=True)
+    SV.to_csv(f"{family}_SV_report_CH.csv", index=False)
+
 
 
 main()
