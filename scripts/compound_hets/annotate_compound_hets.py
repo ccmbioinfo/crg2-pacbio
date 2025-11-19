@@ -20,7 +20,7 @@ def main():
         "--sequence_variant_report", type=str, required=True, help="Path to sequence variant report CSV"
     )
     parser.add_argument(
-        "--sv", type=str, required=True, help="Path to SV report TSV"
+        "--sv", type=str, required=True, help="Path to SV report CSV"
     )
     parser.add_argument(
         "--pedigree", type=str, required=True, help="Path to pedigree file"
@@ -47,8 +47,6 @@ def main():
 
     # restrict variants to those that are het in the proband
     high_impact = high_impact[high_impact[f"gt_types.{proband_id}"] == 1]
-    # remove variants where genotype is like ./A etc
-    high_impact = high_impact[~high_impact[f"gts.{proband_id}"].str.contains("\.")]
 
     # get per-sample variant genotype status
     # extract all sample IDs based on genotype columns
@@ -80,7 +78,7 @@ def main():
     # combine all melted dataframes on Variant_id and Sample to create one dataframe of variants in long format
     dfs = [variant_ps, variant_gts, variant_gt_type, variant_qual]
     # successively merges a list of DataFrames (dfs), each containing different variant/sample-level data,
-    # to produce a single DataFrame (variant_gt_details) with all variant information for each (Variant_id, Sample) pair.
+    # to produce a single DataFrame with all variant information for each (Variant_id, Sample) pair.
     sequence_variant_gt_details = reduce(
         lambda left, right: left.merge(
             right, on=["Variant_id", "Ref", "Alt", "Sample"], how="outer"
