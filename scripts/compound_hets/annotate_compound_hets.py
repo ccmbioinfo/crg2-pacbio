@@ -69,7 +69,7 @@ def main():
         len(high_impact),
         proband_id,
     )
-    high_impact.fillna(".").to_csv(f"{family}_high_impact_sequence_variants.csv", index=False)
+    high_impact.fillna(".").drop_duplicates(subset=["sum_ref_alt_length", "variant_type", "Variant_id"]).to_csv(f"{family}_high_impact_sequence_variants.csv", index=False)
     logger.info("Wrote %s_high_impact_sequence_variants.csv", family)
 
     # get per-sample variant genotype status
