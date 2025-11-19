@@ -154,7 +154,7 @@ def count_gene_variants_by_parental_haplotype(
                                 maternal_haplotype_count += 1
                             elif (
                                 father_zygosity == "missing"
-                            ):  # assume maternal inheritance
+                            ):  
                                 unknown_haplotype_count += 1
                         elif father_zygosity == "heterozygous":
                             if (
@@ -163,17 +163,17 @@ def count_gene_variants_by_parental_haplotype(
                                 paternal_haplotype_count += 1
                             elif (
                                 mother_zygosity == "missing"
-                            ):  # assume paternal inheritance
+                            ):  
                                 unknown_haplotype_count += 1
                         elif (
                             mother_zygosity == "homozygous_ref"
                             and father_zygosity == "homozygous_ref"
-                        ):  # can later use phase set and phase to determine which haplotype to add to?
+                        ):  
                             unknown_haplotype_count += 1
                         elif (
                             mother_zygosity == "missing"
                             and father_zygosity == "missing"
-                        ):  # can later use phase set and phase to determine which haplotype to add to?
+                        ):  
                             unknown_haplotype_count += 1
 
         gene_to_haplotype_counts[gene] = [
@@ -229,7 +229,7 @@ def determine_compound_het_status_no_parents(
         unknown_compound_hets = 0
         phase_sets = variants["PS"].unique()
         if num_variants > 1:
-            if phase_sets.tolist() == ["."]:  # variants are not phased
+            if phase_sets.tolist() == ["."] or phase_sets.tolist() == ["TR_overlap"]:  # variants are not phased
                 unknown_compound_hets += 1
             elif len(phase_sets) == 1:  # all variants are in the same phase set
                 PS = phase_sets[0]
