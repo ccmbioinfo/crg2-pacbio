@@ -2,6 +2,7 @@ import argparse
 from functools import reduce
 import logging
 import pandas as pd
+import pyranges as pr
 import numpy as np
 import re
 
@@ -22,6 +23,12 @@ def main():
     )
     parser.add_argument(
         "--sv", type=str, required=True, help="Path to SV report CSV"
+    )
+    parser.add_argument(
+        "--cnv", type=str, required=True, help="Path to CNV report CSV"
+    )
+    parser.add_argument(
+        "--ensembl", type=str, required=True, help="Path to Ensembl gene CSV"
     )
     parser.add_argument(
         "--pedigree", type=str, required=True, help="Path to pedigree file"
@@ -190,14 +197,47 @@ def main():
     SV_gt_details.replace({"het": "heterozygous", "hom": "homozygous_alt", "-": "homozygous_ref", "./.": "missing"}, inplace=True)
     SV_gt_details["GT_abstracted"] = SV_gt_details["GT"].replace({"0|1": "ref|alt", "1|0": "alt|ref"})
 
+    # process CNVs 
+    logger.info("Reading CNV report from %s", args.cnv)
+    CNV = pd.read_csv(args.cnv, low_memory=False)
+    CNV["Variant_id"] = CNV["CHROM"].astype(str) + "-" + CNV["START"].astype(str) + "-" + CNV["END"].astype(str) + "-" + CNV["SVTYPE"].astype(str)
+    # filter for rare variants that are heterozygous in the proband
+    CNV_rare = CNV[(CNV["pacBioPctFreq_50pctRecOvlp"] < 2) & (CNV[f"gene_symbol"] != ".") & (CNV[f"{proband_id}"] != "0/0")]
+    for sample in sample_ids:
+        CNV_rare[f"{sample}_genotype"] = CNV_rare[f"{sample}_SV_DETAILS"].apply(compound_hets.get_CNV_genotypes)
+    
+    # TCAG does not annotate CNVs against Ensembl genes, so we need to do it manually
+    ensembl = pd.read_csv(args.ensembl, low_memory=False)
+    ensembl["Chromosome"] = "chr" + ensembl["Chromosome"].astype(str)
+    ensembl = pr.PyRanges(ensembl)
+    CNV_pr = pr.PyRanges(CNV_rare[["CHROM", "START", "END", "Variant_id"]].rename(columns={"CHROM": "Chromosome", "START": "Start", "END": "End"}))
+    CNV_ensembl = compound_hets.annotate_genes(CNV_pr, ensembl) # TODO: pull this from annotation/annotate.py
+    CNV_ensembl = CNV_ensembl.rename(columns={"gene_id": "Ensembl_gene_id"})
+    CNV_ensembl = CNV_ensembl[["Variant_id", "Ensembl_gene_id"]].drop_duplicates()
+
+    # melt sample-level genotype columns into long format
+    gt_cols = [c for c in CNV_rare.columns if "genotype" in c]
+    CNV_rare = CNV_rare[["Variant_id"] + gt_cols]
+    CNV_gt_details = compound_hets.melt_sample_columns_SV(CNV_rare, "Variant_id", "_genotype", "Genotype", sample_ids)
+    CNV_gt_details["PS"] = "." # CNVs are not phased, so we set PS to "."
+    CNV_gt_details["GT_abstracted"] = CNV_gt_details["Genotype"]
+    CNV_gt_details["Zygosity"] = CNV_gt_details["Genotype"].apply(lambda x: "heterozygous" if x == "0/1" else "homozygous_alt" if x == "1/1" else "homozygous_ref")
+    # now add gene information
+    CNV_gt_details = CNV_gt_details.merge(CNV_ensembl, on="Variant_id", how="left")
+    CNV_gt_details = CNV_gt_details[~CNV_gt_details["Ensembl_gene_id"].isna()]
+    CNV_gt_details["Variant_type"] = "CNV"
+
 
     # now combine SNV and SV dataframes and identify compound het status for each gene
     sequence_variant_gt_details = sequence_variant_gt_details[["Variant_id", "Sample", "PS", "GT_abstracted", "Zygosity", "Ensembl_gene_id"]]
     sequence_variant_gt_details["Variant_type"] = "sequence_variant"
     SV_gt_details = SV_gt_details[["Variant_id", "Sample", "PS", "GT_abstracted", "Zygosity", "Ensembl_gene_id"]]
     SV_gt_details["Variant_type"] = "SV"
+    CNV_gt_details = CNV_gt_details[["Variant_id", "Sample", "PS", "GT_abstracted", "Zygosity", "Ensembl_gene_id"]]
+    CNV_gt_details["Variant_type"] = "CNV"
+
     # combine all variant types into one dataframe
-    all_variants = pd.concat([sequence_variant_gt_details, SV_gt_details])
+    all_variants = pd.concat([sequence_variant_gt_details, SV_gt_details, CNV_gt_details])
     # remove variants without annotated gene 
     all_variants = all_variants[~all_variants["Ensembl_gene_id"].isna()]
     # get variants that are heterozygous in the proband
@@ -250,12 +290,14 @@ def main():
     gene_CH_status.rename(columns={"Variant_type": "CH_variant_types", "compound_het_status": "CH_status"}, inplace=True)
 
     # now annotate variant reports with compound het status 
+    # small variants
     sequence_variant_report = pd.read_csv(args.sequence_variant_report)
     sequence_variant_report = sequence_variant_report.merge(gene_CH_status, on="Ensembl_gene_id", how="left")
-    sequence_variant_report =sequence_variant_report.fillna(".")
+    sequence_variant_report = sequence_variant_report.fillna(".")
     sequence_variant_report.to_csv(f"{family}_sequence_variant_report_CH.csv", index=False)
     logger.info("Wrote annotated sequence variant report to %s_sequence_variant_report_CH.csv", family)
 
+    # SVs
     CH_status_series = SV.apply(
         lambda x: compound_hets.SV_comp_het_status(x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id")), 
         axis=1
@@ -264,6 +306,14 @@ def main():
     SV = SV.fillna(".")
     SV.to_csv(f"{family}_SV_report_CH.csv", index=False)
     logger.info("Wrote annotated SV report to %s_SV_report_CH.csv", family)
+
+    # CNVs
+    CNV_CH_status = all_variants[all_variants["Variant_type"] == "CNV"][["Ensembl_gene_id", "Variant_id", "compound_het_status"]].drop_duplicates()
+    CNV_gene_CH_status = CNV_CH_status.merge(gene_CH_status, on="Ensembl_gene_id", how="left")
+    CNV_gene_CH_status = CNV_gene_CH_status.groupby("Variant_id").agg({"Ensembl_gene_id": ";".join, "CH_variant_types": "|".join, "CH_status": "|".join}).reset_index()
+    CNV = CNV.merge(CNV_gene_CH_status, on="Variant_id", how="left").fillna(".").drop(columns=["Variant_id", "samples"])
+    CNV.to_csv(f"{family}_CNV_report_CH.csv", index=False)
+
     logger.info("Compound het annotation complete")
 
 
