@@ -399,6 +399,7 @@ def main():
     high_impact = high_impact[
         [
             "Variant_id",
+            "Variation",
             "Clinvar",
             "Gnomad_af_popmax",
             "Cadd_score",
@@ -429,6 +430,7 @@ def main():
         ]
         + zygosity_cols
         + [
+            "Variation",
             "Clinvar",
             "Gnomad_af_popmax",
             "Cadd_score",
