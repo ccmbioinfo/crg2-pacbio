@@ -5,12 +5,43 @@ import pandas as pd
 import pyranges as pr
 import numpy as np
 import re
+from typing import Dict, Tuple
 
 from compound_hets import compound_hets
 from annotation import annotate
 
+# Constants
+ZYGOSITY_HET = "heterozygous"
+ZYGOSITY_HOM_ALT = "homozygous_alt"
+ZYGOSITY_HOM_REF = "homozygous_ref"
+ZYGOSITY_MISSING = "missing"
 
-def main():
+VARIANT_TYPE_SEQUENCE = "sequence_variant"
+VARIANT_TYPE_SV = "SV"
+VARIANT_TYPE_CNV = "CNV"
+
+GT_TYPE_HET = 1
+GT_TYPE_HOM_ALT = 3
+GT_TYPE_MISSING = 2
+
+COMPOUND_HET_STATUS_TRUE = "TRUE"
+COMPOUND_HET_STATUS_FALSE = "FALSE"
+COMPOUND_HET_STATUS_UNKNOWN = "UNKNOWN"
+
+MISSING_VALUE = "."
+
+
+def setup_logging() -> logging.Logger:
+    """Configure and return logger."""
+    logging.basicConfig(
+        level=getattr(logging, "INFO", logging.INFO),
+        format="%(asctime)s - %(levelname)s - %(message)s",
+    )
+    return logging.getLogger(__name__)
+
+
+def parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Annotate compound het status across variant types."
     )
@@ -37,73 +68,131 @@ def main():
     parser.add_argument(
         "--pedigree", type=str, required=True, help="Path to pedigree file"
     )
+    return parser.parse_args()
 
-    args = parser.parse_args()
-    logging.basicConfig(
-        level=getattr(logging, "INFO", logging.INFO),
-        format="%(asctime)s - %(levelname)s - %(message)s",
-    )
-    logger = logging.getLogger(__name__)
 
-    logger.info("Starting compound het annotation")
-    family = args.pedigree.split("/")[-1].split(".")[0].split("_")[0]
-    fam_dict = compound_hets.infer_pedigree_roles(args.pedigree)
+def extract_family_id(pedigree_path: str) -> str:
+    """Extract family ID from pedigree file path."""
+    return pedigree_path.split("/")[-1].split(".")[0].split("_")[0]
+
+
+def setup_pedigree(pedigree_path: str, logger: logging.Logger) -> Tuple[str, str, Dict[str, str]]:
+    """Load pedigree and extract family information."""
+    family = extract_family_id(pedigree_path)
+    fam_dict = compound_hets.infer_pedigree_roles(pedigree_path)
     proband_id = fam_dict["child"]
     logger.info(
-        "Loaded pedigree %s (family %s, proband %s)", args.pedigree, family, proband_id
+        "Loaded pedigree %s (family %s, proband %s)", pedigree_path, family, proband_id
+    )
+    return family, proband_id, fam_dict
+
+
+def create_variant_id(chrom: str, pos, ref: str, alt: str) -> str:
+    """Create variant ID in the form chr-pos-ref-alt."""
+    variant_id = f"{chrom}-{pos}-{ref}-{alt}"
+    return variant_id.replace("chr", "")
+
+
+def filter_heterozygous_variants(
+    df: pd.DataFrame, proband_id: str, fam_dict: Dict[str, str], proband_col: str, 
+    mother_col: str, father_col: str, proband_value, hom_alt_value
+) -> pd.DataFrame:
+    """Filter variants that are het in proband and neither parent is homozygous alternate."""
+    return df[
+        (df[proband_col] == proband_value)
+        & (df[mother_col] != hom_alt_value)
+        & (df[father_col] != hom_alt_value)
+    ]
+
+
+def extract_sample_ids_from_columns(df: pd.DataFrame, prefix: str) -> list:
+    """Extract sample IDs from columns with given prefix."""
+    if prefix == "gts.":
+        return sorted(
+            {
+                re.sub(r"^gts\.", "", col)
+                for col in df.columns
+                if col.startswith("gts.")
+            }
+        )
+    elif prefix.endswith("_GT"):
+        return sorted(col.rsplit("_", 1)[0] for col in df.columns if "_GT" in col)
+    return []
+
+
+def merge_melted_dataframes(dfs: list, merge_on: list) -> pd.DataFrame:
+    """Successively merge a list of DataFrames on specified columns."""
+    return reduce(
+        lambda left, right: left.merge(right, on=merge_on, how="outer"),
+        dfs,
     )
 
-    # first process sequence variants
-    logger.info("Reading HIGH-MED sequence variants from %s", args.high_med)
-    high_med = pd.read_csv(args.high_med, sep="\t")
+
+def map_zygosity_from_gt_type(gt_type: int) -> str:
+    """Map GT_type numeric code to zygosity string."""
+    if gt_type == 3:
+        return ZYGOSITY_HOM_ALT
+    elif gt_type == 1:
+        return ZYGOSITY_HET
+    elif gt_type == 0:
+        return ZYGOSITY_HOM_REF
+    else:
+        return ZYGOSITY_MISSING
+
+
+def process_sequence_variants(
+    high_med_path: str,
+    low_path: str,
+    proband_id: str,
+    fam_dict: Dict[str, str],
+    logger: logging.Logger,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Process sequence variants and return high_impact and variant_gt_details dataframes."""
+    logger.info("Reading HIGH-MED sequence variants from %s", high_med_path)
+    high_med = pd.read_csv(high_med_path, sep="\t")
     logger.info("Loaded %d HIGH-MED variants", len(high_med))
-    logger.info("Reading LOW sequence variants from %s", args.low)
-    low = pd.read_csv(args.low, sep="\t", low_memory=False)
+    
+    logger.info("Reading LOW sequence variants from %s", low_path)
+    low = pd.read_csv(low_path, sep="\t", low_memory=False)
     logger.info("Loaded %d LOW variants", len(low))
 
-    # process low impact variants to select genic variants with relatively high CADD or SpliceAI scores (or indels without these scores)
+    # Filter low impact variants
     low_impact_var_filter_scores = compound_hets.filter_low_impact_variants(low)
     logger.info(
         "Filtered LOW impact variants to %d potentially high-impact variants",
         len(low_impact_var_filter_scores),
     )
-    # create high_impact table: genic damaging noncoding variants and nonsynonymous variants
+    
+    # Combine and deduplicate
     high_impact = pd.concat([low_impact_var_filter_scores, high_med])
-    # de-duplicate (may be LOW impact variants in high_med that are also in low_impact if they have ClinVar annotations)
     high_impact = high_impact.drop_duplicates(subset=["Variant_id"])
-    # create variant ID in the form chr-pos-ref-alt
-    high_impact["Variant_id"] = (
-        high_impact["Chrom"]
-        + "-"
-        + high_impact["Pos"].astype(str)
-        + "-"
-        + high_impact["Ref"].astype(str)
-        + "-"
-        + high_impact["Alt"].astype(str)
-    )
-    high_impact["Variant_id"] = high_impact["Variant_id"].apply(
-        lambda x: x.replace("chr", "")
+    
+    # Create variant ID
+    high_impact["Variant_id"] = high_impact.apply(
+        lambda x: create_variant_id(x["Chrom"], x["Pos"], x["Ref"], x["Alt"]), axis=1
     )
 
-    # restrict variants to those that are het in the proband and neither parent is homozygous alternate
-    high_impact = high_impact[(high_impact[f"gt_types.{proband_id}"] == 1) & (high_impact[f"gt_types.{fam_dict['mother']}"] != 3) & (high_impact[f"gt_types.{fam_dict['father']}"] != 3)]
+    # Filter heterozygous variants
+    high_impact = filter_heterozygous_variants(
+        high_impact,
+        proband_id,
+        fam_dict,
+        f"gt_types.{proband_id}",
+        f"gt_types.{fam_dict['mother']}",
+        f"gt_types.{fam_dict['father']}",
+        GT_TYPE_HET,
+        GT_TYPE_HOM_ALT,
+    )
     logger.info(
         "Retained %d heterozygous high-impact variants for proband %s",
         len(high_impact),
         proband_id,
     )
 
-    # get per-sample variant genotype status
-    # extract all sample IDs based on genotype columns
-    sample_ids = sorted(
-        {
-            re.sub(r"^gts\.", "", col)
-            for col in high_impact.columns
-            if col.startswith("gts.")
-        }
-    )
-
-    # split comma-separated PS string into individual PS columns for each sample
+    # Extract sample IDs
+    sample_ids = extract_sample_ids_from_columns(high_impact, "gts.")
+    
+    # Split PS column
     ps_split_cols = high_impact["PS"].str.split(",", expand=True)
     for idx, sample in enumerate(sample_ids):
         high_impact[f"PS.{sample}"] = ps_split_cols[idx]
@@ -111,6 +200,7 @@ def main():
 
     logger.debug("Extracted %d sample IDs from sequence variant table", len(sample_ids))
 
+    # Melt sample columns
     variant_ps = compound_hets.melt_sample_columns(
         high_impact, "Variant_id", "PS.", "PS", sample_ids
     )
@@ -124,29 +214,23 @@ def main():
         high_impact, "Variant_id", "gt_quals.", "GT_qual", sample_ids
     )
 
-    # combine all melted dataframes on Variant_id and Sample to create one dataframe of variants in long format
+    # Merge melted dataframes
     dfs = [variant_ps, variant_gts, variant_gt_type, variant_qual]
-    # successively merges a list of DataFrames (dfs), each containing different variant/sample-level data,
-    # to produce a single DataFrame with all variant information for each (Variant_id, Sample) pair.
-    sequence_variant_gt_details = reduce(
-        lambda left, right: left.merge(
-            right, on=["Variant_id", "Ref", "Alt", "Sample"], how="outer"
-        ),
-        dfs,
+    sequence_variant_gt_details = merge_melted_dataframes(
+        dfs, ["Variant_id", "Ref", "Alt", "Sample"]
     )
+    
+    # Fix missing genotypes
     sequence_variant_gt_details.loc[
         sequence_variant_gt_details["GT"] == "./.", "GT_type"
-    ] = 2  # for some reason gemini codes some missing genotypes types as 3
+    ] = GT_TYPE_MISSING
+    
+    # Map zygosity
     sequence_variant_gt_details["Zygosity"] = sequence_variant_gt_details[
         "GT_type"
-    ].map(
-        lambda x: (
-            "homozygous_alt"
-            if x == 3
-            else "heterozygous" if x == 1 else "homozygous_ref" if x == 0 else "missing"
-        )
-    )
-    # create variant_to_gene table: variant ID and gene ID
+    ].map(map_zygosity_from_gt_type)
+    
+    # Add gene information
     sequence_variant_to_gene = high_impact[
         ["Variant_id", "Ensembl_gene_id"]
     ].drop_duplicates()
@@ -158,15 +242,25 @@ def main():
         len(sequence_variant_gt_details),
     )
 
-    # abstract the genotype to be "ref|alt" or "alt|ref" to facilitate compound het status determination
+    # Abstract genotype
     sequence_variant_gt_details["GT_abstracted"] = sequence_variant_gt_details.apply(
         lambda x: compound_hets.abstract_gt(x["Ref"], x["Alt"], x["GT"]), axis=1
     )
 
-    # now process SVs
-    # read in SV file and filter for rare genic variants
-    logger.info("Reading SV report from %s", args.sv)
-    SV = pd.read_csv(args.sv, low_memory=False)
+    return high_impact, sequence_variant_gt_details
+
+
+def process_structural_variants(
+    sv_path: str,
+    proband_id: str,
+    fam_dict: Dict[str, str],
+    logger: logging.Logger,
+) -> pd.DataFrame:
+    """Process structural variants and return variant_gt_details dataframe."""
+    logger.info("Reading SV report from %s", sv_path)
+    SV = pd.read_csv(sv_path, low_memory=False)
+    
+    # Filter rare genic variants
     SV_rare_high_impact = SV[
         (SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01)
     ].copy()
@@ -174,6 +268,8 @@ def main():
         "Identified %d rare genic SVs (gnomAD AF <= 0.01)",
         len(SV_rare_high_impact),
     )
+    
+    # Create variant ID
     SV_rare_high_impact["Variant_id"] = (
         SV_rare_high_impact["CHROM"]
         + "-"
@@ -187,8 +283,9 @@ def main():
     )
     SV_rare_high_impact.rename(
         columns={"ENSEMBL_GENE": "Ensembl_gene_id"}, inplace=True
-    )  # for compatibility with SNV CH functions
-    # filter for variants that are het in the proband
+    )
+    
+    # Filter heterozygous variants
     SV_rare_high_impact = SV_rare_high_impact[
         (SV_rare_high_impact[f"{proband_id}_zyg"] == "het")
         & (SV_rare_high_impact[f"{fam_dict['mother']}_zyg"] != "hom")
@@ -200,9 +297,10 @@ def main():
         proband_id,
     )
 
-    # get per-sample SV genotype status
-    # extract all sample IDs based on genotype columns
-    sample_ids = sorted(col.rsplit("_", 1)[0] for col in SV.columns if "_GT" in col)
+    # Extract sample IDs
+    sample_ids = extract_sample_ids_from_columns(SV, "_GT")
+    
+    # Melt sample columns
     variant_ps = compound_hets.melt_sample_columns_SV(
         SV_rare_high_impact, "Variant_id", "_PS", "PS", sample_ids
     )
@@ -212,37 +310,34 @@ def main():
     variant_zyg = compound_hets.melt_sample_columns_SV(
         SV_rare_high_impact, "Variant_id", "_zyg", "Zygosity", sample_ids
     )
-    # combine all melted dataframes on Variant_id and Sample to create one dataframe of variants in long format
+    
+    # Merge melted dataframes
     dfs = [variant_ps, variant_gts, variant_zyg]
-    # successively merges a list of DataFrames (dfs), each containing different variant/sample-level data,
-    # to produce a single DataFrame (variant_gt_details) with all variant information for each (Variant_id, Sample) pair.
-    SV_gt_details = reduce(
-        lambda left, right: left.merge(right, on=["Variant_id", "Sample"], how="outer"),
-        dfs,
-    )
-    # create variant_to_gene table: variant ID and gene ID
+    SV_gt_details = merge_melted_dataframes(dfs, ["Variant_id", "Sample"])
+    
+    # Process gene information
     SV_to_gene = SV_rare_high_impact[
         ["Variant_id", "Ensembl_gene_id"]
     ].drop_duplicates()
     SV_to_gene = SV_to_gene[SV_to_gene["Ensembl_gene_id"].notna()]
-    # NOTE:snpeff annotates some genes against transcript IDs or JASPAR matric IDs - should I filter these out?
-    # an SV may overlap multiple genes, so we need to split the gene IDs and explode the dataframe to create one row per gene
+    
+    # Split and explode gene IDs
     SV_to_gene["Ensembl_gene_id"] = SV_to_gene["Ensembl_gene_id"].str.split(";")
     SV_to_gene = SV_to_gene.explode("Ensembl_gene_id")
-    SV_to_gene["Ensembl_gene_id"] = SV_to_gene["Ensembl_gene_id"].str.split(
-        "-"
-    )  # some SVs annotated as gene-gene by SnpEff, e.g. if it's a feature fusion
+    SV_to_gene["Ensembl_gene_id"] = SV_to_gene["Ensembl_gene_id"].str.split("-")
     SV_to_gene = SV_to_gene.explode("Ensembl_gene_id")
-    # now add gene IDs to variant_gt_details, which will have one row per variant per gene per sample
+    
+    # Add gene information
     SV_gt_details = SV_gt_details.merge(SV_to_gene, on="Variant_id", how="left")
     logger.debug("SV details dataframe contains %d rows", len(SV_gt_details))
-    # recode zygosity to be consistent with SNV CH functions
+    
+    # Recode zygosity
     SV_gt_details.replace(
         {
-            "het": "heterozygous",
-            "hom": "homozygous_alt",
-            "-": "homozygous_ref",
-            "./.": "missing",
+            "het": ZYGOSITY_HET,
+            "hom": ZYGOSITY_HOM_ALT,
+            "-": ZYGOSITY_HOM_REF,
+            "./.": ZYGOSITY_MISSING,
         },
         inplace=True,
     )
@@ -250,9 +345,22 @@ def main():
         {"0|1": "ref|alt", "1|0": "alt|ref"}
     )
 
-    # process CNVs
-    logger.info("Reading CNV report from %s", args.cnv)
-    CNV = pd.read_csv(args.cnv, low_memory=False)
+    return SV_gt_details
+
+
+def process_cnvs(
+    cnv_path: str,
+    ensembl_path: str,
+    proband_id: str,
+    fam_dict: Dict[str, str],
+    sample_ids: list,
+    logger: logging.Logger,
+) -> pd.DataFrame:
+    """Process CNVs and return variant_gt_details dataframe."""
+    logger.info("Reading CNV report from %s", cnv_path)
+    CNV = pd.read_csv(cnv_path, low_memory=False)
+    
+    # Create variant ID
     CNV["Variant_id"] = (
         CNV["CHROM"].astype(str)
         + "-"
@@ -262,18 +370,27 @@ def main():
         + "-"
         + CNV["SVTYPE"].astype(str)
     )
-    # filter for rare variants that are heterozygous in the proband
+    
+    # Filter rare variants
     CNV_rare = CNV[
         (CNV["pacBioPctFreq_50pctRecOvlp"] < 2) & (CNV[f"gene_symbol"] != ".")
     ].copy()
+    
+    # Get genotypes
     for sample in sample_ids:
         CNV_rare[f"{sample}_genotype"] = CNV_rare[f"{sample}_SV_DETAILS"].apply(
             compound_hets.get_CNV_genotypes
         )
-    CNV_rare = CNV_rare[(CNV_rare[f"{proband_id}_genotype"] == "0/1") & (CNV_rare[f"{fam_dict['mother']}_genotype"] != "1/1") & (CNV_rare[f"{fam_dict['father']}_genotype"] != "1/1")]
+    
+    # Filter heterozygous variants
+    CNV_rare = CNV_rare[
+        (CNV_rare[f"{proband_id}_genotype"] == "0/1")
+        & (CNV_rare[f"{fam_dict['mother']}_genotype"] != "1/1")
+        & (CNV_rare[f"{fam_dict['father']}_genotype"] != "1/1")
+    ]
 
-    # TCAG does not annotate CNVs against Ensembl genes, so we need to do it manually
-    ensembl = pd.read_csv(args.ensembl, low_memory=False)
+    # Annotate with Ensembl genes
+    ensembl = pd.read_csv(ensembl_path, low_memory=False)
     ensembl["Chromosome"] = "chr" + ensembl["Chromosome"].astype(str)
     ensembl = pr.PyRanges(ensembl)
     CNV_pr = pr.PyRanges(
@@ -285,65 +402,57 @@ def main():
     CNV_ensembl = CNV_ensembl.rename(columns={"gene_id": "Ensembl_gene_id"})
     CNV_ensembl = CNV_ensembl[["Variant_id", "Ensembl_gene_id"]].drop_duplicates()
 
-    # melt sample-level genotype columns into long format
+    # Melt sample-level genotype columns
     gt_cols = [c for c in CNV_rare.columns if "genotype" in c]
     CNV_rare = CNV_rare[["Variant_id"] + gt_cols]
     CNV_gt_details = compound_hets.melt_sample_columns_SV(
         CNV_rare, "Variant_id", "_genotype", "Genotype", sample_ids
     )
-    CNV_gt_details["PS"] = "."  # CNVs are not phased, so we set PS to "."
+    CNV_gt_details["PS"] = MISSING_VALUE  # CNVs are not phased
     CNV_gt_details["GT_abstracted"] = CNV_gt_details["Genotype"]
     CNV_gt_details["Zygosity"] = CNV_gt_details["Genotype"].apply(
         lambda x: (
-            "heterozygous"
+            ZYGOSITY_HET
             if x == "0/1"
-            else "homozygous_alt" if x == "1/1" else "homozygous_ref"
+            else ZYGOSITY_HOM_ALT if x == "1/1" else ZYGOSITY_HOM_REF
         )
     )
-    # now add gene information
+    
+    # Add gene information
     CNV_gt_details = CNV_gt_details.merge(CNV_ensembl, on="Variant_id", how="left")
     CNV_gt_details = CNV_gt_details[~CNV_gt_details["Ensembl_gene_id"].isna()]
-    CNV_gt_details["Variant_type"] = "CNV"
+    CNV_gt_details["Variant_type"] = VARIANT_TYPE_CNV
 
-    # now combine SNV and SV dataframes and identify compound het status for each gene
-    sequence_variant_gt_details = sequence_variant_gt_details[
-        ["Variant_id", "Sample", "PS", "GT_abstracted", "Zygosity", "Ensembl_gene_id"]
-    ]
-    sequence_variant_gt_details["Variant_type"] = "sequence_variant"
-    SV_gt_details = SV_gt_details[
-        ["Variant_id", "Sample", "PS", "GT_abstracted", "Zygosity", "Ensembl_gene_id"]
-    ]
-    SV_gt_details["Variant_type"] = "SV"
-    CNV_gt_details = CNV_gt_details[
-        ["Variant_id", "Sample", "PS", "GT_abstracted", "Zygosity", "Ensembl_gene_id"]
-    ]
-    CNV_gt_details["Variant_type"] = "CNV"
+    return CNV_gt_details
 
-    # combine all variant types into one dataframe
-    all_variants = pd.concat(
-        [sequence_variant_gt_details, SV_gt_details, CNV_gt_details]
-    )
-    # remove variants without annotated gene
-    all_variants = all_variants[~all_variants["Ensembl_gene_id"].isna()]
-    # get variants that are heterozygous in the proband
+
+def determine_compound_het_status(
+    all_variants: pd.DataFrame,
+    proband_id: str,
+    fam_dict: Dict[str, str],
+    logger: logging.Logger,
+) -> pd.DataFrame:
+    """Determine compound het status for all variants."""
+    # Get variants that are heterozygous in the proband
     all_variants_proband = all_variants[
         (all_variants["Sample"] == proband_id)
-        & (all_variants["Zygosity"] == "heterozygous")
+        & (all_variants["Zygosity"] == ZYGOSITY_HET)
     ].copy()
     logger.info(
         "Combined variant table contains %d rows; %d heterozygous proband variants",
         len(all_variants),
         len(all_variants_proband),
     )
-    # attempt to phase variants using proband phasing only
+    
+    # Phase variants using proband phasing only
     logger.info("Attempting to phase variants using proband phasing only")
     compound_het_status_no_parents = (
         compound_hets.determine_compound_het_status_no_parents(all_variants_proband)
     )
-    # now if any gene has unknown compound het status, we attempt to determine the compound het status using parental genotypes
-    # first, get genes with unknown compound het status
+    
+    # Attempt parental phasing for unknown genes
     unknown_gene = compound_het_status_no_parents[
-        compound_het_status_no_parents["compound_het_status"] == "UNKNOWN"
+        compound_het_status_no_parents["compound_het_status"] == COMPOUND_HET_STATUS_UNKNOWN
     ]
     unknown_variants = (
         all_variants[
@@ -352,7 +461,7 @@ def main():
         .copy()
         .drop_duplicates()
     )
-    # use parental genotypes to determine compound het status
+    
     logger.info(
         "Attempting parental phasing for %d genes with unknown status",
         len(unknown_gene),
@@ -360,6 +469,7 @@ def main():
     logger.debug(
         "Unknown genes: %s", ", ".join(sorted(unknown_gene["Ensembl_gene_id"].unique()))
     )
+    
     compound_het_status_parents = (
         compound_hets.count_gene_variants_by_parental_haplotype(
             unknown_variants, fam_dict
@@ -375,16 +485,173 @@ def main():
             axis=1,
         )
     )
-    # replace unknown compound het status with compound het status after parental phasing
+    
+    # Replace unknown status with parental phasing results
     for gene in compound_het_status_parents.index:
         compound_het_status_no_parents.loc[
             compound_het_status_no_parents["Ensembl_gene_id"] == gene,
             "compound_het_status",
         ] = compound_het_status_parents.loc[gene, "compound_het_status"]
-    # add cross-variant compound het status to variants to create reference table with all variant and sample-level information
+    
+    return compound_het_status_no_parents
+
+
+def annotate_reports(
+    all_variants: pd.DataFrame,
+    sequence_variant_report_path: str,
+    sv_path: str,
+    cnv_path: str,
+    family: str,
+    logger: logging.Logger,
+) -> None:
+    """Annotate variant reports with compound het status."""
+    # Create gene-level compound het status table
+    gene_CH_status = all_variants[
+        ["Ensembl_gene_id", "Variant_type", "compound_het_status"]
+    ].drop_duplicates()
+    gene_CH_status = (
+        gene_CH_status.groupby("Ensembl_gene_id")
+        .agg({"Variant_type": ";".join, "compound_het_status": "first"})
+        .reset_index()
+    )
+    gene_CH_status.rename(
+        columns={
+            "Variant_type": "CH_variant_types",
+            "compound_het_status": "CH_status",
+        },
+        inplace=True,
+    )
+
+    # Annotate sequence variant report
+    sequence_variant_report = pd.read_csv(sequence_variant_report_path)
+    sequence_variant_report = sequence_variant_report.merge(
+        gene_CH_status, on="Ensembl_gene_id", how="left"
+    )
+    sequence_variant_report = sequence_variant_report.fillna(MISSING_VALUE)
+    sequence_variant_report.to_csv(
+        f"{family}_sequence_variant_report_CH.csv", index=False
+    )
+    logger.info(
+        "Wrote annotated sequence variant report to %s_sequence_variant_report_CH.csv",
+        family,
+    )
+
+    # Annotate SV report
+    SV = pd.read_csv(sv_path, low_memory=False)
+    CH_status_series = SV.apply(
+        lambda x: compound_hets.SV_comp_het_status(
+            x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id")
+        ),
+        axis=1,
+    )
+
+    SV["CH_variant_types"] = [
+        (
+            d["CH_variant_types"]
+            if isinstance(d, dict) and "CH_variant_types" in d
+            else MISSING_VALUE
+        )
+        for d in CH_status_series
+    ]
+    SV["CH_status"] = [
+        d["CH_status"] if isinstance(d, dict) and "CH_status" in d else MISSING_VALUE
+        for d in CH_status_series
+    ]
+    SV = SV.fillna(MISSING_VALUE)
+    SV.to_csv(f"{family}_SV_report_CH.csv", index=False)
+    logger.info("Wrote annotated SV report to %s_SV_report_CH.csv", family)
+
+    # Annotate CNV report
+    CNV = pd.read_csv(cnv_path, low_memory=False)
+    CNV["Variant_id"] = CNV["CHROM"].astype(str) + "-" + CNV["START"].astype(str) + "-" + CNV["END"].astype(str) + "-" + CNV["SVTYPE"].astype(str)
+    CNV_CH_status = all_variants[all_variants["Variant_type"] == VARIANT_TYPE_CNV][
+        ["Ensembl_gene_id", "Variant_id", "compound_het_status"]
+    ].drop_duplicates()
+    CNV_gene_CH_status = CNV_CH_status.merge(
+        gene_CH_status, on="Ensembl_gene_id", how="left"
+    )
+    CNV_gene_CH_status = (
+        CNV_gene_CH_status.groupby("Variant_id")
+        .agg(
+            {
+                "Ensembl_gene_id": ";".join,
+                "CH_variant_types": "|".join,
+                "CH_status": "|".join,
+            }
+        )
+        .reset_index()
+    )
+    CNV = (
+        CNV.merge(CNV_gene_CH_status, on="Variant_id", how="left")
+        .fillna(MISSING_VALUE)
+        .drop(columns=["Variant_id", "samples"])
+    )
+    CNV.to_csv(f"{family}_CNV_report_CH.csv", index=False)
+    logger.info("Wrote annotated CNV report to %s_CNV_report_CH.csv", family)
+
+
+def main():
+    """Main function to orchestrate compound het annotation pipeline."""
+    args = parse_arguments()
+    logger = setup_logging()
+    
+    logger.info("Starting compound het annotation")
+    family, proband_id, fam_dict = setup_pedigree(args.pedigree, logger)
+    
+    # Process sequence variants
+    high_impact, sequence_variant_gt_details = process_sequence_variants(
+        args.high_med, args.low, proband_id, fam_dict, logger
+    )
+    
+    # Extract sample IDs from sequence variants (needed for CNV processing)
+    sample_ids = extract_sample_ids_from_columns(high_impact, "gts.")
+    
+    # Process structural variants
+    SV_gt_details = process_structural_variants(
+        args.sv, proband_id, fam_dict, logger
+    )
+    
+    # Process CNVs
+    CNV_gt_details = process_cnvs(
+        args.cnv, args.ensembl, proband_id, fam_dict, sample_ids, logger
+    )
+    
+    # Combine all variant types
+    sequence_variant_gt_details = sequence_variant_gt_details[
+        ["Variant_id", "Sample", "PS", "GT_abstracted", "Zygosity", "Ensembl_gene_id"]
+    ]
+    sequence_variant_gt_details["Variant_type"] = VARIANT_TYPE_SEQUENCE
+    
+    SV_gt_details = SV_gt_details[
+        ["Variant_id", "Sample", "PS", "GT_abstracted", "Zygosity", "Ensembl_gene_id"]
+    ]
+    SV_gt_details["Variant_type"] = VARIANT_TYPE_SV
+    
+    CNV_gt_details = CNV_gt_details[
+        ["Variant_id", "Sample", "PS", "GT_abstracted", "Zygosity", "Ensembl_gene_id"]
+    ]
+    CNV_gt_details["Variant_type"] = VARIANT_TYPE_CNV
+    
+    all_variants = pd.concat(
+        [sequence_variant_gt_details, SV_gt_details, CNV_gt_details]
+    )
+    all_variants = all_variants[~all_variants["Ensembl_gene_id"].isna()]
+    
+    # Determine compound het status
+    compound_het_status = determine_compound_het_status(
+        all_variants, proband_id, fam_dict, logger
+    )
+    
+    # Add compound het status to variants
     all_variants = all_variants.merge(
-        compound_het_status_no_parents, on="Ensembl_gene_id", how="left"
+        compound_het_status, on="Ensembl_gene_id", how="left"
     ).sort_values(by=["Ensembl_gene_id", "Sample"])
+    
+    # Create wide variant table
+    ensembl = pd.read_csv(args.ensembl, low_memory=False)
+    ensembl["Chromosome"] = "chr" + ensembl["Chromosome"].astype(str)
+    ensembl_pr = pr.PyRanges(ensembl)
+    
     wide_variants = all_variants.pivot_table(
         index=["Variant_id", "Variant_type", "Ensembl_gene_id", "compound_het_status"],
         columns="Sample",
@@ -395,8 +662,9 @@ def main():
         f"{field}_{sample}" for field, sample in wide_variants.columns
     ]
     wide_variants = wide_variants.reset_index()
-    # add ClinVar, impact, CADD, gnomAD, and SpliceAI annotations to sequence variants
-    high_impact = high_impact[
+    
+    # Add sequence variant annotations
+    high_impact_subset = high_impact[
         [
             "Variant_id",
             "Variation",
@@ -407,16 +675,16 @@ def main():
             "Nucleotide_change_ensembl",
         ]
     ]
-    high_impact["Gnomad_af_popmax"] = high_impact["Gnomad_af_popmax"].replace(-1, 0)
-    wide_variants = wide_variants.merge(high_impact, on="Variant_id", how="left")
-
-    # add gene name
-    ensembl_df = ensembl.df.drop_duplicates(subset="gene_id")
+    high_impact_subset["Gnomad_af_popmax"] = high_impact_subset["Gnomad_af_popmax"].replace(-1, 0)
+    wide_variants = wide_variants.merge(high_impact_subset, on="Variant_id", how="left")
+    
+    # Add gene name
+    ensembl_df = ensembl_pr.df.drop_duplicates(subset="gene_id")
     wide_variants["Gene_name"] = wide_variants["Ensembl_gene_id"].map(
         ensembl_df.set_index("gene_id")["gene_name"]
     )
-
-    # format for export
+    
+    # Format for export
     zygosity_cols = [c for c in wide_variants.columns if "Zygosity" in c]
     PS_cols = [c for c in wide_variants.columns if "PS" in c]
     GT_cols = [c for c in wide_variants.columns if "GT_abstracted" in c]
@@ -440,100 +708,31 @@ def main():
         + GT_cols
         + PS_cols
     ].sort_values(by=["Ensembl_gene_id"])
+    
     wide_variants = wide_variants.replace(
         {
-            "heterozygous": "het",
-            "homozygous_alt": "hom",
-            "homozygous_ref": "-",
-            np.nan: ".",
+            ZYGOSITY_HET: "het",
+            ZYGOSITY_HOM_ALT: "hom",
+            ZYGOSITY_HOM_REF: "-",
+            np.nan: MISSING_VALUE,
         }
     )
+    
     wide_variants.to_csv(f"{family}_compound_het_variants.csv", index=False)
     logger.info(
         "Wrote combined variant annotations to %s_compound_het_variants.csv", family
     )
-
-    # now annotate variant reports with compound het status
-    # create gene-level compound het status table
-    gene_CH_status = all_variants[
-        ["Ensembl_gene_id", "Variant_type", "compound_het_status"]
-    ].drop_duplicates()
-    gene_CH_status = (
-        gene_CH_status.groupby("Ensembl_gene_id")
-        .agg({"Variant_type": ";".join, "compound_het_status": "first"})
-        .reset_index()
-    )
-    gene_CH_status.rename(
-        columns={
-            "Variant_type": "CH_variant_types",
-            "compound_het_status": "CH_status",
-        },
-        inplace=True,
-    )
-
-    # small variants
-    sequence_variant_report = pd.read_csv(args.sequence_variant_report)
-    sequence_variant_report = sequence_variant_report.merge(
-        gene_CH_status, on="Ensembl_gene_id", how="left"
-    )
-    sequence_variant_report = sequence_variant_report.fillna(".")
-    sequence_variant_report.to_csv(
-        f"{family}_sequence_variant_report_CH.csv", index=False
-    )
-    logger.info(
-        "Wrote annotated sequence variant report to %s_sequence_variant_report_CH.csv",
+    
+    # Annotate reports
+    annotate_reports(
+        all_variants,
+        args.sequence_variant_report,
+        args.sv,
+        args.cnv,
         family,
+        logger,
     )
-
-    # SVs
-    CH_status_series = SV.apply(
-        lambda x: compound_hets.SV_comp_het_status(
-            x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id")
-        ),
-        axis=1,
-    )
-
-    SV["CH_variant_types"] = [
-        (
-            d["CH_variant_types"]
-            if isinstance(d, dict) and "CH_variant_types" in d
-            else "."
-        )
-        for d in CH_status_series
-    ]
-    SV["CH_status"] = [
-        d["CH_status"] if isinstance(d, dict) and "CH_status" in d else "."
-        for d in CH_status_series
-    ]
-    SV = SV.fillna(".")
-    SV.to_csv(f"{family}_SV_report_CH.csv", index=False)
-    logger.info("Wrote annotated SV report to %s_SV_report_CH.csv", family)
-
-    # CNVs
-    CNV_CH_status = all_variants[all_variants["Variant_type"] == "CNV"][
-        ["Ensembl_gene_id", "Variant_id", "compound_het_status"]
-    ].drop_duplicates()
-    CNV_gene_CH_status = CNV_CH_status.merge(
-        gene_CH_status, on="Ensembl_gene_id", how="left"
-    )
-    CNV_gene_CH_status = (
-        CNV_gene_CH_status.groupby("Variant_id")
-        .agg(
-            {
-                "Ensembl_gene_id": ";".join,
-                "CH_variant_types": "|".join,
-                "CH_status": "|".join,
-            }
-        )
-        .reset_index()
-    )
-    CNV = (
-        CNV.merge(CNV_gene_CH_status, on="Variant_id", how="left")
-        .fillna(".")
-        .drop(columns=["Variant_id", "samples"])
-    )
-    CNV.to_csv(f"{family}_CNV_report_CH.csv", index=False)
-
+    
     logger.info("Compound het annotation complete")
 
 
