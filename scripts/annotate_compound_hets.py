@@ -373,7 +373,7 @@ def process_cnvs(
     
     # Filter rare variants
     CNV_rare = CNV[
-        (CNV["pacBioPctFreq_50pctRecOvlp"] < 2) & (CNV[f"gene_symbol"] != ".")
+        (CNV["pacBioPctFreq_50pctRecOvlp"] < 5) & (CNV[f"gene_symbol"] != ".")
     ].copy()
     
     # Get genotypes
