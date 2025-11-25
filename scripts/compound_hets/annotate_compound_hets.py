@@ -70,15 +70,13 @@ def main():
     high_impact["Variant_id"] = high_impact["Chrom"] + "-" + high_impact["Pos"].astype(str) + "-" + high_impact["Ref"].astype(str) + "-" + high_impact["Alt"].astype(str)
     high_impact["Variant_id"] = high_impact["Variant_id"].apply(lambda x: x.replace("chr", ""))
 
-    # restrict variants to those that are het in the proband and export for analyst review
+    # restrict variants to those that are het in the proband
     high_impact = high_impact[high_impact[f"gt_types.{proband_id}"] == 1]
     logger.info(
         "Retained %d heterozygous high-impact variants for proband %s",
         len(high_impact),
         proband_id,
     )
-    high_impact.fillna(".").drop_duplicates(subset=["sum_ref_alt_length", "variant_type", "Variant_id"]).to_csv(f"{family}_high_impact_sequence_variants.csv", index=False)
-    logger.info("Wrote %s_high_impact_sequence_variants.csv", family)
 
     # get per-sample variant genotype status
     # extract all sample IDs based on genotype columns
@@ -282,16 +280,43 @@ def main():
         compound_het_status_no_parents.loc[compound_het_status_no_parents["Ensembl_gene_id"] == gene, "compound_het_status"] = (
             compound_het_status_parents.loc[gene, "compound_het_status"]
         )
-    # add cross-variant compound het status to variants 
+    # add cross-variant compound het status to variants to create reference table with all variant and sample-level information
     all_variants = all_variants.merge(compound_het_status_no_parents, on="Ensembl_gene_id", how="left").sort_values(by=["Ensembl_gene_id", "Sample"])
-    all_variants.to_csv(f"{family}_compound_het_variants.csv", index=False)
+    wide_variants = all_variants.pivot_table(
+        index=["Variant_id", "Variant_type", "Ensembl_gene_id", "compound_het_status"],
+        columns="Sample",
+        values=["PS", "GT_abstracted", "Zygosity"],
+        aggfunc="first"
+    )
+    wide_variants.columns = [
+        f"{field}_{sample}"
+        for field, sample in wide_variants.columns
+    ]
+    wide_variants = wide_variants.reset_index()
+    # add ClinVar, impact, CADD, gnomAD, and SpliceAI annotations to sequence variants
+    high_impact = high_impact[["Variant_id", "Clinvar", "Gnomad_af_popmax", "Cadd_score", "SpliceAI_score", "Nucleotide_change_ensembl"]]
+    high_impact["Gnomad_af_popmax"] = high_impact["Gnomad_af_popmax"].replace(-1, 0)
+    wide_variants = wide_variants.merge(high_impact, on="Variant_id", how="left")
+
+    # add gene name
+    ensembl_df = ensembl.df.drop_duplicates(subset="gene_id")
+    wide_variants["Gene_name"] = wide_variants["Ensembl_gene_id"].map(ensembl_df.set_index("gene_id")["gene_name"])
+
+    # format for export
+    zygosity_cols = [c for c in wide_variants.columns if "Zygosity" in c]
+    PS_cols = [c for c in wide_variants.columns if "PS" in c]
+    GT_cols = [c for c in wide_variants.columns if "GT_abstracted" in c]
+    wide_variants = wide_variants[["Variant_id", "Variant_type", "Gene_name", "Ensembl_gene_id", "compound_het_status"] + zygosity_cols + ["Clinvar", "Gnomad_af_popmax", "Cadd_score", "SpliceAI_score", "Nucleotide_change_ensembl"] + GT_cols + PS_cols].sort_values(by=["Ensembl_gene_id"])
+    wide_variants = wide_variants.replace({"heterozygous": "het", "homozygous_alt": "hom", "homozygous_ref": "-", np.nan: "."})
+    wide_variants.to_csv(f"{family}_compound_het_variants.csv", index=False)
     logger.info("Wrote combined variant annotations to %s_compound_het_variants.csv", family)
     
+    # now annotate variant reports with compound het status 
+    # create gene-level compound het status table
     gene_CH_status = all_variants[["Ensembl_gene_id", "Variant_type", "compound_het_status"]].drop_duplicates()
     gene_CH_status = gene_CH_status.groupby("Ensembl_gene_id").agg({"Variant_type": ";".join, "compound_het_status": "first"}).reset_index()
     gene_CH_status.rename(columns={"Variant_type": "CH_variant_types", "compound_het_status": "CH_status"}, inplace=True)
 
-    # now annotate variant reports with compound het status 
     # small variants
     sequence_variant_report = pd.read_csv(args.sequence_variant_report)
     sequence_variant_report = sequence_variant_report.merge(gene_CH_status, on="Ensembl_gene_id", how="left")
