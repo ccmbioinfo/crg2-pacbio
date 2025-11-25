@@ -6,7 +6,8 @@ import pyranges as pr
 import numpy as np
 import re
 
-import compound_hets
+import compound_hets 
+from annotation import annotate
 
 def main():
     parser = argparse.ArgumentParser(
@@ -202,16 +203,17 @@ def main():
     CNV = pd.read_csv(args.cnv, low_memory=False)
     CNV["Variant_id"] = CNV["CHROM"].astype(str) + "-" + CNV["START"].astype(str) + "-" + CNV["END"].astype(str) + "-" + CNV["SVTYPE"].astype(str)
     # filter for rare variants that are heterozygous in the proband
-    CNV_rare = CNV[(CNV["pacBioPctFreq_50pctRecOvlp"] < 2) & (CNV[f"gene_symbol"] != ".") & (CNV[f"{proband_id}"] != "0/0")]
+    CNV_rare = CNV[(CNV["pacBioPctFreq_50pctRecOvlp"] < 2) & (CNV[f"gene_symbol"] != ".")]
     for sample in sample_ids:
         CNV_rare[f"{sample}_genotype"] = CNV_rare[f"{sample}_SV_DETAILS"].apply(compound_hets.get_CNV_genotypes)
+    CNV_rare = CNV_rare[CNV_rare[f"{proband_id}_genotype"] == "0/1"]
     
     # TCAG does not annotate CNVs against Ensembl genes, so we need to do it manually
     ensembl = pd.read_csv(args.ensembl, low_memory=False)
     ensembl["Chromosome"] = "chr" + ensembl["Chromosome"].astype(str)
     ensembl = pr.PyRanges(ensembl)
     CNV_pr = pr.PyRanges(CNV_rare[["CHROM", "START", "END", "Variant_id"]].rename(columns={"CHROM": "Chromosome", "START": "Start", "END": "End"}))
-    CNV_ensembl = compound_hets.annotate_genes(CNV_pr, ensembl) # TODO: pull this from annotation/annotate.py
+    CNV_ensembl = annotate.annotate_genes(CNV_pr, ensembl)
     CNV_ensembl = CNV_ensembl.rename(columns={"gene_id": "Ensembl_gene_id"})
     CNV_ensembl = CNV_ensembl[["Variant_id", "Ensembl_gene_id"]].drop_duplicates()
 

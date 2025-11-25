@@ -410,19 +410,5 @@ def SV_comp_het_status(genes, variant_impact, compound_het_status):
 def get_CNV_genotypes(cnv_details):
     if pd.isna(cnv_details):
         return "0/0"
-    return cnv_details.split(":")[3]
-
-def annotate_genes(loci: pr.PyRanges, genes: pr.PyRanges) -> pd.DataFrame:
-    # TODO: pull this from annotation/annotate.py
-    """
-    Annotate loci against Ensembl genes
-    """
-    loci_ensembl = loci.join(
-        genes, suffix="_ensembl", how="left", apply_strand_suffix=False
-    ).drop(["Start_ensembl", "End_ensembl", "Strand"])
-    loci_ensembl_df = loci_ensembl.df
-    loci_ensembl_df["gene_name"] = np.where(
-        loci_ensembl_df["gene_name"].isnull(), "-1", loci_ensembl_df["gene_name"]
-    )
-
-    return loci_ensembl_df
+    else:
+        return cnv_details.split(":")[3]
