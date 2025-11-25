@@ -6,7 +6,7 @@ import pyranges as pr
 import numpy as np
 import re
 
-import compound_hets
+from compound_hets import compound_hets
 from annotation import annotate
 
 
