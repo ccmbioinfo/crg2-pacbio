@@ -203,7 +203,7 @@ def main():
     CNV = pd.read_csv(args.cnv, low_memory=False)
     CNV["Variant_id"] = CNV["CHROM"].astype(str) + "-" + CNV["START"].astype(str) + "-" + CNV["END"].astype(str) + "-" + CNV["SVTYPE"].astype(str)
     # filter for rare variants that are heterozygous in the proband
-    CNV_rare = CNV[(CNV["pacBioPctFreq_50pctRecOvlp"] < 2) & (CNV[f"gene_symbol"] != ".")]
+    CNV_rare = CNV[(CNV["pacBioPctFreq_50pctRecOvlp"] < 2) & (CNV[f"gene_symbol"] != ".")].copy()
     for sample in sample_ids:
         CNV_rare[f"{sample}_genotype"] = CNV_rare[f"{sample}_SV_DETAILS"].apply(compound_hets.get_CNV_genotypes)
     CNV_rare = CNV_rare[CNV_rare[f"{proband_id}_genotype"] == "0/1"]
