@@ -85,8 +85,8 @@ def main():
         lambda x: x.replace("chr", "")
     )
 
-    # restrict variants to those that are het in the proband
-    high_impact = high_impact[high_impact[f"gt_types.{proband_id}"] == 1]
+    # restrict variants to those that are het in the proband and neither parent is homozygous alternate
+    high_impact = high_impact[(high_impact[f"gt_types.{proband_id}"] == 1) & (high_impact[f"gt_types.{fam_dict['mother']}"] != 3) & (high_impact[f"gt_types.{fam_dict['father']}"] != 3)]
     logger.info(
         "Retained %d heterozygous high-impact variants for proband %s",
         len(high_impact),
@@ -190,7 +190,9 @@ def main():
     )  # for compatibility with SNV CH functions
     # filter for variants that are het in the proband
     SV_rare_high_impact = SV_rare_high_impact[
-        SV_rare_high_impact[f"{proband_id}_zyg"] == "het"
+        (SV_rare_high_impact[f"{proband_id}_zyg"] == "het")
+        & (SV_rare_high_impact[f"{fam_dict['mother']}_zyg"] != "hom")
+        & (SV_rare_high_impact[f"{fam_dict['father']}_zyg"] != "hom")
     ]
     logger.info(
         "Retained %d heterozygous SVs for proband %s",
@@ -268,7 +270,7 @@ def main():
         CNV_rare[f"{sample}_genotype"] = CNV_rare[f"{sample}_SV_DETAILS"].apply(
             compound_hets.get_CNV_genotypes
         )
-    CNV_rare = CNV_rare[CNV_rare[f"{proband_id}_genotype"] == "0/1"]
+    CNV_rare = CNV_rare[(CNV_rare[f"{proband_id}_genotype"] == "0/1") & (CNV_rare[f"{fam_dict['mother']}_genotype"] != "1/1") & (CNV_rare[f"{fam_dict['father']}_genotype"] != "1/1")]
 
     # TCAG does not annotate CNVs against Ensembl genes, so we need to do it manually
     ensembl = pd.read_csv(args.ensembl, low_memory=False)
