@@ -5,6 +5,7 @@ import pyranges as pr
 import numpy as np
 import re
 
+
 def filter_low_impact_variants(low: pd.DataFrame) -> pd.DataFrame:
     """Select low impact variants that may be damaging
 
@@ -129,12 +130,21 @@ def count_gene_variants_by_parental_haplotype(
         maternal_haplotype_count = 0
         paternal_haplotype_count = 0
         unknown_haplotype_count = 0
-        for variant in variant_gt_details[variant_gt_details["Ensembl_gene_id"] == gene][
-            "Variant_id"
-        ]:
-            proband_zygosity = variant_gt_details[(variant_gt_details["Variant_id"] == variant) & (variant_gt_details["Sample"] == fam_dict["child"])]["Zygosity"].values[0]
-            mother_zygosity = variant_gt_details[(variant_gt_details["Variant_id"] == variant) & (variant_gt_details["Sample"] == fam_dict["mother"])]["Zygosity"].values[0]
-            father_zygosity = variant_gt_details[(variant_gt_details["Variant_id"] == variant) & (variant_gt_details["Sample"] == fam_dict["father"])]["Zygosity"].values[0]
+        for variant in variant_gt_details[
+            variant_gt_details["Ensembl_gene_id"] == gene
+        ]["Variant_id"]:
+            proband_zygosity = variant_gt_details[
+                (variant_gt_details["Variant_id"] == variant)
+                & (variant_gt_details["Sample"] == fam_dict["child"])
+            ]["Zygosity"].values[0]
+            mother_zygosity = variant_gt_details[
+                (variant_gt_details["Variant_id"] == variant)
+                & (variant_gt_details["Sample"] == fam_dict["mother"])
+            ]["Zygosity"].values[0]
+            father_zygosity = variant_gt_details[
+                (variant_gt_details["Variant_id"] == variant)
+                & (variant_gt_details["Sample"] == fam_dict["father"])
+            ]["Zygosity"].values[0]
             if not (
                 proband_zygosity == "homozygous_ref"
                 or proband_zygosity == "missing"
@@ -153,28 +163,24 @@ def count_gene_variants_by_parental_haplotype(
                                 father_zygosity == "homozygous_ref"
                             ):  # clear maternal inheritance
                                 maternal_haplotype_count += 1
-                            elif (
-                                father_zygosity == "missing"
-                            ):  
+                            elif father_zygosity == "missing":
                                 unknown_haplotype_count += 1
                         elif father_zygosity == "heterozygous":
                             if (
                                 mother_zygosity == "homozygous_ref"
                             ):  # clear paternal inheritance
                                 paternal_haplotype_count += 1
-                            elif (
-                                mother_zygosity == "missing"
-                            ):  
+                            elif mother_zygosity == "missing":
                                 unknown_haplotype_count += 1
                         elif (
                             mother_zygosity == "homozygous_ref"
                             and father_zygosity == "homozygous_ref"
-                        ):  
+                        ):
                             unknown_haplotype_count += 1
                         elif (
                             mother_zygosity == "missing"
                             and father_zygosity == "missing"
-                        ):  
+                        ):
                             unknown_haplotype_count += 1
 
         gene_to_haplotype_counts[gene] = [
@@ -211,7 +217,7 @@ def is_compound_het(
 
 
 def determine_compound_het_status_no_parents(
-    variant_gt_details: pd.DataFrame
+    variant_gt_details: pd.DataFrame,
 ) -> pd.DataFrame:
     """Determine compound het status for a given gene using only long-read phasing information.
 
@@ -230,7 +236,9 @@ def determine_compound_het_status_no_parents(
         unknown_compound_hets = 0
         phase_sets = variants["PS"].unique()
         if num_variants > 1:
-            if phase_sets.tolist() == ["."] or phase_sets.tolist() == ["TR_overlap"]:  # variants are not phased
+            if phase_sets.tolist() == ["."] or phase_sets.tolist() == [
+                "TR_overlap"
+            ]:  # variants are not phased
                 unknown_compound_hets += 1
             elif len(phase_sets) == 1:  # all variants are in the same phase set
                 PS = phase_sets[0]
@@ -379,7 +387,8 @@ def melt_sample_columns_SV(
 
     return melted
 
-def SV_comp_het_status(genes, variant_impact, compound_het_status): 
+
+def SV_comp_het_status(genes, variant_impact, compound_het_status):
     """
     Determine compound het status for SV variants
 
@@ -392,20 +401,28 @@ def SV_comp_het_status(genes, variant_impact, compound_het_status):
     """
     gene_compound_het_statuses = []
     gene_compound_het_variant_types = []
-    if pd.isna(genes): 
+    if pd.isna(genes):
         return {"CH_variant_types": ".", "CH_status": "."}
     elif variant_impact == "intergenic_region":
         return {"CH_variant_types": ".", "CH_status": "."}
     else:
-        genes = re.split(';|-', genes)
-        for gene in genes: 
+        genes = re.split(";|-", genes)
+        for gene in genes:
             try:
-                gene_compound_het_statuses.append(compound_het_status.loc[gene, "CH_status"])
-                gene_compound_het_variant_types.append(compound_het_status.loc[gene, "CH_variant_types"])
+                gene_compound_het_statuses.append(
+                    compound_het_status.loc[gene, "CH_status"]
+                )
+                gene_compound_het_variant_types.append(
+                    compound_het_status.loc[gene, "CH_variant_types"]
+                )
             except KeyError:
                 gene_compound_het_statuses.append(".")
                 gene_compound_het_variant_types.append(".")
-        return  {"CH_variant_types": "|".join(gene_compound_het_variant_types), "CH_status": "|".join(gene_compound_het_statuses)} # return a dictionary with CH_status and CH_variant_types
+        return {
+            "CH_variant_types": "|".join(gene_compound_het_variant_types),
+            "CH_status": "|".join(gene_compound_het_statuses),
+        }  # return a dictionary with CH_status and CH_variant_types
+
 
 def get_CNV_genotypes(cnv_details):
     if pd.isna(cnv_details):
