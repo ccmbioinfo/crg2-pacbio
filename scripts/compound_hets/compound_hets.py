@@ -393,9 +393,9 @@ def SV_comp_het_status(genes, variant_impact, compound_het_status):
     gene_compound_het_statuses = []
     gene_compound_het_variant_types = []
     if pd.isna(genes): 
-        return {"CH_status": ".", "CH_variant_types": "."}
+        return {"CH_variant_types": ".", "CH_status": "."}
     elif variant_impact == "intergenic_region":
-        return {"CH_status": ".", "CH_variant_types": "."}
+        return {"CH_variant_types": ".", "CH_status": "."}
     else:
         genes = re.split(';|-', genes)
         for gene in genes: 
@@ -405,7 +405,7 @@ def SV_comp_het_status(genes, variant_impact, compound_het_status):
             except KeyError:
                 gene_compound_het_statuses.append(".")
                 gene_compound_het_variant_types.append(".")
-        return  {"CH_status": "|".join(gene_compound_het_statuses), "CH_variant_types": "|".join(gene_compound_het_variant_types)} # return a dictionary with CH_status and CH_variant_types
+        return  {"CH_variant_types": "|".join(gene_compound_het_variant_types), "CH_status": "|".join(gene_compound_het_statuses)} # return a dictionary with CH_status and CH_variant_types
 
 def get_CNV_genotypes(cnv_details):
     if pd.isna(cnv_details):

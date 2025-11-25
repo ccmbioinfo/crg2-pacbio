@@ -304,7 +304,9 @@ def main():
         lambda x: compound_hets.SV_comp_het_status(x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id")), 
         axis=1
     )
-    SV[["CH_status", "CH_variant_types"]] = pd.DataFrame(CH_status_series.tolist(), index=SV.index)
+
+    SV["CH_variant_types"] = [d["CH_variant_types"] if isinstance(d, dict) and "CH_variant_types" in d else "." for d in CH_status_series]
+    SV["CH_status"] = [d["CH_status"] if isinstance(d, dict) and "CH_status" in d else "." for d in CH_status_series]
     SV = SV.fillna(".")
     SV.to_csv(f"{family}_SV_report_CH.csv", index=False)
     logger.info("Wrote annotated SV report to %s_SV_report_CH.csv", family)
