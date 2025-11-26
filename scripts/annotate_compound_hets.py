@@ -98,11 +98,26 @@ def filter_heterozygous_variants(
     mother_col: str, father_col: str, proband_value, hom_alt_value
 ) -> pd.DataFrame:
     """Filter variants that are het in proband and neither parent is homozygous alternate."""
-    return df[
-        (df[proband_col] == proband_value)
-        & (df[mother_col] != hom_alt_value)
-        & (df[father_col] != hom_alt_value)
-    ]
+    if mother_col == "gt_types.0" and father_col == "gt_types.0": # no parents in pedigree
+        return df[df[proband_col] == proband_value]
+    elif mother_col == "gt_types.0":
+        # mother is missing
+        return df[
+            (df[proband_col] == proband_value)
+            & (df[father_col] != hom_alt_value)
+        ]
+    elif father_col == "gt_types.0":
+        # father is missing
+        return df[
+            (df[proband_col] == proband_value)
+            & (df[mother_col] != hom_alt_value)
+        ]
+    else:
+        return df[
+            (df[proband_col] == proband_value)
+            & (df[mother_col] != hom_alt_value)
+            & (df[father_col] != hom_alt_value)
+        ]
 
 
 def extract_sample_ids_from_columns(df: pd.DataFrame, prefix: str) -> list:
@@ -271,7 +286,7 @@ def process_structural_variants(
     
     # Create variant ID
     SV_rare_high_impact["Variant_id"] = (
-        SV_rare_high_impact["CHROM"]
+        SV_rare_high_impact["CHROM"].astype(str)
         + "-"
         + SV_rare_high_impact["POS"].astype(str)
         + "-"
@@ -286,11 +301,26 @@ def process_structural_variants(
     )
     
     # Filter heterozygous variants
-    SV_rare_high_impact = SV_rare_high_impact[
-        (SV_rare_high_impact[f"{proband_id}_zyg"] == "het")
-        & (SV_rare_high_impact[f"{fam_dict['mother']}_zyg"] != "hom")
-        & (SV_rare_high_impact[f"{fam_dict['father']}_zyg"] != "hom")
-    ]
+    if fam_dict.get("mother") == "0" and fam_dict.get("father") == "0": # no parents in pedigree
+        SV_rare_high_impact = SV_rare_high_impact[SV_rare_high_impact[f"{proband_id}_zyg"] == "het"]
+    elif fam_dict.get("mother") == "0":
+        # mother is missing
+        SV_rare_high_impact = SV_rare_high_impact[
+            (SV_rare_high_impact[f"{proband_id}_zyg"] == "het")
+            & (SV_rare_high_impact[f"{fam_dict['father']}_zyg"] != "hom")
+        ]
+    elif fam_dict.get("father") == "0":
+        # father is missing
+        SV_rare_high_impact = SV_rare_high_impact[
+            (SV_rare_high_impact[f"{proband_id}_zyg"] == "het")
+            & (SV_rare_high_impact[f"{fam_dict['mother']}_zyg"] != "hom")
+        ]
+    else:
+        SV_rare_high_impact = SV_rare_high_impact[
+            (SV_rare_high_impact[f"{proband_id}_zyg"] == "het")
+            & (SV_rare_high_impact[f"{fam_dict['mother']}_zyg"] != "hom")
+            & (SV_rare_high_impact[f"{fam_dict['father']}_zyg"] != "hom")
+        ]
     logger.info(
         "Retained %d heterozygous SVs for proband %s",
         len(SV_rare_high_impact),
@@ -383,11 +413,26 @@ def process_cnvs(
         )
     
     # Filter heterozygous variants
-    CNV_rare = CNV_rare[
-        (CNV_rare[f"{proband_id}_genotype"] == "0/1")
-        & (CNV_rare[f"{fam_dict['mother']}_genotype"] != "1/1")
-        & (CNV_rare[f"{fam_dict['father']}_genotype"] != "1/1")
-    ]
+    if fam_dict.get("mother") == "0" and fam_dict.get("father") == "0": # no parents in pedigree
+        CNV_rare = CNV_rare[CNV_rare[f"{proband_id}_genotype"] == "0/1"]
+    elif fam_dict.get("mother") == "0":
+        # mother is missing
+        CNV_rare = CNV_rare[
+            (CNV_rare[f"{proband_id}_genotype"] == "0/1")
+            & (CNV_rare[f"{fam_dict['father']}_genotype"] != "1/1")
+        ]
+    elif fam_dict.get("father") == "0":
+        # father is missing
+        CNV_rare = CNV_rare[
+            (CNV_rare[f"{proband_id}_genotype"] == "0/1")
+            & (CNV_rare[f"{fam_dict['mother']}_genotype"] != "1/1")
+        ]
+    else:
+        CNV_rare = CNV_rare[
+            (CNV_rare[f"{proband_id}_genotype"] == "0/1")
+            & (CNV_rare[f"{fam_dict['mother']}_genotype"] != "1/1")
+            & (CNV_rare[f"{fam_dict['father']}_genotype"] != "1/1")
+        ]
 
     # Annotate with Ensembl genes
     ensembl = pd.read_csv(ensembl_path, low_memory=False)
@@ -449,6 +494,13 @@ def determine_compound_het_status(
     compound_het_status_no_parents = (
         compound_hets.determine_compound_het_status_no_parents(all_variants_proband)
     )
+    
+    # Check if parents exist in pedigree before attempting parental phasing
+    if fam_dict.get("mother") == "0" or fam_dict.get("father") == "0":
+        logger.info(
+            "Skipping parental phasing: proband is missing one or both parents"
+        )
+        return compound_het_status_no_parents
     
     # Attempt parental phasing for unknown genes
     unknown_gene = compound_het_status_no_parents[

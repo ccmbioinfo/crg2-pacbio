@@ -74,18 +74,23 @@ def infer_pedigree_roles(pedigree: str) -> dict:
             "phenotype",
         ],
     )
-    # just take ID of first child if there are multiple children
-    child = child = pedigree[
-        (pedigree["paternal_ID"] != "0") & (pedigree["maternal_ID"] != "0")
-    ]["individual_ID"].values[0]
-    father = pedigree[
-        pedigree["individual_ID"]
-        == pedigree[pedigree["individual_ID"] == child]["paternal_ID"].values[0]
-    ]["individual_ID"].values[0]
-    mother = pedigree[
-        pedigree["individual_ID"]
-        == pedigree[pedigree["individual_ID"] == child]["maternal_ID"].values[0]
-    ]["individual_ID"].values[0]
+    pedigree = pedigree.astype(str)
+    # just take ID of first affected child if there are multiple affected children
+    try:
+        child = pedigree[
+            (pedigree["paternal_ID"] != "0") & (pedigree["maternal_ID"] != "0") & (pedigree["phenotype"] == "2")
+        ]["individual_ID"].values[0]
+    except IndexError:
+        # one or both parents are missing, pull first affected individual
+        try:
+            child =  pedigree[
+                (pedigree["phenotype"] == "2")
+            ]["individual_ID"].values[0]  
+        except IndexError:
+            logging.error("No affected individuals found in pedigree")
+            raise IndexError("No affected individuals found in pedigree")
+    father = pedigree[pedigree["individual_ID"] == child]["paternal_ID"].values[0]
+    mother = pedigree[pedigree["individual_ID"] == child]["maternal_ID"].values[0]
     fam_dict = {"child": child, "father": father, "mother": mother}
 
     return fam_dict
