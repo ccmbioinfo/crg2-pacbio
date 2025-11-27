@@ -181,6 +181,7 @@ def process_sequence_variants(
     # Combine and deduplicate
     high_impact = pd.concat([low_impact_var_filter_scores, high_med])
     high_impact = high_impact.drop_duplicates(subset=["Variant_id"])
+    high_impact = high_impact[high_impact["TG_LRWGS_ac"] < 20]
     
     # Create variant ID
     high_impact["Variant_id"] = high_impact.apply(
@@ -277,7 +278,7 @@ def process_structural_variants(
     
     # Filter rare genic variants
     SV_rare_high_impact = SV[
-        (SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01)
+        (SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01) & (SV["TG_nhomalt_max"] <= 5)
     ].copy()
     logger.info(
         "Identified %d rare genic SVs (gnomAD AF <= 0.01)",
@@ -721,13 +722,13 @@ def main():
             "Variant_id",
             "Variation",
             "Clinvar",
-            "Gnomad_af_popmax",
+            "Gnomad_af_grpmax",
             "Cadd_score",
             "SpliceAI_score",
             "Nucleotide_change_ensembl",
         ]
     ]
-    high_impact_subset["Gnomad_af_popmax"] = high_impact_subset["Gnomad_af_popmax"].replace(-1, 0)
+    high_impact_subset["Gnomad_af_grpmax"] = high_impact_subset["Gnomad_af_grpmax"].replace(-1, 0)
     wide_variants = wide_variants.merge(high_impact_subset, on="Variant_id", how="left")
     
     # Add gene name
@@ -752,7 +753,7 @@ def main():
         + [
             "Variation",
             "Clinvar",
-            "Gnomad_af_popmax",
+            "Gnomad_af_grpmax",
             "Cadd_score",
             "SpliceAI_score",
             "Nucleotide_change_ensembl",
