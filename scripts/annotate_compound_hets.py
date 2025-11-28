@@ -68,17 +68,12 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--pedigree", type=str, required=True, help="Path to pedigree file"
     )
+    parser.add_argument("--family", type=str, required=True, help="Family ID")
     return parser.parse_args()
 
 
-def extract_family_id(pedigree_path: str) -> str:
-    """Extract family ID from pedigree file path."""
-    return pedigree_path.split("/")[-1].split(".")[0].split("_")[0]
-
-
-def setup_pedigree(pedigree_path: str, logger: logging.Logger) -> Tuple[str, str, Dict[str, str]]:
+def setup_pedigree(pedigree_path: str, family: str, logger: logging.Logger) -> Tuple[str, str, Dict[str, str]]:
     """Load pedigree and extract family information."""
-    family = extract_family_id(pedigree_path)
     fam_dict = compound_hets.infer_pedigree_roles(pedigree_path)
     proband_id = fam_dict["child"]
     logger.info(
@@ -649,7 +644,7 @@ def main():
     logger = setup_logging()
     
     logger.info("Starting compound het annotation")
-    family, proband_id, fam_dict = setup_pedigree(args.pedigree, logger)
+    family, proband_id, fam_dict = setup_pedigree(args.pedigree, args.family, logger)
     
     # Process sequence variants
     high_impact, sequence_variant_gt_details = process_sequence_variants(
