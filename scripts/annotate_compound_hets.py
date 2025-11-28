@@ -1,5 +1,6 @@
 import argparse
 from functools import reduce
+import glob
 import logging
 import pandas as pd
 import pyranges as pr
@@ -55,10 +56,10 @@ def parse_arguments() -> argparse.Namespace:
         "--low", type=str, required=True, help="Path to LOW sequence variants TSV"
     )
     parser.add_argument(
-        "--sequence_variant_report",
+        "--sequence_variant_report_dir",
         type=str,
         required=True,
-        help="Path to sequence variant report CSV",
+        help="Path to directory containing sequence variant report CSV",
     )
     parser.add_argument("--sv", type=str, required=True, help="Path to SV report CSV")
     parser.add_argument("--cnv", type=str, required=True, help="Path to CNV report CSV")
@@ -546,7 +547,7 @@ def determine_compound_het_status(
 
 def annotate_reports(
     all_variants: pd.DataFrame,
-    sequence_variant_report_path: str,
+    sequence_variant_report_dir: str,
     sv_path: str,
     cnv_path: str,
     family: str,
@@ -571,6 +572,7 @@ def annotate_reports(
     )
 
     # Annotate sequence variant report
+    sequence_variant_report_path = glob.glob(f"{sequence_variant_report_dir}/*.wgs.coding.*.csv")[0]
     sequence_variant_report = pd.read_csv(sequence_variant_report_path)
     sequence_variant_report = sequence_variant_report.merge(
         gene_CH_status, on="Ensembl_gene_id", how="left"
@@ -774,7 +776,7 @@ def main():
     # Annotate reports
     annotate_reports(
         all_variants,
-        args.sequence_variant_report,
+        args.sequence_variant_report_dir,
         args.sv,
         args.cnv,
         family,

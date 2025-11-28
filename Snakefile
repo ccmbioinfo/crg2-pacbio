@@ -7,6 +7,8 @@ include: "rules/svreport.smk"
 include: "rules/outlier_expansions.smk"
 include: "rules/pathogenic_expansion_loci.smk"
 include: "rules/denovo_TR.smk"
+include: "rules/compound_hets.smk"
+include: "rules/cnv.smk"
 
 def get_children_ids(ped_file):
     import pandas as pd
