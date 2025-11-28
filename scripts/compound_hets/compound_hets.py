@@ -13,7 +13,7 @@ def filter_low_impact_variants(low: pd.DataFrame) -> pd.DataFrame:
         low (pd.DataFrame): DataFrame with low impact variants queried from gemini database
 
     Returns:
-        pd.DataFrame: DataFrame with genic low impact variants that may be damaging (SNVs with SpliceAI >=0.2, CADD >= 14, or indel with no SpliceAI or CADD score)
+        pd.DataFrame: DataFrame with genic low impact variants that may be damaging (SNVs with SpliceAI >=0.2, CADD >= 10, or indel with no SpliceAI or CADD score)
     """
     # filter out intergenic variants
     low_impact_var_filter = low[
@@ -45,10 +45,10 @@ def filter_low_impact_variants(low: pd.DataFrame) -> pd.DataFrame:
     low_impact_var_filter["variant_type"] = low_impact_var_filter[
         "sum_ref_alt_length"
     ].apply(lambda x: "SNV" if x == 2 else "indel")
-    # retain SNVs with SpliceAI >=0.2, CADD >= 14, or indel with no SpliceAI or CADD score:
+    # retain SNVs with SpliceAI >=0.2, CADD >= 10, or indel with no SpliceAI or CADD score:
     low_impact_var_filter_scores = low_impact_var_filter[
         (low_impact_var_filter["SpliceAI_score_parsed"] >= 0.2)
-        | (low_impact_var_filter["Cadd_score"] >= 14)
+        | (low_impact_var_filter["Cadd_score"] >= 10)
         | (
             (low_impact_var_filter["variant_type"] == "indel")
             & (low_impact_var_filter["SpliceAI_score_parsed"].isna())
