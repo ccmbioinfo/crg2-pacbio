@@ -789,4 +789,5 @@ def main():
     logger.info("Compound het annotation complete")
 
 
-main()
+if __name__ == "__main__":
+    main()
