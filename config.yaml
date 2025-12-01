@@ -35,6 +35,7 @@ ref:
 annotation:
   c4r: False # if samples belong to C4R, leave C4R sample IDs in
   omim_path: "~/crg2-pacbio/scripts/cre/data/"
+  ensembl_to_NCBI_df: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/ensembl_to_NCBI_ID.csv"
   pacbio.vcfanno:
     conf: "~/crg2-pacbio/vcfanno/pacbio.vcfanno.conf"
     lua_script: "~/crg2-pacbio/vcfanno/crg.vcfanno.lua"
@@ -72,7 +73,7 @@ params:
 
 trgt:
   samples: "samples.tsv"
-  ensembl: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/Homo_sapiens.GRCh38.109.chr.processed.csv"
+  ensembl: " /hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/Homo_sapiens.GRCh38.109.chr.processed.csv"
   gnomad_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/gnomad.v4.0.constraint_metrics.tsv"
   segdup: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/data/reference/annotation/GRCh38.segdups.bed.gz"
   control_alleles: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/code/scripts/trgt/crg2-pacbio/scripts/VCFs/cmh_0.4.0.sorted.no.missing.95perc.vcf.gz"
