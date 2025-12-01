@@ -434,3 +434,75 @@ def get_CNV_genotypes(cnv_details):
         return "0/0"
     else:
         return cnv_details.split(":")[3]
+
+
+def map_gene_symbol_to_ensembl(gene_symbol, ensembl_df):
+    """
+    Map a gene symbol to an Ensembl gene ID using the provided Ensembl DataFrame.
+
+    Args:
+        gene_symbol (str): The gene symbol to map.
+        ensembl_df (pd.DataFrame): The Ensembl DataFrame containing gene information.
+
+    Returns:
+        str: The Ensembl gene ID if found, otherwise the original gene symbol.
+    """
+    return ensembl_df[ensembl_df["gene_name"] == gene_symbol]["gene_id"].values[0]
+
+
+def map_NCBI_ID_to_ensembl(NCBI_ID, ensembl_to_NCBI_df):
+    """
+    Map an NCBI gene ID to an Ensembl gene ID using the provided Ensembl to NCBI ID dataframe.
+
+    Args:
+        NCBI_ID (str): The NCBI gene ID to map.
+        ensembl_to_NCBI_df (pd.DataFrame): The Ensembl to NCBI ID dataframe.
+
+    Returns:
+        str: The Ensembl gene ID if found, otherwise the gene symbol.
+    """
+    try:
+        return ensembl_to_NCBI_df[ensembl_to_NCBI_df["entrezgene_id"] == int(NCBI_ID)]["ensembl_gene_id"].values[0]
+    except:
+        return NCBI_ID
+
+
+def replace_NCBI_IDs_with_Ensembl_IDs(variant_df, ensembl_df, ensembl_to_NCBI_df):
+    """
+    Replace NCBI gene IDs with Ensembl gene IDs in a variant dataframe.
+    Sometimes there are NCBI IDs in the Ensembl_gene_id column. 
+    This function replaces the NCBI IDs with the Ensembl IDs to facilitate cross-variant compound het status determination.
+
+    Args:
+        variant_df (pd.DataFrame): The variant dataframe to replace NCBI IDs with Ensembl IDs.
+        ensembl_df (pd.DataFrame): The Ensembl DataFrame containing gene information.
+        ensembl_to_NCBI_df (pd.DataFrame): The Ensembl to NCBI ID dataframe.
+
+    Returns:
+        pd.DataFrame: The variant dataframe with NCBI IDs replaced with Ensembl IDs.
+    """
+    # get genes with NCBI ID instead of Ensembl ID
+    no_ensembl_id = variant_df[~variant_df["Ensembl_gene_id"].str.contains("ENSG")]["Gene"].unique()
+    ID_dict = {}
+    not_mapped = []
+    for gene in no_ensembl_id:
+        try: 
+            ensembl_id = map_gene_symbol_to_ensembl(gene, ensembl_df)
+            ID_dict[gene] = ensembl_id
+        except:
+            not_mapped.append(gene)
+    # map NCBI IDs to Ensembl IDs
+    for gene in not_mapped:
+        NCBI_ID = [id for id in variant_df[variant_df["Gene"] == gene]["Ensembl_gene_id"].values if "ENSG" not in id][0]
+        try:
+            ensembl_id = map_NCBI_ID_to_ensembl(NCBI_ID, ensembl_to_NCBI_df)
+            ID_dict[gene] = ensembl_id
+        except:
+            not_mapped.append(gene)
+        
+    # map gene symbols to Ensembl IDs
+    mask = ~variant_df["Ensembl_gene_id"].str.contains("ENSG")
+    for idx, row in variant_df[mask].iterrows():
+        gene = row["Gene"]
+        if gene in ID_dict and pd.notnull(ID_dict[gene]):
+            variant_df.at[idx, "Ensembl_gene_id"] = ID_dict[gene]

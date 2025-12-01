@@ -67,6 +67,9 @@ def parse_arguments() -> argparse.Namespace:
         "--ensembl", type=str, required=True, help="Path to Ensembl gene CSV"
     )
     parser.add_argument(
+        "--ensembl_to_NCBI_df", type=str, required=True, help="Path to Ensembl to NCBI ID CSV"
+    )
+    parser.add_argument(
         "--pedigree", type=str, required=True, help="Path to pedigree file"
     )
     parser.add_argument("--family", type=str, required=True, help="Family ID")
@@ -156,6 +159,8 @@ def process_sequence_variants(
     low_path: str,
     proband_id: str,
     fam_dict: Dict[str, str],
+    ensembl: pd.DataFrame,
+    ensembl_to_NCBI_df: pd.DataFrame,
     logger: logging.Logger,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Process sequence variants and return high_impact and variant_gt_details dataframes."""
@@ -176,7 +181,12 @@ def process_sequence_variants(
     
     # Combine and deduplicate
     high_impact = pd.concat([low_impact_var_filter_scores, high_med])
-    high_impact = high_impact.drop_duplicates(subset=["Variant_id"])
+    high_impact = high_impact.drop_duplicates(subset=["Variant_id"]).copy()
+
+    # Replace NCBI IDs with Ensembl IDs where neccessary (sequence variant Ensembl_gene_id column may contain NCBI IDs)
+    compound_hets.replace_NCBI_IDs_with_Ensembl_IDs(high_impact, ensembl, ensembl_to_NCBI_df)
+
+    # Filter by TG inhouse allele count
     high_impact = high_impact[high_impact["TG_LRWGS_ac"] < 20]
     
     # Create variant ID
@@ -649,11 +659,13 @@ def main():
     family, proband_id, fam_dict = setup_pedigree(args.pedigree, args.family, logger)
     
     # Process sequence variants
+    ensembl = pd.read_csv(args.ensembl, low_memory=False)
+    ensembl_to_NCBI_df = pd.read_csv(args.ensembl_to_NCBI_df, low_memory=False)
     high_impact, sequence_variant_gt_details = process_sequence_variants(
-        args.high_med, args.low, proband_id, fam_dict, logger
+        args.high_med, args.low, proband_id, fam_dict, ensembl, ensembl_to_NCBI_df, logger
     )
     
-    # Extract sample IDs from sequence variants (needed for CNV processing)
+    # Extract sample IDs from sequence variants
     sample_ids = extract_sample_ids_from_columns(high_impact, "gts.")
     
     # Process structural variants
@@ -698,7 +710,6 @@ def main():
     ).sort_values(by=["Ensembl_gene_id", "Sample"])
     
     # Create wide variant table
-    ensembl = pd.read_csv(args.ensembl, low_memory=False)
     ensembl["Chromosome"] = "chr" + ensembl["Chromosome"].astype(str)
     ensembl_pr = pr.PyRanges(ensembl)
     
