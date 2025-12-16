@@ -684,6 +684,84 @@ def add_clingen(clingen_df, gene, colname):
         clingen = "."
     return clingen
 
+def add_clingen_regions(annotsv_df, clingen_regions_df):
+    """
+    Annotate SVs against ClinGen regions
+    """
+    # parse Genomic Location to extract CHROM, START, END
+    clingen_regions_df["CHROM"] = clingen_regions_df["Genomic Location"].str.split(":").str[0].apply(lambda x: x.replace("chr", ""))
+    clingen_regions_df["START"] = clingen_regions_df["Genomic Location"].str.split(":").str[1].str.split("-").str[0]
+    clingen_regions_df["END"] = clingen_regions_df["Genomic Location"].str.split(":").str[1].str.split("-").str[1]
+    clingen_regions_df = clingen_regions_df[clingen_regions_df["CHROM"] != "tbd"]
+    
+    # prepare clingen regions for BedTools 
+    clingen_regions_bed_df = clingen_regions_df[["CHROM", "START", "END", "ISCA Region Name"]].copy()
+    clingen_regions_bed_df.rename(columns={"ISCA Region Name": "clingen_region_curation"}, inplace=True)
+    
+    # convert annotsv_df to BedTool format
+    annotsv_bed = annotsv_df_to_bed(annotsv_df)
+    
+    # convert clingen regions to BedTool format
+    clingen_regions_bed = BedTool.from_dataframe(clingen_regions_bed_df)
+    
+    # perform intersection
+    intersect = annotsv_bed.intersect(
+        clingen_regions_bed,
+        wa=True,
+        wb=True,
+    ).to_dataframe()
+    
+    if len(intersect) > 0:
+        intersect.columns = [
+            "CHROM",
+            "POS",
+            "END",
+            "SVTYPE",
+            "SVLEN",
+            "ID",
+            "CHROM_region",
+            "POS_region",
+            "END_region",
+            "clingen_region_curation",
+        ]
+        
+        # make a column with region details, e.g 1:25266309-25324509
+        intersect["clingen_region"] = intersect[
+            ["CHROM_region", "POS_region", "END_region"]
+        ].apply(lambda x: f"{x[0]}:{int(x[1])}-{int(x[2])}", axis=1)
+
+        # calculate percent of sample SV overlapped by region
+        intersect["sample_SV_clingen_region_perc_overlap"] = intersect.apply(
+            lambda row: calculate_sample_SV_overlap(row["POS"], row["END"], row["POS_region"], row["END_region"]), axis=1
+        ).astype(str)
+        # group by SV to aggregate multiple overlapping regions
+        intersect_agg = intersect.groupby(["CHROM", "POS", "END", "SVTYPE", "ID"]).agg(
+            {
+                "clingen_region_curation": ";".join,
+                "clingen_region": ";".join,
+                "sample_SV_clingen_region_perc_overlap": ";".join,
+            }
+        ).reset_index()
+        
+        # convert columns to proper types for merging
+        for col in ["POS", "END"]:
+            intersect_agg[col] = intersect_agg[col].astype(int)
+        intersect_agg["CHROM"] = intersect_agg["CHROM"].astype(str)
+        
+        # merge with annotsv_df
+        annotsv_df = pd.merge(
+            annotsv_df,
+            intersect_agg,
+            how="left",
+            on=["CHROM", "POS", "END", "SVTYPE", "ID"],
+        ).fillna({"clingen_region_curation": ".", "clingen_region": ".", "sample_SV_clingen_region_perc_overlap": "."})
+    else:
+        # No overlaps found, add empty columns
+        annotsv_df["clingen_region_curation"] = "."
+        annotsv_df["clingen_region"] = "."
+        annotsv_df["sample_SV_clingen_region_perc_overlap"] = "."
+    return annotsv_df
+
 
 def add_BND_structure(svtype, info, alt):
     if svtype == "BND":
@@ -713,6 +791,7 @@ def main(
     clingen_HI,
     clingen_TS,
     clingen_disease,
+    clingen_regions
 ):
     print(c4r)
     # filter out SVs < 50bp
@@ -886,6 +965,8 @@ def main(
         add_clingen(clingen_disease, gene, "Classification")
         for gene in df_merge["GENE_NAME"].values
     ]
+    # add clingen region curations
+    df_merge = add_clingen_regions(df_merge, clingen_regions)
 
     # define columns to be included in report
     hpo_cols = ["HPO"] if isinstance(hpo, pd.DataFrame) else []
@@ -922,6 +1003,9 @@ def main(
             "clingen_classification",
             "clingen_HI",
             "clingen_TS",
+            "clingen_region_curation",
+            "clingen_region",
+            "sample_SV_clingen_region_perc_overlap",
         ]
         + hpo_cols
         + zyg_cols
@@ -1093,6 +1177,12 @@ if __name__ == "__main__":
         type=str,
         required=True,
     )
+    parser.add_argument(
+        "-clingen_regions",
+        help="clingen region curations",
+        type=str,
+        required=True,
+    )
 
     args = parser.parse_args()
 
@@ -1133,6 +1223,8 @@ if __name__ == "__main__":
         names=["CHROM", "POS", "END", "Gene", "Score"],
     )
     clingen_disease = pd.read_csv(args.clingen_disease, comment="#")
+    clingen_region_cols = ["ISCA ID", "ISCA Region Name", "cytoBand", "Genomic Location", "Haploinsufficiency Score", "Haploinsufficiency Description", "Haploinsufficiency PMID1", "Haploinsufficiency PMID2", "Haploinsufficiency PMID3", "Haploinsufficiency PMID4", "Haploinsufficiency PMID5", "Haploinsufficiency PMID6", "Triplosensitivity Score", "Triplosensitivity Description", "Triplosensitivity PMID1", "Triplosensitivity PMID2", "Triplosensitivity PMID3", "Triplosensitivity PMID4", "Triplosensitivity PMID5", "Triplosensitivity PMID6", "Date Last Evaluated", "Haploinsufficiency Disease ID", "Triplosensitivity Disease ID"]
+    clingen_regions = pd.read_csv(args.clingen_regions, comment="#", sep="\t", names=clingen_region_cols)
 
     main(
         df,
@@ -1154,4 +1246,5 @@ if __name__ == "__main__":
         clingen_HI,
         clingen_TS,
         clingen_disease,
+        clingen_regions,
     )

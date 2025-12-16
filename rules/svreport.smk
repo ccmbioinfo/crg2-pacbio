@@ -74,7 +74,8 @@ rule sv_report:
                         -dark_regions {params.anno_path}/Alliance_Dark_Genes_LR_Pnl_TargetsCaptured_hg38_ann.bed \
                         -clingen_HI {params.anno_path}/ClinGen_haploinsufficiency_gene_GRCh38.bed \
                         -clingen_TS {params.anno_path}/ClinGen_triplosensitivity_gene_GRCh38.bed \
-                        -clingen_disease {params.anno_path}/ClinGen_tableExport_202310.csv) > {log} 2>&1
+                        -clingen_disease {params.anno_path}/ClinGen_tableExport_202310.csv \
+                        -clingen_regions {params.anno_path}/ClinGen_region_curation_list_GRCh38.tsv) > {log} 2>&1
             else
                 (python3 {params.crg2_pacbio}/scripts/annotate_SVs.py \
                     -annotsv {input.annotsv} \
@@ -94,6 +95,7 @@ rule sv_report:
                     -dark_regions {params.anno_path}/Alliance_Dark_Genes_LR_Pnl_TargetsCaptured_hg38_ann.bed \
                     -clingen_HI {params.anno_path}/ClinGen_haploinsufficiency_gene_GRCh38.bed \
                     -clingen_TS {params.anno_path}/ClinGen_triplosensitivity_gene_GRCh38.bed \
-                    -clingen_disease {params.anno_path}/ClinGen_tableExport_202310.csv) > {log} 2>&1
+                    -clingen_disease {params.anno_path}/ClinGen_tableExport_202310.csv \
+                    -clingen_regions {params.anno_path}/ClinGen_region_curation_list_GRCh38.tsv) > {log} 2>&1
             fi
         """
