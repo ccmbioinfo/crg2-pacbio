@@ -147,7 +147,7 @@ def merge_full_split_annos(annotsv_df):
 
 def add_hpo(hpo, gene):
     try:
-        genes = gene.split(";")
+        genes = [g for g in re.split('[;&]', gene) if g]
     except AttributeError:
         return "NA"
     terms = []
@@ -172,7 +172,7 @@ def add_hpo(hpo, gene):
 
 
 def add_omim(omim_df, gene):
-    genes = gene.split(";")
+    genes = [g for g in re.split('[;&]', gene) if g]
     phenos = []
     inheritance = []
     for gene in genes:
@@ -665,7 +665,7 @@ def calculate_sample_SV_overlap(sample_pos, sample_end, database_pos, database_e
 
 
 def add_clingen(clingen_df, gene, colname):
-    genes = gene.split(";")
+    genes = [g for g in re.split('[;&]', gene) if g]
     clingen = []
     for gene in genes:
         # split by - for intergenic variants, which are annotated as <upstream_gene>-<downstream_gene>
