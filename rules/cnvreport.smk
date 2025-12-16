@@ -1,9 +1,56 @@
-rule snpeff:
-    input: get_pbsv_vcf
+rule bcftools_merge:
+    input: get_cnv_dir
     output:
-        vcf = "sv/{family}.pbsv.snpeff.vcf",
+        vcf = "cnv/{family}.cnv.vcf.gz"
     log:
-        "logs/sv/{family}.snpeff.log"
+        "logs/cnv/{family}.cnv.bcftools.merge.log"
+    conda:
+        "../envs/common.yaml"
+    shell:
+        """
+        (bcftools merge -m none `echo {input}/*hificnv*.vcf.gz` | bgzip > {output}
+        tabix {output}) > {log} 2>&1
+        """
+
+rule truvari_collapse:
+    input: "cnv/{family}.cnv.vcf.gz"
+    output:
+        merged_variants = "cnv/{family}.cnv.truvari.merge.vcf",
+        collapsed_variants = temp("cnv/{family}.cnv.truvari.collapse.vcf")
+    params:
+        ref = config["ref"]["genome"]
+    log:
+        "logs/cnv/{family}.cnv.truvari.merge.log"
+    conda:
+        "../envs/truvari.yaml"
+    shell:
+        """
+        (truvari collapse -i {input} \
+                -o {output.merged_variants} \
+                -c {output.collapsed_variants} \
+                -f {params.ref} \
+                --sizemin 50 --sizemax 50000000 --refdist 2000 --pctsize 0.5 --pctovl 0.5 --pctseq 0 -k common)  > {log} 2>&1
+        """
+
+rule fix_hifi_cnv_CI:
+    input: "cnv/{family}.cnv.truvari.merge.vcf"
+    output: temp("cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf")
+    log: "logs/cnv/{family}.fix.CIPOS.log"
+    params:
+        crg2_pacbio = config["tools"]["crg2_pacbio"],
+    conda:
+        "../envs/str_sv.yaml"
+    shell:
+        """
+        (python3 {params.crg2_pacbio}/scripts/fix_hifi_cnv_CI.py -input_vcf {input} -output_vcf {output}) > {log} 2>&1
+        """
+
+rule cnv_snpeff:
+    input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
+    output:
+        vcf = "cnv/{family}.cnv.snpeff.vcf",
+    log:
+        "logs/cnv/{family}.snpeff.log"
     params:
         java_opts = config["params"]["snpeff"]["java_opts"],
         reference = config["ref"]["name"],
@@ -11,12 +58,12 @@ rule snpeff:
     wrapper:
         get_wrapper_path("snpeff")
 
-rule annotsv:
-    input: get_pbsv_vcf
+rule cnv_annotsv:
+    input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
     output:
-        annotsv_annotated =  "sv/{family}.AnnotSV.tsv",
-        annotsv_unannotated =  temp("sv/{family}.AnnotSV.unannotated.tsv")
-    log: "logs/sv/{family}.annotsv.log"
+        annotsv_annotated =  "cnv/{family}.AnnotSV.tsv",
+        annotsv_unannotated =  temp("cnv/{family}.AnnotSV.unannotated.tsv")
+    log: "logs/cnv/{family}.annotsv.log"
     params:
         annotsv_path = config["tools"]["annotSV"]
     conda:
@@ -32,13 +79,14 @@ rule annotsv:
             -genomeBuild GRCh38) > {log} 2>&1
         """
 
-rule sv_report:
+rule cnv_report:
     input: 
-        pbsv_vcf = get_pbsv_vcf,
-        snpeff = "sv/{family}.pbsv.snpeff.vcf",
-        annotsv = "sv/{family}.AnnotSV.tsv"
-    output: "sv/{family}.SV.csv"
-    log: "logs/sv/{family}.sv.report.log"
+        cnv_vcf = "cnv/{family}.cnv.truvari.merge.vcf.gz",
+        cnv_index = "cnv/{family}.cnv.truvari.merge.vcf.gz.tbi",
+        snpeff = "cnv/{family}.cnv.snpeff.vcf",
+        annotsv = "cnv/{family}.AnnotSV.tsv"
+    output: "cnv/{family}.CNV.csv"
+    log: "logs/cnv/{family}.cnv.report.log"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
@@ -60,8 +108,8 @@ rule sv_report:
                     (python3 {params.crg2_pacbio}/scripts/annotate_SVs.py \
                         -annotsv {input.annotsv} \
                         -snpeff {input.snpeff} \
-                        -variant_type SV \
-                        -vcf {input.pbsv_vcf} \
+                        -variant_type CNV \
+                        -vcf {input.cnv_vcf} \
                         -omim {params.omim} \
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
@@ -79,8 +127,8 @@ rule sv_report:
                 (python3 {params.crg2_pacbio}/scripts/annotate_SVs.py \
                     -annotsv {input.annotsv} \
                     -snpeff {input.snpeff} \
-                    -variant_type SV \
-                    -vcf {input.pbsv_vcf} \
+                    -variant_type CNV \
+                    -vcf {input.cnv_vcf} \
                     -omim {params.omim} \
                     -hpo {params.HPO} \
                     -exon {params.exon} \
