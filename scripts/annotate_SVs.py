@@ -287,10 +287,7 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols, variant_type):
     pop_svs_DEL_DUP_INV_bed = BedTool.from_dataframe(pop_svs_DEL_DUP_INV)
 
    # look for population DEL, DUP, and INV calls with 80% reciprocal overlap with sample DEL, DUP, and INV calls
-    intersect_DEL_DUP_INV = annotsv_DEL_DUP_INV_bed.intersect(
-        pop_svs_DEL_DUP_INV_bed, wa=True, wb=True, F=0.8, f=0.8
-    ).to_dataframe()
-    intersect_DEL_DUP_INV.columns = [
+    intersect_cols = [
         "CHROM",
         "POS",
         "END",
@@ -303,23 +300,14 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols, variant_type):
         "SVTYPE_pop",
         "SVLEN_pop"
     ] + cols
+    intersect_DEL_DUP_INV = annotsv_DEL_DUP_INV_bed.intersect(
+        pop_svs_DEL_DUP_INV_bed, wa=True, wb=True, F=0.8, f=0.8
+    ).to_dataframe(names=intersect_cols)
+
 
     if variant_type == "SV":
         # look for population INS/BND within 50 bp of sample INS/BND 
-        window_INS_BND = annotsv_INS_BND_bed.window(pop_svs_INS_BND_bed, w=50).to_dataframe()
-        window_INS_BND.columns = [
-            "CHROM",
-            "POS",
-            "END",
-            "SVTYPE",
-            "SVLEN",
-            "ID",
-            "CHROM_pop",
-            "POS_pop",
-            "END_pop",
-            "SVTYPE_pop",
-            "SVLEN_pop"
-        ] + cols
+        window_INS_BND = annotsv_INS_BND_bed.window(pop_svs_INS_BND_bed, w=50).to_dataframe(names=intersect_cols)
         # only keep matches where the size fraction is greater than 0.8, e.g.  an insertion of 1000bp will not be matched to a 100bp insertion at the same position
         window_INS_BND["SVLEN"] = window_INS_BND["SVLEN"].abs()
         window_INS_BND["size_fraction"] = window_INS_BND.apply(lambda x: (min([x["SVLEN"], x["SVLEN_pop"]]))/(max([x["SVLEN"], x["SVLEN_pop"]])), axis=1)
@@ -781,8 +769,9 @@ def main(
     prefix,
     exon_bed,
     gnomad,
-    inhouse,
-    tg,
+    inhouse_c4r,
+    inhouse_tg,
+    cnv_inhouse_tg,
     colorsdb,
     dark_regions,
     odd_regions,
@@ -910,11 +899,11 @@ def main(
         "seen_in_C4R_count",
     ]
 
-    df_merge = annotate_pop_svs(df_merge, inhouse, inhouse_cols, variant_type)
+    df_merge = annotate_pop_svs(df_merge, inhouse_c4r, inhouse_cols, variant_type)
     inhouse_cols = [col for col in inhouse_cols if col != "C4R_ID"]
 
-    # add TG inhouse db SV counts
-    print("Adding TG SV frequencies")
+    # add TG inhouse db SV/CNV counts
+    print("Adding TG CNV/SV frequencies")
     tg_cols = [
         "TG_ID",
         "TG_AC",
@@ -922,8 +911,11 @@ def main(
         "seen_in_TG",
         "seen_in_TG_count",
     ]
+    if variant_type == "SV":
+        df_merge  = annotate_pop_svs(df_merge, inhouse_tg, tg_cols, variant_type)
+    else:
+        df_merge  = annotate_pop_svs(df_merge, cnv_inhouse_tg, tg_cols, variant_type)
 
-    df_merge  = annotate_pop_svs(df_merge, tg, tg_cols, variant_type)
     tg_cols = [col for col in tg_cols if col != "TG_ID"]
 
     # add CoLoRSdb SVs
@@ -1118,14 +1110,20 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
-        "-inhouse",
+        "-inhouse_c4r",
         help="C4R inhouse database",
         type=str,
         required=True,
     )
     parser.add_argument(
-        "-tg",
+        "-inhouse_tg",
         help="TG inhouse database",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "-cnv_inhouse_tg",
+        help="TG inhouse database for CNV calls",
         type=str,
         required=True,
     )
@@ -1236,8 +1234,9 @@ if __name__ == "__main__":
         prefix,
         args.exon,
         args.gnomad,
-        args.inhouse,
-        args.tg,
+        args.inhouse_c4r,
+        args.inhouse_tg,
+        args.cnv_inhouse_tg,
         args.colorsdb,
         args.dark_regions,
         args.odd_regions,
