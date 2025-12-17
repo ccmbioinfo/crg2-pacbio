@@ -89,11 +89,10 @@ rule cnv_annotsv:
 
 rule cnv_report:
     input: 
-        cnv_vcf = "cnv/{family}.cnv.truvari.merge.vcf.gz",
         cnv_index = "cnv/{family}.cnv.truvari.merge.vcf.gz.tbi",
         snpeff = "cnv/{family}.cnv.snpeff.vcf",
         annotsv = "cnv/{family}.AnnotSV.tsv"
-    output: "cnv/{family}.CNV.csv"
+    output: "cnv/{family}.cnv.csv"
     log: "logs/cnv/{family}.cnv.report.log"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
@@ -118,7 +117,6 @@ rule cnv_report:
                         -annotsv {input.annotsv} \
                         -snpeff {input.snpeff} \
                         -variant_type CNV \
-                        -vcf {input.cnv_vcf} \
                         -omim {params.omim} \
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
@@ -139,7 +137,6 @@ rule cnv_report:
                     -annotsv {input.annotsv} \
                     -snpeff {input.snpeff} \
                     -variant_type CNV \
-                    -vcf {input.cnv_vcf} \
                     -omim {params.omim} \
                     -hpo {params.HPO} \
                     -exon {params.exon} \

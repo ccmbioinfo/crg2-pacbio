@@ -469,6 +469,27 @@ def group_by_odd_regions(annotsv_df: pd.DataFrame) -> pd.DataFrame:
     return annotsv_odd_regions_merged_dedup
 
 
+def group_by_dark_regions(annotsv_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    One hit may be associated with multiple dark regions features and therefore multiple rows
+    Aggregate by dark regions and join features to remove duplicate rows
+    """
+    annotsv_df["PB_dark_region_perc_overlap"] = annotsv_df["PB_dark_region_perc_overlap"].astype(str)
+    annotsv_dark_regions_dedup = annotsv_df.groupby(["CHROM", "POS", "END", "SVTYPE", "ID"]).agg(
+        {
+            "PB_dark_region_gene": ";".join,
+            "PB_dark_region": ";".join,
+            "PB_dark_region_perc_overlap": ";".join,
+        }
+    )
+    # merge with original loci table
+    annotsv_df = annotsv_df.drop(["PB_dark_region_gene", "PB_dark_region", "PB_dark_region_perc_overlap"], axis=1)
+    annotsv_dark_regions_merged = annotsv_df.merge(annotsv_dark_regions_dedup, on=["CHROM", "POS", "END", "SVTYPE", "ID"], how="left")
+    annotsv_dark_regions_merged_dedup = annotsv_dark_regions_merged.drop_duplicates(keep="first")
+
+    return annotsv_dark_regions_merged_dedup
+
+
 def annotate_repeats(annotsv_df, repeats, variant_type):
     #  sample SV must be fully encompassed by repeat
     annotsv_bed = annotsv_df_to_bed(annotsv_df)
@@ -765,7 +786,6 @@ def main(
     variant_type,
     omim,
     hpo,
-    vcf,
     prefix,
     exon_bed,
     gnomad,
@@ -934,6 +954,7 @@ def main(
 
     # add PacBio dark regions
     df_merge = annotate_pb_regions(df_merge, dark_regions, "PB_dark_region_gene")
+    df_merge = group_by_dark_regions(df_merge) # aggregate dark regions and join features to remove duplicate rows
 
     # add PacBio odd regions
     df_merge = annotate_pb_regions(df_merge, odd_regions, "PB_odd_region_type")
@@ -981,7 +1002,6 @@ def main(
             "END",
             "SVLEN",
             "SVTYPE",
-            "ID",
             "INFO",
             "FILTER",
             "GENE_NAME",
@@ -1044,32 +1064,8 @@ def main(
     df_merge = df_merge.drop_duplicates()
     today = date.today()
     today = today.strftime("%Y-%m-%d")
-    df_merge.to_csv(f"{prefix}.{variant_type}.csv", index=False)
-    df_merge.to_csv(f"{prefix}.{variant_type}.{today}.csv", index=False)
-
-    # make a dictionary of variants with SVLEN >=50 and BNDs from vcf
-    # validate that the only SVs missing from annotSV merged and SV >=50 bp are on non-canonical chr
-    vcf_variant_dict = {}
-    i = 0
-    for record in vcf.fetch():
-        i += 1
-        try:
-            length = abs(float(record.info["SVLEN"][0]))
-            if length >= 50:
-                vcf_variant_dict[record.id] = length
-        except KeyError:
-            if record.info["SVTYPE"] == "BND":
-                vcf_variant_dict[record.id] = 0
-        except TypeError:
-            length = abs(float(record.info["SVLEN"]))
-            if length >= 50:
-                vcf_variant_dict[record.id] = length
-            
-
-    vcf_ID = vcf_variant_dict.keys()
-    annotSV_ID = list(set(df_merge["ID"]))
-    print("SVs in pbsv that are not present in AnnotSV tsv:")
-    print(vcf_ID - annotSV_ID)
+    df_merge.to_csv(f"{prefix}.{variant_type.lower()}.csv", index=False)
+    df_merge.to_csv(f"{prefix}.{variant_type.lower()}.{today}.csv", index=False)
 
 
 if __name__ == "__main__":
@@ -1090,12 +1086,6 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="Path to directory containing OMIM mim2gene and morbidmap files",
-    )
-    parser.add_argument(
-        "-vcf",
-        help="pbsv vcf file",
-        type=str,
-        required=True,
     )
     parser.add_argument(
         "-exon",
@@ -1190,8 +1180,6 @@ if __name__ == "__main__":
     snpeff_df = vcf_to_df(args.snpeff)
     df = rename_SV_cols(df)
     prefix = args.annotsv.replace(".AnnotSV.tsv", "")
-    # parse original pbsv VCF just to ensure all SVs are included in final report
-    vcf = VariantFile(args.vcf)
 
     hpo = args.hpo
     if hpo:
@@ -1230,7 +1218,6 @@ if __name__ == "__main__":
         args.variant_type,
         args.omim,
         hpo,
-        vcf,
         prefix,
         args.exon,
         args.gnomad,

@@ -34,10 +34,9 @@ rule annotsv:
 
 rule sv_report:
     input: 
-        pbsv_vcf = get_pbsv_vcf,
         snpeff = "sv/{family}.pbsv.snpeff.vcf",
         annotsv = "sv/{family}.AnnotSV.tsv"
-    output: "sv/{family}.SV.csv"
+    output: "sv/{family}.sv.csv"
     log: "logs/sv/{family}.sv.report.log"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
@@ -62,7 +61,6 @@ rule sv_report:
                         -annotsv {input.annotsv} \
                         -snpeff {input.snpeff} \
                         -variant_type SV \
-                        -vcf {input.pbsv_vcf} \
                         -omim {params.omim} \
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
@@ -83,7 +81,6 @@ rule sv_report:
                     -annotsv {input.annotsv} \
                     -snpeff {input.snpeff} \
                     -variant_type SV \
-                    -vcf {input.pbsv_vcf} \
                     -omim {params.omim} \
                     -hpo {params.HPO} \
                     -exon {params.exon} \
