@@ -8,8 +8,16 @@ rule bcftools_merge:
         "../envs/common.yaml"
     shell:
         """
-        (bcftools merge -m none `echo {input}/*hificnv*.vcf.gz` | bgzip > {output}
-        tabix {output}) > {log} 2>&1
+        (
+        n_vcfs=$(ls {input}/*hificnv*.vcf.gz | wc -l)
+        if [ "$n_vcfs" -eq 1 ]; then
+            cp {input}/*hificnv*.vcf.gz {output}
+            tabix {output}
+        else
+            bcftools merge -m none {input}/*hificnv*.vcf.gz | bgzip > {output}
+            tabix {output}
+        fi
+        ) > {log} 2>&1
         """
 
 rule truvari_collapse:
