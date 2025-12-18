@@ -50,6 +50,7 @@ annotation:
   sv_report:
       exon: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/genes/MANE.GRCh38.v1.0.ensembl_genomic.bed"
       inhouse_c4r: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/C4R_SV_db/pbsv.allsamples.counts.2025-12-04.bed"
+      cnv_inhouse_c4r: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/C4R_CNV_db/hificnv.allsamples.counts.2025-12-18.bed"
       inhouse_tg: "/hpf/largeprojects/tgnode/sandbox/mcouse_analysis/results/LRWGS_SV_db/pbsv.allsamples.counts.2025-12-04.bed"
       cnv_inhouse_tg: "/hpf/largeprojects/tgnode/sandbox/mcouse_analysis/results/LRWGS_CNV_db/hificnv.allsamples.counts.2025-12-17.bed"
       anno_path: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/annotations/"

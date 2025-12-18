@@ -47,7 +47,6 @@ rule sv_report:
         repeats = config["trgt"]["adotto_repeats"],
         inhouse_c4r = config["annotation"]["sv_report"]["inhouse_c4r"],
         inhouse_tg = config["annotation"]["sv_report"]["inhouse_tg"],
-        cnv_inhouse_tg = config["annotation"]["sv_report"]["cnv_inhouse_tg"],
         gnomad_SV = config["annotation"]["sv_report"]["gnomad_SV"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
@@ -66,7 +65,6 @@ rule sv_report:
                         -gnomad {params.gnomad_SV} \
                         -inhouse_c4r {params.inhouse_c4r} \
                         -inhouse_tg {params.inhouse_tg} \
-                        -cnv_inhouse_tg {params.cnv_inhouse_tg} \
                         -colorsdb {params.colorsdb} \
                         -odd_regions {params.anno_path}/GRCh38.oddRegions.bed \
                         -repeats {params.anno_path}/human_GRCh38_no_alt_analysis_set.trgt.bed \
@@ -87,7 +85,6 @@ rule sv_report:
                     -gnomad {params.gnomad_SV} \
                     -inhouse_c4r {params.inhouse_c4r} \
                     -inhouse_tg {params.inhouse_tg} \
-                    -cnv_inhouse_tg {params.cnv_inhouse_tg} \
                     -colorsdb {params.colorsdb} \
                     -odd_regions {params.anno_path}/GRCh38.oddRegions.bed \
                     -repeats {params.anno_path}/human_GRCh38_no_alt_analysis_set.trgt.bed \

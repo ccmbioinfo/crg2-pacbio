@@ -378,6 +378,9 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols, variant_type):
         how="left",
         on=["CHROM", "POS", "END", "SVTYPE", "ID"],
     ).fillna(value={col: 0 for col in cols})
+    max_cols = [col for col in cols if "_max" in col]
+    for col in max_cols:
+        annotsv_pop_svs[col] = annotsv_pop_svs[col].astype(int)
     return annotsv_pop_svs
 
 
@@ -790,6 +793,7 @@ def main(
     exon_bed,
     gnomad,
     inhouse_c4r,
+    cnv_inhouse_c4r,
     inhouse_tg,
     cnv_inhouse_tg,
     colorsdb,
@@ -871,7 +875,7 @@ def main(
     # df_merge_notbenign = df_merge[apply_filter_benign(df_merge)]
 
     # add snpeff annos
-    snpeff_df = parse_snpeff(snpeff_df, "CNV")
+    snpeff_df = parse_snpeff(snpeff_df, variant_type)
     for col in ["POS", "END"]:
         snpeff_df[col] = snpeff_df[col].astype(int)
         df_merge[col] = df_merge[col].astype(int)
@@ -909,8 +913,8 @@ def main(
     ]
     df_merge = annotate_pop_svs(df_merge, gnomad, gnomad_cols, variant_type)
 
-    # add C4R inhouse db SV counts
-    print("Adding C4R SV frequencies")
+    # add C4R inhouse db SV/CNV counts
+    print("Adding C4R frequencies")
     inhouse_cols = [
         "C4R_ID",
         "C4R_AC",
@@ -918,12 +922,19 @@ def main(
         "seen_in_C4R",
         "seen_in_C4R_count",
     ]
+    if variant_type == "SV" and inhouse_c4r:
+        df_merge = annotate_pop_svs(df_merge, inhouse_c4r, inhouse_cols, variant_type)
+    elif variant_type == "CNV" and cnv_inhouse_c4r:
+        df_merge = annotate_pop_svs(df_merge, cnv_inhouse_c4r, inhouse_cols, variant_type)
+    else:
+        # Initialize columns with default values
+        for col in inhouse_cols:
+            df_merge[col] = 0
 
-    df_merge = annotate_pop_svs(df_merge, inhouse_c4r, inhouse_cols, variant_type)
     inhouse_cols = [col for col in inhouse_cols if col != "C4R_ID"]
 
     # add TG inhouse db SV/CNV counts
-    print("Adding TG CNV/SV frequencies")
+    print("Adding TG frequencies")
     tg_cols = [
         "TG_ID",
         "TG_AC",
@@ -931,10 +942,14 @@ def main(
         "seen_in_TG",
         "seen_in_TG_count",
     ]
-    if variant_type == "SV":
+    if variant_type == "SV" and inhouse_tg:
         df_merge  = annotate_pop_svs(df_merge, inhouse_tg, tg_cols, variant_type)
-    else:
+    elif variant_type == "CNV" and cnv_inhouse_tg:
         df_merge  = annotate_pop_svs(df_merge, cnv_inhouse_tg, tg_cols, variant_type)
+    else:
+        # Initialize columns with default values
+        for col in tg_cols:
+            df_merge[col] = 0
 
     tg_cols = [col for col in tg_cols if col != "TG_ID"]
 
@@ -1101,21 +1116,27 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-inhouse_c4r",
-        help="C4R inhouse database",
+        help="C4R inhouse database (SV only)",
         type=str,
-        required=True,
+        required=False,
+    )
+    parser.add_argument(
+        "-cnv_inhouse_c4r",
+        help="C4R inhouse database for CNV calls (CNV only)",
+        type=str,
+        required=False,
     )
     parser.add_argument(
         "-inhouse_tg",
-        help="TG inhouse database",
+        help="TG inhouse database (SV only)",
         type=str,
-        required=True,
+        required=False,
     )
     parser.add_argument(
         "-cnv_inhouse_tg",
-        help="TG inhouse database for CNV calls",
+        help="TG inhouse database for CNV calls (CNV only)",
         type=str,
-        required=True,
+        required=False,
     )
     parser.add_argument(
         "-colorsdb",
@@ -1174,6 +1195,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Validate that appropriate databases are provided based on variant_type
+    if args.variant_type == "SV":
+        if not args.inhouse_c4r:
+            parser.error("-inhouse_c4r is required for SV variant type")
+        if not args.inhouse_tg:
+            parser.error("-inhouse_tg is required for SV variant type")
+    elif args.variant_type == "CNV":
+        if not args.cnv_inhouse_c4r:
+            parser.error("-cnv_inhouse_c4r is required for CNV variant type")
+        if not args.cnv_inhouse_tg:
+            parser.error("-cnv_inhouse_tg is required for CNV variant type")
+
     # pull chrom, pos, end, SVtype, format fields and DDD annotations from AnnotSV text file
     df = pd.read_csv(args.annotsv, sep="\t", low_memory=False)
     # pull gene annotations from SnpEff VCF
@@ -1222,6 +1255,7 @@ if __name__ == "__main__":
         args.exon,
         args.gnomad,
         args.inhouse_c4r,
+        args.cnv_inhouse_c4r,
         args.inhouse_tg,
         args.cnv_inhouse_tg,
         args.colorsdb,

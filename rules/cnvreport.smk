@@ -101,10 +101,9 @@ rule cnv_report:
         exon = config["annotation"]["sv_report"]["exon"],
         anno_path = config["annotation"]["sv_report"]["anno_path"],
         repeats = config["trgt"]["adotto_repeats"],
-        inhouse_c4r = config["annotation"]["sv_report"]["inhouse_c4r"],
-        gnomad_SV = config["annotation"]["sv_report"]["gnomad_SV"],
-        inhouse_tg = config["annotation"]["sv_report"]["inhouse_tg"],
+        cnv_inhouse_c4r = config["annotation"]["sv_report"]["cnv_inhouse_c4r"],
         cnv_inhouse_tg = config["annotation"]["sv_report"]["cnv_inhouse_tg"],
+        gnomad_SV = config["annotation"]["sv_report"]["gnomad_SV"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
     conda:
@@ -120,8 +119,7 @@ rule cnv_report:
                         -omim {params.omim} \
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
-                        -inhouse_c4r {params.inhouse_c4r} \
-                        -inhouse_tg {params.inhouse_tg} \
+                        -cnv_inhouse_c4r {params.cnv_inhouse_c4r} \
                         -cnv_inhouse_tg {params.cnv_inhouse_tg} \
                         -colorsdb {params.colorsdb} \
                         -odd_regions {params.anno_path}/GRCh38.oddRegions.bed \
@@ -141,8 +139,7 @@ rule cnv_report:
                     -hpo {params.HPO} \
                     -exon {params.exon} \
                     -gnomad {params.gnomad_SV} \
-                    -inhouse_c4r {params.inhouse_c4r} \
-                    -inhouse_tg {params.inhouse_tg} \
+                    -cnv_inhouse_c4r {params.cnv_inhouse_c4r} \
                     -cnv_inhouse_tg {params.cnv_inhouse_tg} \
                     -colorsdb {params.colorsdb} \
                     -odd_regions {params.anno_path}/GRCh38.oddRegions.bed \
