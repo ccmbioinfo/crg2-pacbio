@@ -782,6 +782,38 @@ def add_BND_structure(svtype, info, alt):
     else:
         return info
 
+def annotate_gene_CDS(annotsv_df, ensembl):
+    """
+    Annotate loci against Ensembl gene CDS
+    """
+    ensembl = pd.read_csv(ensembl)
+    ensembl = ensembl[ensembl["Feature"] == "CDS"][["Chromosome", "Start", "End", "gene_name"]]
+    ensembl_bed = BedTool.from_dataframe(ensembl)
+    annotsv_bed = annotsv_df_to_bed(annotsv_df)
+    intersect_cols = ["CHROM",
+            "POS",
+            "END",
+            "SVTYPE",
+            "SVLEN",
+            "ID",
+            "CHROM_ens",
+            "POS_ens",
+            "END_ens",
+            "GENE_NAME",
+            "GENE_ID",
+            "GENE_BIOTYPE",
+            "FEATURE"]
+    intersect = annotsv_bed.intersect(ensembl_bed, wa=True, wb=True).to_dataframe(names=intersect_cols)
+    intersect = intersect.drop_duplicates(subset=["GENE_NAME"]).groupby(["CHROM", "POS", "END", "SVTYPE", "ID"]).agg({"GENE_NAME": ";".join}).reset_index()
+    intersect.rename(columns={"GENE_NAME": "ENSEMBL_CDS"}, inplace=True)
+    annotsv_df = pd.merge(
+        annotsv_df,
+        intersect,
+        how="left",
+        on=["CHROM", "POS", "END", "SVTYPE", "ID"],
+    ).fillna(value={"ENSEMBL_CDS": "."})
+    return annotsv_df
+
 
 def main(
     df,
@@ -793,6 +825,7 @@ def main(
     exon_bed,
     gnomad,
     dgv,
+    ensembl,
     inhouse_c4r,
     cnv_inhouse_c4r,
     inhouse_tg,
@@ -970,6 +1003,10 @@ def main(
     # add exon counts
     df_merge = get_exon_counts(df_merge, exon_bed)
 
+    # add Ensembl CDS annotation
+    print("Adding Ensembl CDS annotation")
+    df_merge = annotate_gene_CDS(df_merge, ensembl)
+
     # add UCSC genome browser URL
     df_merge["UCSC_link"] = [
         annotate_UCSC(chrom, pos, end)
@@ -1030,6 +1067,7 @@ def main(
             "FILTER",
             "GENE_NAME",
             "ENSEMBL_GENE",
+            "ENSEMBL_CDS",
             "VARIANT",
             "IMPACT",
             "UCSC_link",
@@ -1127,6 +1165,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "-dgv",
         help="DGV CNV calls in tsv format",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "-ensembl",
+        help="Ensembl GTF subset CSV file",
         type=str,
         required=True,
     )
@@ -1271,6 +1315,7 @@ if __name__ == "__main__":
         args.exon,
         args.gnomad,
         args.dgv,
+        args.ensembl,
         args.inhouse_c4r,
         args.cnv_inhouse_c4r,
         args.inhouse_tg,
