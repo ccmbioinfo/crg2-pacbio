@@ -378,7 +378,7 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols, variant_type):
         how="left",
         on=["CHROM", "POS", "END", "SVTYPE", "ID"],
     ).fillna(value={col: 0 for col in cols})
-    max_cols = [col for col in cols if "_max" in col]
+    max_cols = [col for col in cols if col.endswith("_max")]
     for col in max_cols:
         annotsv_pop_svs[col] = annotsv_pop_svs[col].astype(int)
     return annotsv_pop_svs
@@ -792,6 +792,7 @@ def main(
     prefix,
     exon_bed,
     gnomad,
+    dgv,
     inhouse_c4r,
     cnv_inhouse_c4r,
     inhouse_tg,
@@ -912,6 +913,14 @@ def main(
         "gnomad_HOM",
     ]
     df_merge = annotate_pop_svs(df_merge, gnomad, gnomad_cols, variant_type)
+
+    # add DGV SVs
+    print("Adding DGV SV frequencies")
+    dgv_cols = [
+        "DGV_AF",
+        "DGV_NUM_SAMPLES_TESTED",
+    ]
+    df_merge = annotate_pop_svs(df_merge, dgv, dgv_cols, variant_type)
 
     # add C4R inhouse db SV/CNV counts
     print("Adding C4R frequencies")
@@ -1043,6 +1052,7 @@ def main(
         + cn_cols
         + ["Tx", "Frameshift", "EXONS_SPANNED", "Nearest_SS_type", "Dist_nearest_SS"]
         + gnomad_cols
+        + dgv_cols
         + inhouse_cols
         + tg_cols
         + colorsdb_cols
@@ -1111,6 +1121,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "-gnomad",
         help="gnomad SVs in bed format",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "-dgv",
+        help="DGV CNV calls in tsv format",
         type=str,
         required=True,
     )
@@ -1254,6 +1270,7 @@ if __name__ == "__main__":
         prefix,
         args.exon,
         args.gnomad,
+        args.dgv,
         args.inhouse_c4r,
         args.cnv_inhouse_c4r,
         args.inhouse_tg,

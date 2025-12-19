@@ -48,6 +48,7 @@ rule sv_report:
         inhouse_c4r = config["annotation"]["sv_report"]["inhouse_c4r"],
         inhouse_tg = config["annotation"]["sv_report"]["inhouse_tg"],
         gnomad_SV = config["annotation"]["sv_report"]["gnomad_SV"],
+        dgv = config["annotation"]["sv_report"]["dgv"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
     conda:
@@ -63,6 +64,7 @@ rule sv_report:
                         -omim {params.omim} \
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
+                        -dgv {params.dgv} \
                         -inhouse_c4r {params.inhouse_c4r} \
                         -inhouse_tg {params.inhouse_tg} \
                         -colorsdb {params.colorsdb} \
@@ -83,6 +85,7 @@ rule sv_report:
                     -hpo {params.HPO} \
                     -exon {params.exon} \
                     -gnomad {params.gnomad_SV} \
+                    -dgv {params.dgv} \
                     -inhouse_c4r {params.inhouse_c4r} \
                     -inhouse_tg {params.inhouse_tg} \
                     -colorsdb {params.colorsdb} \
