@@ -308,14 +308,17 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols, variant_type):
     if variant_type == "SV":
         # look for population INS/BND within 50 bp of sample INS/BND 
         window_INS_BND = annotsv_INS_BND_bed.window(pop_svs_INS_BND_bed, w=50).to_dataframe(names=intersect_cols)
-        # only keep matches where the size fraction is greater than 0.8, e.g.  an insertion of 1000bp will not be matched to a 100bp insertion at the same position
-        window_INS_BND["SVLEN"] = window_INS_BND["SVLEN"].abs()
-        window_INS_BND["size_fraction"] = window_INS_BND.apply(lambda x: (min([x["SVLEN"], x["SVLEN_pop"]]))/(max([x["SVLEN"], x["SVLEN_pop"]])), axis=1)
-        window_INS_BND = window_INS_BND[window_INS_BND["size_fraction"] >= 0.8]
-        window_INS_BND = window_INS_BND.drop(columns=["size_fraction"])
+        if len(window_INS_BND) > 0:
+            # only keep matches where the size fraction is greater than 0.8, e.g.  an insertion of 1000bp will not be matched to a 100bp insertion at the same position
+            window_INS_BND["SVLEN"] = window_INS_BND["SVLEN"].abs()
+            window_INS_BND["size_fraction"] = window_INS_BND.apply(lambda x: (min([x["SVLEN"], x["SVLEN_pop"]]))/(max([x["SVLEN"], x["SVLEN_pop"]])), axis=1)
+            window_INS_BND = window_INS_BND[window_INS_BND["size_fraction"] >= 0.8]
+            window_INS_BND = window_INS_BND.drop(columns=["size_fraction"])
 
-        # now concatenate the window and SVLEN-based matches
-        intersect = pd.concat([window_INS_BND, intersect_DEL_DUP_INV])
+            # now concatenate the window and SVLEN-based matches
+            intersect = pd.concat([window_INS_BND, intersect_DEL_DUP_INV])
+        else: # may be no matches if population database does not include INS/BND calls (e.g. DGV)
+            intersect = intersect_DEL_DUP_INV
     else:
         intersect = intersect_DEL_DUP_INV
     
