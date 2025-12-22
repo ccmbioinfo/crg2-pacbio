@@ -815,6 +815,52 @@ def annotate_gene_CDS(annotsv_df, ensembl):
     return annotsv_df
 
 
+def annotate_breakpoint_gene(annotsv_df, ensembl, location):
+    """
+    Annotate breakpoint (SV/CNV start or end) against Ensembl genes
+    """
+    ensembl = pd.read_csv(ensembl)
+    ensembl = ensembl[ensembl["Feature"] == "gene"][["Chromosome", "Start", "End", "gene_name"]]
+    ensembl_bed = BedTool.from_dataframe(ensembl)
+    # create bed files for start or end position
+    loc_bed_df = annotsv_df[["CHROM", "POS", "END", "SVTYPE", "ID"]].copy()
+    if location == "START ":
+        loc_bed_df["START"] = loc_bed_df["POS"] - 1  
+        loc_bed_df["END_bed"] = loc_bed_df["POS"] 
+    else:
+        loc_bed_df["START"] = loc_bed_df["END"] - 1  
+        loc_bed_df["END_bed"] = loc_bed_df["END"] 
+
+    loc_bed_df = loc_bed_df[["CHROM", "START", "END_bed", "POS", "END", "SVTYPE", "ID"]] 
+    loc_bed = BedTool.from_dataframe(loc_bed_df)
+    # intersect with ensembl genes
+    intersect_cols = ["CHROM", 
+            "START", 
+            "END_bed", 
+            "POS", 
+            "END", 
+            "SVTYPE", 
+            "ID", 
+            "CHROM_ens",
+            "POS_ens",
+            "END_ens",
+            "GENE_NAME",
+            "GENE_ID",
+            "GENE_BIOTYPE",
+            "FEATURE"]
+    intersect = loc_bed.intersect(ensembl_bed, wa=True, wb=True).to_dataframe(names=intersect_cols)
+    # aggregate genes
+    intersect_agg = intersect.groupby(["CHROM", "POS", "END", "SVTYPE", "ID"]).agg({"GENE_NAME": ";".join}).reset_index()
+    intersect_agg.rename(columns={"GENE_NAME": f"GENE_SYMBOL_{location}"}, inplace=True)
+    # merge with annotsv_df
+    for col in ["POS", "END"]:
+        intersect_agg[col] = intersect_agg[col].astype(int)
+    intersect_agg["CHROM"] = intersect_agg["CHROM"].astype(str)
+    annotsv_df = pd.merge(annotsv_df, intersect_agg, how="left", on=["CHROM", "POS", "END", "SVTYPE", "ID"]).fillna(value={f"GENE_SYMBOL_{location}": "."})
+    
+    return annotsv_df
+
+ 
 def main(
     df,
     snpeff_df,
@@ -1007,6 +1053,11 @@ def main(
     print("Adding Ensembl CDS annotation")
     df_merge = annotate_gene_CDS(df_merge, ensembl)
 
+    # add start and end gene symbols
+    print("Adding start and end gene symbols")
+    df_merge = annotate_breakpoint_gene(df_merge, ensembl, "START")
+    df_merge = annotate_breakpoint_gene(df_merge, ensembl, "END")
+
     # add UCSC genome browser URL
     df_merge["UCSC_link"] = [
         annotate_UCSC(chrom, pos, end)
@@ -1068,6 +1119,8 @@ def main(
             "GENE_NAME",
             "ENSEMBL_GENE",
             "ENSEMBL_CDS",
+            "GENE_SYMBOL_START",
+            "GENE_SYMBOL_END",
             "VARIANT",
             "IMPACT",
             "UCSC_link",
