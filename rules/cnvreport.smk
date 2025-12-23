@@ -37,7 +37,7 @@ rule truvari_collapse:
                 -o {output.merged_variants} \
                 -c {output.collapsed_variants} \
                 -f {params.ref} \
-                --sizemin 50 --sizemax 50000000 --refdist 2000 --pctsize 0.5 --pctovl 0.5 --pctseq 0 -k common)  > {log} 2>&1
+                --sizemin 50 --sizemax 5000000000 --refdist 2000 --pctsize 0.5 --pctovl 0.5 --pctseq 0 -k common)  > {log} 2>&1
         """
 
 rule fix_hifi_cnv_CI:
