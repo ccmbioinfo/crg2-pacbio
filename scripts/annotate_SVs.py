@@ -1178,9 +1178,12 @@ def main(
     )
 
     df_merge = df_merge[report_columns]
-    # exclude splice site annotations for CNVs
     if variant_type == "CNV":
+        # exclude splice site annotations for CNVs
         df_merge = df_merge.drop(columns=["Nearest_SS_type", "Dist_nearest_SS"])
+        # add back confidence intervals for CNV length now that annotation is done
+        df_merge["POS"] = df_merge["POS"] + 2000
+        df_merge["END"] = df_merge["END"] - 2000
     df_merge = df_merge.replace("nan", ".")
     df_merge = df_merge.fillna(".")
     df_merge = df_merge.drop_duplicates()
