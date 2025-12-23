@@ -808,13 +808,13 @@ def annotate_gene_CDS(annotsv_df, ensembl):
             "FEATURE"]
     intersect = annotsv_bed.intersect(ensembl_bed, wa=True, wb=True).to_dataframe(names=intersect_cols)
     intersect = intersect.drop_duplicates(subset=["GENE_NAME"]).groupby(["CHROM", "POS", "END", "SVTYPE", "ID"]).agg({"GENE_NAME": ";".join}).reset_index()
-    intersect.rename(columns={"GENE_NAME": "ENSEMBL_CDS"}, inplace=True)
+    intersect.rename(columns={"GENE_NAME": "GENE_NAME_CDS"}, inplace=True)
     annotsv_df = pd.merge(
         annotsv_df,
         intersect,
         how="left",
         on=["CHROM", "POS", "END", "SVTYPE", "ID"],
-    ).fillna(value={"ENSEMBL_CDS": "."})
+    ).fillna(value={"GENE_NAME_CDS": "."})
     return annotsv_df
 
 
@@ -854,12 +854,12 @@ def annotate_breakpoint_gene(annotsv_df, ensembl, location):
     intersect = loc_bed.intersect(ensembl_bed, wa=True, wb=True).to_dataframe(names=intersect_cols)
     # aggregate genes
     intersect_agg = intersect.groupby(["CHROM", "POS", "END", "SVTYPE", "ID"]).agg({"GENE_NAME": ";".join}).reset_index()
-    intersect_agg.rename(columns={"GENE_NAME": f"GENE_SYMBOL_{location}"}, inplace=True)
+    intersect_agg.rename(columns={"GENE_NAME": f"GENE_NAME_{location}"}, inplace=True)
     # merge with annotsv_df
     for col in ["POS", "END"]:
         intersect_agg[col] = intersect_agg[col].astype(int)
     intersect_agg["CHROM"] = intersect_agg["CHROM"].astype(str)
-    annotsv_df = pd.merge(annotsv_df, intersect_agg, how="left", on=["CHROM", "POS", "END", "SVTYPE", "ID"]).fillna(value={f"GENE_SYMBOL_{location}": "."})
+    annotsv_df = pd.merge(annotsv_df, intersect_agg, how="left", on=["CHROM", "POS", "END", "SVTYPE", "ID"]).fillna(value={f"GENE_NAME_{location}": "."})
     
     return annotsv_df
 
@@ -1121,9 +1121,9 @@ def main(
             "FILTER",
             "GENE_NAME",
             "ENSEMBL_GENE",
-            "ENSEMBL_CDS",
-            "GENE_SYMBOL_START",
-            "GENE_SYMBOL_END",
+            "GENE_NAME_CDS",
+            "GENE_NAME_START",
+            "GENE_NAME_END",
             "VARIANT",
             "IMPACT",
             "UCSC_link",
