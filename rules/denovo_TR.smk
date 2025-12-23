@@ -84,10 +84,10 @@ rule annotate_trgt_denovo:
     output: "TRGT_denovo/{family}_{child}.TRGT.denovo.annotated.csv"
     params:
       crg2_pacbio = config["tools"]["crg2_pacbio"],
-      genes = config["trgt"]["ensembl"],
-      constraint = config["trgt"]["gnomad_constraint"],
+      genes = config["annotation"]["general"]["ensembl"],
+      constraint = config["annotation"]["general"]["gnomad_constraint"],
       OMIM = config["annotation"]["omim_path"],
-      segdup = config["trgt"]["segdup"],
+      segdup = config["annotation"]["general"]["segdup"],
       controls = config["trgt"]["control_alleles_tsv"],
       c4r = config["annotation"]["c4r"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",

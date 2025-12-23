@@ -141,15 +141,15 @@ rule annotate_repeat_outliers:
     log:  "logs/repeat_outliers/{family}.annotate.repeat.outliers.log"
     params: 
       crg2_pacbio = config["tools"]["crg2_pacbio"],
-      genes = config["trgt"]["ensembl"],
+      genes = config["annotation"]["general"]["ensembl"],
       OMIM = config["annotation"]["omim_path"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
-      constraint = config["trgt"]["gnomad_constraint"],
+      constraint = config["annotation"]["general"]["gnomad_constraint"],
       c4r_outliers = config["trgt"]["C4R_outliers"],
       c4r = config["annotation"]["c4r"],
-      promoters = config["trgt"]["promoters"],
+      promoters = config["annotation"]["general"]["promoters"],
       TR_constraint = config["trgt"]["TR_constraint"],
-      repeat_catalog = config["trgt"]["adotto_repeats"]
+      repeat_catalog = config["annotation"]["general"]["adotto_repeats"]
     resources:
         mem_mb = 20000
     conda: 

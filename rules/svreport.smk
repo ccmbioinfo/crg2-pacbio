@@ -42,14 +42,15 @@ rule sv_report:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
         omim = config["annotation"]["omim_path"],
-        exon = config["annotation"]["sv_report"]["exon"],
-        anno_path = config["annotation"]["sv_report"]["anno_path"],
-        repeats = config["trgt"]["adotto_repeats"],
+        exon = config["annotation"]["general"]["exon"],
+        long_read_regions = config["annotation"]["general"]["long_read_regions"],
+        repeats = config["annotation"]["general"]["adotto_repeats"],
         inhouse_c4r = config["annotation"]["sv_report"]["inhouse_c4r"],
         inhouse_tg = config["annotation"]["sv_report"]["inhouse_tg"],
         gnomad_SV = config["annotation"]["sv_report"]["gnomad_SV"],
         dgv = config["annotation"]["sv_report"]["dgv"],
-        ensembl = config["trgt"]["ensembl"],
+        ensembl = config["annotation"]["general"]["ensembl"],
+        clingen_path = config["annotation"]["general"]["clingen_path"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
     conda:
@@ -70,14 +71,14 @@ rule sv_report:
                         -inhouse_c4r {params.inhouse_c4r} \
                         -inhouse_tg {params.inhouse_tg} \
                         -colorsdb {params.colorsdb} \
-                        -odd_regions {params.anno_path}/GRCh38.oddRegions.bed \
-                        -repeats {params.anno_path}/human_GRCh38_no_alt_analysis_set.trgt.bed \
+                        -odd_regions {params.long_read_regions}/GRCh38.oddRegions.bed \
+                        -repeats {params.repeats} \
                         -c4r {params.c4r} \
-                        -dark_regions {params.anno_path}/Alliance_Dark_Genes_LR_Pnl_TargetsCaptured_hg38_ann.bed \
-                        -clingen_HI {params.anno_path}/ClinGen_haploinsufficiency_gene_GRCh38.bed \
-                        -clingen_TS {params.anno_path}/ClinGen_triplosensitivity_gene_GRCh38.bed \
-                        -clingen_disease {params.anno_path}/ClinGen_tableExport_202310.csv \
-                        -clingen_regions {params.anno_path}/ClinGen_region_curation_list_GRCh38.tsv) > {log} 2>&1
+                        -dark_regions {params.long_read_regions}/Alliance_Dark_Genes_LR_Pnl_TargetsCaptured_hg38_ann.bed \
+                        -clingen_HI {params.clingen_path}/ClinGen_haploinsufficiency_gene_GRCh38.bed \
+                        -clingen_TS {params.clingen_path}/ClinGen_triplosensitivity_gene_GRCh38.bed \
+                        -clingen_disease {params.clingen_path}/ClinGen_tableExport_202310.csv \
+                        -clingen_regions {params.clingen_path}/ClinGen_region_curation_list_GRCh38.tsv) > {log} 2>&1
             else
                 (python3 {params.crg2_pacbio}/scripts/annotate_SVs.py \
                     -annotsv {input.annotsv} \
@@ -92,13 +93,13 @@ rule sv_report:
                     -inhouse_c4r {params.inhouse_c4r} \
                     -inhouse_tg {params.inhouse_tg} \
                     -colorsdb {params.colorsdb} \
-                    -odd_regions {params.anno_path}/GRCh38.oddRegions.bed \
-                    -repeats {params.anno_path}/human_GRCh38_no_alt_analysis_set.trgt.bed \
+                    -odd_regions {params.long_read_regions}/GRCh38.oddRegions.bed \
+                    -repeats {params.repeats} \
                     -c4r {params.c4r} \
-                    -dark_regions {params.anno_path}/Alliance_Dark_Genes_LR_Pnl_TargetsCaptured_hg38_ann.bed \
-                    -clingen_HI {params.anno_path}/ClinGen_haploinsufficiency_gene_GRCh38.bed \
-                    -clingen_TS {params.anno_path}/ClinGen_triplosensitivity_gene_GRCh38.bed \
-                    -clingen_disease {params.anno_path}/ClinGen_tableExport_202310.csv \
-                    -clingen_regions {params.anno_path}/ClinGen_region_curation_list_GRCh38.tsv) > {log} 2>&1
+                    -dark_regions {params.long_read_regions}/Alliance_Dark_Genes_LR_Pnl_TargetsCaptured_hg38_ann.bed \
+                    -clingen_HI {params.clingen_path}/ClinGen_haploinsufficiency_gene_GRCh38.bed \
+                    -clingen_TS {params.clingen_path}/ClinGen_triplosensitivity_gene_GRCh38.bed \
+                    -clingen_disease {params.clingen_path}/ClinGen_tableExport_202310.csv \
+                    -clingen_regions {params.clingen_path}/ClinGen_region_curation_list_GRCh38.tsv) > {log} 2>&1
             fi
         """

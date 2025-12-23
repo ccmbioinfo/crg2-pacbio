@@ -1,6 +1,6 @@
 rule pbcpgtools:
     input:
-        samples = config["trgt"]["samples"]
+        samples = config["run"]["samples"]
     params:
         ref = config["ref"]["genome"],
         pbcpgtools = config["pbcpgtools"]["binary"], 
@@ -29,7 +29,7 @@ rule pbcpgtools:
 
 rule mosdepth_tiles:
     input:  
-        samples = config["trgt"]["samples"]
+        samples = config["run"]["samples"]
     params:
         mosdepth = config["tools"]["mosdepth"],
         regions = config["methbat"]["regions_bed"]
@@ -155,8 +155,8 @@ rule methbat_annotate_outliers:
         trs = get_TR_outliers
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
-        ensembl = config["trgt"]["ensembl"],
-        gnomad_constraint = config["trgt"]["gnomad_constraint"],
+        ensembl = config["annotation"]["general"]["ensembl"],
+        gnomad_constraint = config["annotation"]["general"]["gnomad_constraint"],
         OMIM_path = config["annotation"]["omim_path"], 
         hpo = config["run"]["hpo"]
     output: "methbat/outliers/{sample}.annotated.outliers.csv"
