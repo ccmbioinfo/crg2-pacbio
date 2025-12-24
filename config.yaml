@@ -9,9 +9,9 @@ run:
   flank: 100000
 
 genes:
-  ensembl: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/Homo_sapiens.GRCh38.112.gtf_subset.csv"
-  refseq: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/GRCh38_latest_genomic.gff_subset.csv"
-  hgnc: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/HGNC_20240717.txt"
+  ensembl: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/for_gene_panels/Homo_sapiens.GRCh38.112.gtf_subset.csv"
+  refseq: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/refseq/GRCh38_latest_genomic.gff_subset.csv"
+  hgnc: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/HGNC/HGNC_20240717.txt"
 
 tools:
   cre: "~/crg2-pacbio/scripts/cre"
@@ -47,20 +47,19 @@ annotation:
   snpeff:
     data_dir: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/snpeff/data"
   general:
-    exon: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/MANE/MANE.GRCh38.v1.0.ensembl_genomic.bed"
-    long_read_regions: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/long_read_specific_regions/"
+    exon: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/MANE/MANE.GRCh38.v1.0.ensembl_genomic.bed"
+    long_read_regions: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/long_read_regions/"
     clingen_path: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/ClinGen/"
     adotto_repeats: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/repeats/repeat_catalogs_for_TRGT/adotto_repeats.hg38.bed"
-    promoters: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/GRCh38-PLS.bed"
-    ensembl: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/Homo_sapiens.GRCh38.109.chr.processed.csv"
-    gnomad_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/gnomad.v4.0.constraint_metrics.tsv"
-    segdup: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/data/reference/annotation/GRCh38.segdups.bed.gz"
+    promoters: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/non_coding/promoters/GRCh38-PLS.bed"
+    ensembl: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/Homo_sapiens.GRCh38.109.chr.processed.csv"
+    gnomad_constraint: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/gnomAD/v4.1/constraint/gnomad.v4.1.constraint_metrics.tsv"
   sv_report:
     inhouse_c4r: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/C4R_SV_db/pbsv.allsamples.counts.2025-12-04.bed"
     cnv_inhouse_c4r: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/C4R_CNV_db/hificnv.allsamples.counts.2025-12-18.bed"
     inhouse_tg: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TG_LRWGS_db/pbsv.allsamples.counts.2025-12-04.bed"
     cnv_inhouse_tg: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TG_LRWGS_db/hificnv.allsamples.counts.2025-12-17.bed"
-    gnomad_SV: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/gnomad4.1_SV/gnomad.v4.1.sv.sites.processed.bed"
+    gnomad_SV: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/gnomAD/v4.1/SV/gnomad.v4.1.sv.sites.processed.bed"
     dgv: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/DGV/DGV.GS.hg38.tsv"
     colorsdb: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/CoLoRSdb/v1.1.0/CoLoRSdb.GRCh38.v1.1.0.pbsv.jasmine.bed"
   pathogenic_repeats:
