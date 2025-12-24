@@ -6,7 +6,7 @@ rule genotype_adotto_loci:
     params: 
         trgt = config["tools"]["trgt"],
         ref = config["ref"]["genome"],
-        repeats = config["trgt"]["adotto_repeats"]
+        repeats = config["annotation"]["general"]["adotto_repeats"]
     log: "logs/repeat_outliers/{family}_{sample}.trgt.log"
     conda:
         "../envs/common.yaml"
