@@ -1,9 +1,64 @@
-rule snpeff:
-    input: get_pbsv_vcf
+rule bcftools_merge:
+    input: get_cnv_dir
     output:
-        vcf = "sv/{family}.pbsv.snpeff.vcf",
+        vcf = "cnv/{family}.cnv.vcf.gz"
     log:
-        "logs/sv/{family}.snpeff.log"
+        "logs/cnv/{family}.cnv.bcftools.merge.log"
+    conda:
+        "../envs/common.yaml"
+    shell:
+        """
+        (
+        n_vcfs=$(ls {input}/*hificnv*.vcf.gz | wc -l)
+        if [ "$n_vcfs" -eq 1 ]; then
+            cp {input}/*hificnv*.vcf.gz {output}
+            tabix {output}
+        else
+            bcftools merge -m none {input}/*hificnv*.vcf.gz | bgzip > {output}
+            tabix {output}
+        fi
+        ) > {log} 2>&1
+        """
+
+rule truvari_collapse:
+    input: "cnv/{family}.cnv.vcf.gz"
+    output:
+        merged_variants = "cnv/{family}.cnv.truvari.merge.vcf",
+        collapsed_variants = temp("cnv/{family}.cnv.truvari.collapse.vcf")
+    params:
+        ref = config["ref"]["genome"]
+    log:
+        "logs/cnv/{family}.cnv.truvari.merge.log"
+    conda:
+        "../envs/truvari.yaml"
+    shell:
+        """
+        (truvari collapse -i {input} \
+                -o {output.merged_variants} \
+                -c {output.collapsed_variants} \
+                -f {params.ref} \
+                --sizemin 50 --sizemax 5000000000 --refdist 4000 --pctsize 0.5 --pctovl 0.5 --pctseq 0 -k common)  > {log} 2>&1
+        """
+
+rule fix_hifi_cnv_CI:
+    input: "cnv/{family}.cnv.truvari.merge.vcf"
+    output: temp("cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf")
+    log: "logs/cnv/{family}.fix.CIPOS.log"
+    params:
+        crg2_pacbio = config["tools"]["crg2_pacbio"],
+    conda:
+        "../envs/str_sv.yaml"
+    shell:
+        """
+        (python3 {params.crg2_pacbio}/scripts/fix_hifi_cnv_CI.py -input_vcf {input} -output_vcf {output}) > {log} 2>&1
+        """
+
+rule cnv_snpeff:
+    input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
+    output:
+        vcf = "cnv/{family}.cnv.snpeff.vcf",
+    log:
+        "logs/cnv/{family}.snpeff.log"
     params:
         java_opts = config["params"]["snpeff"]["java_opts"],
         reference = config["ref"]["name"],
@@ -11,12 +66,12 @@ rule snpeff:
     wrapper:
         get_wrapper_path("snpeff")
 
-rule annotsv:
-    input: get_pbsv_vcf
+rule cnv_annotsv:
+    input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
     output:
-        annotsv_annotated =  "sv/{family}.AnnotSV.tsv",
-        annotsv_unannotated =  temp("sv/{family}.AnnotSV.unannotated.tsv")
-    log: "logs/sv/{family}.annotsv.log"
+        annotsv_annotated =  "cnv/{family}.AnnotSV.tsv",
+        annotsv_unannotated =  temp("cnv/{family}.AnnotSV.unannotated.tsv")
+    log: "logs/cnv/{family}.annotsv.log"
     params:
         annotsv_path = config["tools"]["annotSV"]
     conda:
@@ -32,25 +87,26 @@ rule annotsv:
             -genomeBuild GRCh38) > {log} 2>&1
         """
 
-rule sv_report:
+rule cnv_report:
     input: 
-        snpeff = "sv/{family}.pbsv.snpeff.vcf",
-        annotsv = "sv/{family}.AnnotSV.tsv"
-    output: "sv/{family}.sv.csv"
-    log: "logs/sv/{family}.sv.report.log"
+        cnv_index = "cnv/{family}.cnv.truvari.merge.vcf.gz.tbi",
+        snpeff = "cnv/{family}.cnv.snpeff.vcf",
+        annotsv = "cnv/{family}.AnnotSV.tsv"
+    output: "cnv/{family}.cnv.csv"
+    log: "logs/cnv/{family}.cnv.report.log"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
         omim = config["annotation"]["omim_path"],
         exon = config["annotation"]["general"]["exon"],
         long_read_regions = config["annotation"]["general"]["long_read_regions"],
+        clingen_path = config["annotation"]["general"]["clingen_path"],
         repeats = config["annotation"]["general"]["adotto_repeats"],
-        inhouse_c4r = config["annotation"]["sv_report"]["inhouse_c4r"],
-        inhouse_tg = config["annotation"]["sv_report"]["inhouse_tg"],
+        cnv_inhouse_c4r = config["annotation"]["sv_report"]["cnv_inhouse_c4r"],
+        cnv_inhouse_tg = config["annotation"]["sv_report"]["cnv_inhouse_tg"],
         gnomad_SV = config["annotation"]["sv_report"]["gnomad_SV"],
         dgv = config["annotation"]["sv_report"]["dgv"],
         ensembl = config["annotation"]["general"]["ensembl"],
-        clingen_path = config["annotation"]["general"]["clingen_path"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
     conda:
@@ -62,14 +118,14 @@ rule sv_report:
                     (python3 {params.crg2_pacbio}/scripts/annotate_SVs.py \
                         -annotsv {input.annotsv} \
                         -snpeff {input.snpeff} \
-                        -variant_type SV \
+                        -variant_type CNV \
                         -omim {params.omim} \
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
                         -dgv {params.dgv} \
                         -ensembl {params.ensembl} \
-                        -inhouse_c4r {params.inhouse_c4r} \
-                        -inhouse_tg {params.inhouse_tg} \
+                        -cnv_inhouse_c4r {params.cnv_inhouse_c4r} \
+                        -cnv_inhouse_tg {params.cnv_inhouse_tg} \
                         -colorsdb {params.colorsdb} \
                         -odd_regions {params.long_read_regions}/GRCh38.oddRegions.bed \
                         -repeats {params.repeats} \
@@ -83,15 +139,15 @@ rule sv_report:
                 (python3 {params.crg2_pacbio}/scripts/annotate_SVs.py \
                     -annotsv {input.annotsv} \
                     -snpeff {input.snpeff} \
-                    -variant_type SV \
+                    -variant_type CNV \
                     -omim {params.omim} \
                     -hpo {params.HPO} \
                     -exon {params.exon} \
                     -gnomad {params.gnomad_SV} \
                     -dgv {params.dgv} \
                     -ensembl {params.ensembl} \
-                    -inhouse_c4r {params.inhouse_c4r} \
-                    -inhouse_tg {params.inhouse_tg} \
+                    -cnv_inhouse_c4r {params.cnv_inhouse_c4r} \
+                    -cnv_inhouse_tg {params.cnv_inhouse_tg} \
                     -colorsdb {params.colorsdb} \
                     -odd_regions {params.long_read_regions}/GRCh38.oddRegions.bed \
                     -repeats {params.repeats} \

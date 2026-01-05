@@ -31,7 +31,7 @@ rule trgt_denovo:
     params:
         trgt_denovo = config["tools"]["trgt-denovo"],
         ref = config["ref"]["genome"],
-        bed = config["trgt"]["adotto_repeats"]
+        bed = config["annotation"]["general"]["adotto_repeats"]
     output: "TRGT_denovo/{family}_{child}.TRGT.denovo.tsv"
     log: "logs/denovo_TRs/{family}_{child}.TRGT-denovo.log"
     resources:
@@ -84,10 +84,10 @@ rule annotate_trgt_denovo:
     output: "TRGT_denovo/{family}_{child}.TRGT.denovo.annotated.csv"
     params:
       crg2_pacbio = config["tools"]["crg2_pacbio"],
-      genes = config["trgt"]["ensembl"],
-      constraint = config["trgt"]["gnomad_constraint"],
+      genes = config["annotation"]["general"]["ensembl"],
+      constraint = config["annotation"]["general"]["gnomad_constraint"],
       OMIM = config["annotation"]["omim_path"],
-      segdup = config["trgt"]["segdup"],
+      long_read_regions = config["annotation"]["general"]["long_read_regions"],
       controls = config["trgt"]["control_alleles_tsv"],
       c4r = config["annotation"]["c4r"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
@@ -104,7 +104,7 @@ rule annotate_trgt_denovo:
                 --ensembl {params.genes} \
                 --gnomad_constraint {params.constraint} \
                 --OMIM_path {params.OMIM} \
-                --segdup {params.segdup} \
+                --segdup {params.long_read_regions}/GRCh38.segdups.bed.gz \
                 --c4r {params.c4r} \
                 --controls {params.controls} \
 		        --c4r_outliers {params.c4r_outliers}) > {log} 2>&1
@@ -114,7 +114,7 @@ rule annotate_trgt_denovo:
                 --ensembl {params.genes} \
                 --gnomad_constraint {params.constraint} \
                 --OMIM_path {params.OMIM} \
-                --segdup {params.segdup} \
+                --segdup {params.long_read_regions}/GRCh38.segdups.bed.gz \
                 --c4r {params.c4r} \
                 --controls {params.controls} \
                 --hpo {params.HPO} \
