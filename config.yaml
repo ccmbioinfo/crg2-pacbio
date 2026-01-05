@@ -34,7 +34,7 @@ ref:
 annotation:
   c4r: False # if samples belong to C4R, leave C4R sample IDs in
   omim_path: "~/crg2-pacbio/scripts/cre/data/"
-  ensembl_to_NCBI_df: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/ensembl_to_NCBI_ID.csv"
+  ensembl_to_NCBI_df: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/ensembl_to_NCBI_ID.csv"
   pacbio.vcfanno:
     conf: "~/crg2-pacbio/vcfanno/pacbio.vcfanno.conf"
     lua_script: "~/crg2-pacbio/vcfanno/crg.vcfanno.lua"
