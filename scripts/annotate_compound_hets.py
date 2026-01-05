@@ -2,6 +2,7 @@ import argparse
 from functools import reduce
 import glob
 import logging
+import os
 import pandas as pd
 import pyranges as pr
 import numpy as np
@@ -589,10 +590,10 @@ def annotate_reports(
     )
     sequence_variant_report = sequence_variant_report.fillna(MISSING_VALUE)
     sequence_variant_report.to_csv(
-        f"{family}_sequence_variant_report_CH.csv", index=False
+        f"reports/{family}.wgs.coding.CH.csv", index=False
     )
     logger.info(
-        "Wrote annotated sequence variant report to %s_sequence_variant_report_CH.csv",
+        "Wrote annotated sequence variant report to %s.wgs.coding.CH.csv",
         family,
     )
 
@@ -618,8 +619,8 @@ def annotate_reports(
         for d in CH_status_series
     ]
     SV = SV.fillna(MISSING_VALUE)
-    SV.to_csv(f"{family}_SV_report_CH.csv", index=False)
-    logger.info("Wrote annotated SV report to %s_SV_report_CH.csv", family)
+    SV.to_csv(f"reports/{family}.pbsv.CH.csv", index=False)
+    logger.info("Wrote annotated SV report to %s.pbsv.CH.csv", family)
 
     # Annotate CNV report
     CNV = pd.read_csv(cnv_path, low_memory=False)
@@ -646,8 +647,8 @@ def annotate_reports(
         .fillna(MISSING_VALUE)
         .drop(columns=["Variant_id", "samples"])
     )
-    CNV.to_csv(f"{family}_CNV_report_CH.csv", index=False)
-    logger.info("Wrote annotated CNV report to %s_CNV_report_CH.csv", family)
+    CNV.to_csv(f"reports/{family}.cnv.CH.csv", index=False)
+    logger.info("Wrote annotated CNV report to %s.cnv.CH.csv", family)
 
 
 def main():
@@ -656,6 +657,8 @@ def main():
     logger = setup_logging()
     
     logger.info("Starting compound het annotation")
+    if not os.path.exists("reports"):
+        os.makedirs("reports")
     family, proband_id, fam_dict = setup_pedigree(args.pedigree, args.family, logger)
     
     # Process sequence variants
@@ -733,6 +736,7 @@ def main():
             "Gnomad_af_grpmax",
             "Cadd_score",
             "SpliceAI_score",
+            "promoterAI_score",
             "Nucleotide_change_ensembl",
         ]
     ]
@@ -764,6 +768,7 @@ def main():
             "Gnomad_af_grpmax",
             "Cadd_score",
             "SpliceAI_score",
+            "promoterAI_score",
             "Nucleotide_change_ensembl",
         ]
         + GT_cols
@@ -779,9 +784,9 @@ def main():
         }
     )
     
-    wide_variants.to_csv(f"{family}_compound_het_variants.csv", index=False)
+    wide_variants.to_csv(f"reports/{family}.compound.het.status.csv", index=False)
     logger.info(
-        "Wrote combined variant annotations to %s_compound_het_variants.csv", family
+        "Wrote combined variant annotations to %s.compound.het.status.csv", family
     )
     
     # Annotate reports

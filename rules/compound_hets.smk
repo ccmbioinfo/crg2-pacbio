@@ -7,9 +7,9 @@ rule get_sequence_variants_for_CH:
         severity="{severity}",
         crg2_pacbio = config["tools"]["crg2_pacbio"]
     log:
-        "logs/compound_hets/get_sequence_variants_for_CH_{family}_{severity}.log",
+        "logs/compound_hets/{family}.get.sequence.variants.for.CH.{severity}.log",
     conda:
-        "../envs/cre.yaml"
+        "../envs/gemini.yaml"
     wildcard_constraints:
         severity="HIGH-MED|LOW"
     shell:
@@ -30,13 +30,13 @@ rule identify_compound_hets:
         sequence_variant_report_CH="reports/{family}.wgs.coding.CH.csv",
         SV_report_CH="reports/{family}.pbsv.CH.csv",
         CNV_report_CH="reports/{family}.cnv.CH.csv",
-        compound_het_status="reports/{family}.compound_het_status.csv",
+        compound_het_status="reports/{family}.compound.het.status.csv",
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"]
     conda:
         "../envs/str_sv.yaml"
     log:
-        "logs/compound_hets/identify_compound_hets_{family}.log",
+        "logs/compound_hets/{family}.identify.compound.hets.log",
     shell:
         """
         (python3 {params.crg2_pacbio}/scripts/annotate_compound_hets.py --high_med {input.high_med_variants} \

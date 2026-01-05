@@ -6,6 +6,23 @@ import numpy as np
 import re
 
 
+def parse_promoterAI_score(score):
+    """Parse the promoterAI score.
+    Args:
+        score (str): The promoterAI score.
+    Returns:
+        float: The parsed promoterAI score.
+    """
+    if pd.isna(score):
+        return None
+    if score == "No":
+        return None
+    try:
+        return max([abs(float(i)) for i in score.split(",")])
+    except:
+        return score
+
+
 def filter_low_impact_variants(low: pd.DataFrame) -> pd.DataFrame:
     """Select low impact variants that may be damaging
 
@@ -13,7 +30,7 @@ def filter_low_impact_variants(low: pd.DataFrame) -> pd.DataFrame:
         low (pd.DataFrame): DataFrame with low impact variants queried from gemini database
 
     Returns:
-        pd.DataFrame: DataFrame with genic low impact variants that may be damaging (SNVs with SpliceAI >=0.2, CADD >= 10, or indel with no SpliceAI or CADD score)
+        pd.DataFrame: DataFrame with genic low impact variants that may be damaging (SNVs with SpliceAI >=0.2, CADD >= 10, promoterAI >= 0.1, or indel with no SpliceAI or CADD score)
     """
     # filter out intergenic variants
     low_impact_var_filter = low[
@@ -28,7 +45,7 @@ def filter_low_impact_variants(low: pd.DataFrame) -> pd.DataFrame:
             ]
         )
     ].copy()
-    # parse SpliceAI and CADD scores
+    # parse SpliceAI, CADD, and promoterAI scores
     low_impact_var_filter["SpliceAI_score_parsed"] = low_impact_var_filter[
         "SpliceAI_score"
     ].apply(lambda x: max(x.split("|")[2:6]) if not pd.isna(x) else np.nan)
@@ -38,6 +55,7 @@ def filter_low_impact_variants(low: pd.DataFrame) -> pd.DataFrame:
     low_impact_var_filter["Cadd_score"] = low_impact_var_filter["Cadd_score"].astype(
         float
     )
+    low_impact_var_filter["promoterAI_score_parsed"] = low_impact_var_filter["promoterAI_score"].apply(parse_promoterAI_score)
     # identify variant type
     low_impact_var_filter["sum_ref_alt_length"] = (
         low_impact_var_filter["Ref"].str.len() + low_impact_var_filter["Alt"].str.len()
@@ -45,10 +63,11 @@ def filter_low_impact_variants(low: pd.DataFrame) -> pd.DataFrame:
     low_impact_var_filter["variant_type"] = low_impact_var_filter[
         "sum_ref_alt_length"
     ].apply(lambda x: "SNV" if x == 2 else "indel")
-    # retain SNVs with SpliceAI >=0.2, CADD >= 10, or indel with no SpliceAI or CADD score:
+    # retain SNVs with SpliceAI >=0.2, CADD >= 10, promoterAI >= 0.1, or indel with no SpliceAI or CADD score:
     low_impact_var_filter_scores = low_impact_var_filter[
         (low_impact_var_filter["SpliceAI_score_parsed"] >= 0.2)
         | (low_impact_var_filter["Cadd_score"] >= 10)
+        | (low_impact_var_filter["promoterAI_score_parsed"] >= 0.1)
         | (
             (low_impact_var_filter["variant_type"] == "indel")
             & (low_impact_var_filter["SpliceAI_score_parsed"].isna())
@@ -505,4 +524,4 @@ def replace_NCBI_IDs_with_Ensembl_IDs(variant_df, ensembl_df, ensembl_to_NCBI_df
     for idx, row in variant_df[mask].iterrows():
         gene = row["Gene"]
         if gene in ID_dict and pd.notnull(ID_dict[gene]):
-            variant_df.at[idx, "Ensembl_gene_id"] = ID_dict[gene]
+            variant_df.at[idx, "Ensembl_gene_id"] = ID_dict[gene] 

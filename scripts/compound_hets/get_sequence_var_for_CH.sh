@@ -31,6 +31,7 @@ sQuery="select \
         tg_lrwgs_ac as TG_LRWGS_ac,\
         cadd_phred as Cadd_score,\
         COALESCE(spliceai_score, '') as SpliceAI_score,
+        promoterAI as promoterAI_score,
         PS as PS,"
 
 while read sample
