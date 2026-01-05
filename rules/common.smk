@@ -98,3 +98,7 @@ def get_cnvs(wildcards):
 
 def get_TR_outliers (wildcards):
     return variants_for_methbat.loc["TR_outliers", "path"]
+
+def get_cnv_dir(wildcards):
+    family = project
+    return units.loc[family, "cnv_dir"]
