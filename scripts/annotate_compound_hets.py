@@ -188,6 +188,8 @@ def process_sequence_variants(
     compound_hets.replace_NCBI_IDs_with_Ensembl_IDs(high_impact, ensembl, ensembl_to_NCBI_df)
 
     # Filter by TG inhouse allele count
+    high_impact["TG_LRWGS_ac"].replace(np.nan, 0, inplace=True)
+    high_impact["TG_LRWGS_ac"] = high_impact["TG_LRWGS_ac"].astype(int)
     high_impact = high_impact[high_impact["TG_LRWGS_ac"] < 20]
     
     # Create variant ID
@@ -214,11 +216,15 @@ def process_sequence_variants(
 
     # Extract sample IDs
     sample_ids = extract_sample_ids_from_columns(high_impact, "gts.")
+    print(sample_ids)
     
     # Split PS column
-    ps_split_cols = high_impact["PS"].str.split(",", expand=True)
-    for idx, sample in enumerate(sample_ids):
-        high_impact[f"PS.{sample}"] = ps_split_cols[idx]
+    if len(sample_ids) > 1:
+        ps_split_cols = high_impact["PS"].str.split(",", expand=True)
+        for idx, sample in enumerate(sample_ids):
+            high_impact[f"PS.{sample}"] = ps_split_cols[idx]
+    else:
+        high_impact[f"PS.{sample_ids[0]}"] = high_impact["PS"]
     high_impact.drop(columns=["PS"], inplace=True)
 
     logger.debug("Extracted %d sample IDs from sequence variant table", len(sample_ids))
@@ -277,10 +283,11 @@ def process_structural_variants(
     sv_path: str,
     proband_id: str,
     fam_dict: Dict[str, str],
+    variant_type: str,
     logger: logging.Logger,
 ) -> pd.DataFrame:
     """Process structural variants and return variant_gt_details dataframe."""
-    logger.info("Reading SV report from %s", sv_path)
+    logger.info("Reading %s report from %s", variant_type, sv_path)
     SV = pd.read_csv(sv_path, low_memory=False)
     
     # Filter rare genic variants
@@ -288,22 +295,34 @@ def process_structural_variants(
         (SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01) & (SV["TG_nhomalt_max"] <= 5)
     ].copy()
     logger.info(
-        "Identified %d rare genic SVs (gnomAD AF <= 0.01)",
+        "Identified %d rare genic %s (gnomAD AF <= 0.01)",
+        variant_type,
         len(SV_rare_high_impact),
     )
     
     # Create variant ID
-    SV_rare_high_impact["Variant_id"] = (
-        SV_rare_high_impact["CHROM"].astype(str)
-        + "-"
-        + SV_rare_high_impact["POS"].astype(str)
-        + "-"
-        + SV_rare_high_impact["END"].astype(str)
-        + "-"
-        + SV_rare_high_impact["SVTYPE"]
-        + "-"
-        + SV_rare_high_impact["ID"]
-    )
+    if variant_type == VARIANT_TYPE_SV: # SVs
+        SV_rare_high_impact["Variant_id"] = (
+            SV_rare_high_impact["CHROM"].astype(str)
+            + "-"
+            + SV_rare_high_impact["POS"].astype(str)
+            + "-"
+            + SV_rare_high_impact["END"].astype(str)
+            + "-"
+            + SV_rare_high_impact["SVTYPE"]
+            + "-"
+            + SV_rare_high_impact["ID"]
+        )
+    else: # CNVs
+        SV_rare_high_impact["Variant_id"] = (
+            SV_rare_high_impact["CHROM"].astype(str)
+            + "-"
+            + SV_rare_high_impact["POS"].astype(str)
+            + "-"
+            + SV_rare_high_impact["END"].astype(str)
+            + "-"
+            + SV_rare_high_impact["SVTYPE"]
+        )
     SV_rare_high_impact.rename(
         columns={"ENSEMBL_GENE": "Ensembl_gene_id"}, inplace=True
     )
@@ -330,7 +349,8 @@ def process_structural_variants(
             & (SV_rare_high_impact[f"{fam_dict['father']}_zyg"] != "hom")
         ]
     logger.info(
-        "Retained %d heterozygous SVs for proband %s",
+        "Retained %d heterozygous %s for proband %s",
+        variant_type,
         len(SV_rare_high_impact),
         proband_id,
     )
@@ -339,9 +359,18 @@ def process_structural_variants(
     sample_ids = extract_sample_ids_from_columns(SV, "_GT")
     
     # Melt sample columns
-    variant_ps = compound_hets.melt_sample_columns_SV(
-        SV_rare_high_impact, "Variant_id", "_PS", "PS", sample_ids
-    )
+    if variant_type == VARIANT_TYPE_CNV:
+        # CNVs don't have PS columns, create dummy dataframe with PS values as "."
+        variant_ids = SV_rare_high_impact["Variant_id"].unique()
+        variant_ps = pd.DataFrame({
+            "Variant_id": np.repeat(variant_ids, len(sample_ids)),
+            "Sample": np.tile(sample_ids, len(variant_ids)),
+            "PS": MISSING_VALUE
+        })
+    else:
+        variant_ps = compound_hets.melt_sample_columns_SV(
+            SV_rare_high_impact, "Variant_id", "_PS", "PS", sample_ids
+        )
     variant_gts = compound_hets.melt_sample_columns_SV(
         SV_rare_high_impact, "Variant_id", "_GT", "GT", sample_ids
     )
@@ -619,34 +648,31 @@ def annotate_reports(
         for d in CH_status_series
     ]
     SV = SV.fillna(MISSING_VALUE)
-    SV.to_csv(f"reports/{family}.pbsv.CH.csv", index=False)
+    SV.to_csv(f"reports/{family}.sv.CH.csv", index=False)
     logger.info("Wrote annotated SV report to %s.pbsv.CH.csv", family)
 
     # Annotate CNV report
     CNV = pd.read_csv(cnv_path, low_memory=False)
-    CNV["Variant_id"] = CNV["CHROM"].astype(str) + "-" + CNV["START"].astype(str) + "-" + CNV["END"].astype(str) + "-" + CNV["SVTYPE"].astype(str)
-    CNV_CH_status = all_variants[all_variants["Variant_type"] == VARIANT_TYPE_CNV][
-        ["Ensembl_gene_id", "Variant_id", "compound_het_status"]
-    ].drop_duplicates()
-    CNV_gene_CH_status = CNV_CH_status.merge(
-        gene_CH_status, on="Ensembl_gene_id", how="left"
+    CH_status_series = CNV.apply(
+        lambda x: compound_hets.SV_comp_het_status(
+            x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id")
+        ),
+        axis=1, 
     )
-    CNV_gene_CH_status = (
-        CNV_gene_CH_status.groupby("Variant_id")
-        .agg(
-            {
-                "Ensembl_gene_id": ";".join,
-                "CH_variant_types": "|".join,
-                "CH_status": "|".join,
-            }
+
+    CNV["CH_variant_types"] = [
+        (
+            d["CH_variant_types"]
+            if isinstance(d, dict) and "CH_variant_types" in d
+            else MISSING_VALUE
         )
-        .reset_index()
-    )
-    CNV = (
-        CNV.merge(CNV_gene_CH_status, on="Variant_id", how="left")
-        .fillna(MISSING_VALUE)
-        .drop(columns=["Variant_id", "samples"])
-    )
+        for d in CH_status_series
+    ]
+    CNV["CH_status"] = [
+        d["CH_status"] if isinstance(d, dict) and "CH_status" in d else MISSING_VALUE
+        for d in CH_status_series
+    ]
+    CNV = CNV.fillna(MISSING_VALUE)
     CNV.to_csv(f"reports/{family}.cnv.CH.csv", index=False)
     logger.info("Wrote annotated CNV report to %s.cnv.CH.csv", family)
 
@@ -673,12 +699,12 @@ def main():
     
     # Process structural variants
     SV_gt_details = process_structural_variants(
-        args.sv, proband_id, fam_dict, logger
+        args.sv, proband_id, fam_dict, VARIANT_TYPE_SV, logger
     )
     
     # Process CNVs
-    CNV_gt_details = process_cnvs(
-        args.cnv, args.ensembl, proband_id, fam_dict, sample_ids, logger
+    CNV_gt_details = process_structural_variants(
+        args.cnv, proband_id, fam_dict, VARIANT_TYPE_CNV, logger
     )
     
     # Combine all variant types
