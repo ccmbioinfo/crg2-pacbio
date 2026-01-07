@@ -28,7 +28,7 @@ rule identify_compound_hets:
         pedigree=config["run"]["ped"],
     output:
         sequence_variant_report_CH="reports/{family}.wgs.coding.CH.csv",
-        SV_report_CH="reports/{family}.pbsv.CH.csv",
+        SV_report_CH="reports/{family}.sv.CH.csv",
         CNV_report_CH="reports/{family}.cnv.CH.csv",
         compound_het_status="reports/{family}.compound.het.status.csv",
     params:
