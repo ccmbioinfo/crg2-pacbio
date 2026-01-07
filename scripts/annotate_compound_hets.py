@@ -780,13 +780,14 @@ def main():
     zygosity_cols = [c for c in wide_variants.columns if "Zygosity" in c]
     PS_cols = [c for c in wide_variants.columns if "PS" in c]
     GT_cols = [c for c in wide_variants.columns if "GT_abstracted" in c]
+    wide_variants.rename(columns={"compound_het_status": "CH_status"}, inplace=True)
     wide_variants = wide_variants[
         [
             "Variant_id",
             "Variant_type",
             "Gene_name",
             "Ensembl_gene_id",
-            "compound_het_status",
+            "CH_status",
         ]
         + zygosity_cols
         + [
