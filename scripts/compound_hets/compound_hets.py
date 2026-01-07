@@ -412,13 +412,15 @@ def melt_sample_columns_SV(
     return melted
 
 
-def SV_comp_het_status(genes, variant_impact, compound_het_status):
+def SV_comp_het_status(genes, variant_impact, compound_het_status, ensembl_to_NCBI_df):
     """
     Determine compound het status for SV variants
 
     Args:
         genes (list): List of genes impacted by an SV
+        variant_impact (str): Variant impact
         compound_het_status (pd.DataFrame): DataFrame of compound het status for genes
+        ensembl_to_NCBI_df (pd.DataFrame): DataFrame mapping Ensembl gene IDs to HGNC and NCBI gene IDs
 
     Returns:
         dict: Dictionary with CH_status and CH_variant_types for the genes impacted by the SV
@@ -430,14 +432,17 @@ def SV_comp_het_status(genes, variant_impact, compound_het_status):
     elif variant_impact == "intergenic_region":
         return {"CH_variant_types": ".", "CH_status": "."}
     else:
-        genes = re.split(";|-", genes)
+        genes = re.split(";|-|&", genes)
         for gene in genes:
+            hgnc_symbol = map_ensembl_ID_to_HGNC(gene, ensembl_to_NCBI_df)
             try:
+                status = compound_het_status.loc[gene, "CH_status"]
                 gene_compound_het_statuses.append(
-                    compound_het_status.loc[gene, "CH_status"]
+                    f"{hgnc_symbol}:{status}"
                 )
+                variant_types = compound_het_status.loc[gene, "CH_variant_types"]
                 gene_compound_het_variant_types.append(
-                    compound_het_status.loc[gene, "CH_variant_types"]
+                    f"{hgnc_symbol}:{variant_types}"
                 )
             except KeyError:
                 gene_compound_het_statuses.append(".")
@@ -484,6 +489,23 @@ def map_NCBI_ID_to_ensembl(NCBI_ID, ensembl_to_NCBI_df):
         return ensembl_to_NCBI_df[ensembl_to_NCBI_df["entrezgene_id"] == int(NCBI_ID)]["ensembl_gene_id"].values[0]
     except:
         return NCBI_ID
+
+
+def map_ensembl_ID_to_HGNC(ensembl_ID, ensembl_to_NCBI_df):
+    """
+    Map an Ensembl gene ID to an HGNC gene symbol using the provided Ensembl to HGNC and NCBI ID dataframe.
+
+    Args:
+        ensembl_ID (str): The Ensembl gene ID to map.
+        ensembl_to_NCBI_df (pd.DataFrame): The Ensembl to HGNC and NCBI ID dataframe.
+
+    Returns:
+        str: The HGNC gene ID if found, otherwise the Ensembl gene ID.
+    """
+    try:
+        return ensembl_to_NCBI_df[ensembl_to_NCBI_df["ensembl_gene_id"] == ensembl_ID]["hgnc_symbol"].values[0]
+    except:
+        return ensembl_ID
 
 
 def replace_NCBI_IDs_with_Ensembl_IDs(variant_df, ensembl_df, ensembl_to_NCBI_df):

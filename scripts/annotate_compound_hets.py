@@ -591,6 +591,7 @@ def annotate_reports(
     sv_path: str,
     cnv_path: str,
     family: str,
+    ensembl_to_NCBI_df: pd.DataFrame,
     logger: logging.Logger,
 ) -> None:
     """Annotate variant reports with compound het status."""
@@ -630,7 +631,7 @@ def annotate_reports(
     SV = pd.read_csv(sv_path, low_memory=False)
     CH_status_series = SV.apply(
         lambda x: compound_hets.SV_comp_het_status(
-            x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id")
+            x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id"), ensembl_to_NCBI_df
         ),
         axis=1,
     )
@@ -655,7 +656,7 @@ def annotate_reports(
     CNV = pd.read_csv(cnv_path, low_memory=False)
     CH_status_series = CNV.apply(
         lambda x: compound_hets.SV_comp_het_status(
-            x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id")
+            x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id"), ensembl_to_NCBI_df
         ),
         axis=1, 
     )
@@ -822,6 +823,7 @@ def main():
         args.sv,
         args.cnv,
         family,
+        ensembl_to_NCBI_df,
         logger,
     )
     
