@@ -1117,6 +1117,7 @@ def main(
             "END",
             "SVLEN",
             "SVTYPE",
+            "ID",
             "INFO",
             "FILTER",
             "GENE_NAME",
@@ -1180,7 +1181,7 @@ def main(
     df_merge = df_merge[report_columns]
     if variant_type == "CNV":
         # exclude splice site annotations for CNVs
-        df_merge = df_merge.drop(columns=["Nearest_SS_type", "Dist_nearest_SS"])
+        df_merge = df_merge.drop(columns=["Nearest_SS_type", "Dist_nearest_SS", "ID"])
         # add back confidence intervals for CNV length now that annotation is done
         df_merge["POS"] = df_merge["POS"] + 2000
         df_merge["END"] = df_merge["END"] - 2000

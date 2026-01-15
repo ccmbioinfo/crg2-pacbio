@@ -1,2 +1,2 @@
-family	platform	small_variant_vcf   pbsv_vcf
+family	platform	small_variant_vcf   pbsv_vcf    cnv_dir
 NA12878	PACBIO

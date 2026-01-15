@@ -66,6 +66,12 @@ def get_pbsv_vcf(wildcards):
 
     return input_vcf
 
+def get_cnv_dir(wildcards):
+    family = project
+    cnv_dir = units.loc[family, "cnv_dir"]
+
+    return cnv_dir
+
 def get_trgt_path_str_vcf_dir(wildcards):
     family = project
     input_vcf = units.loc[family, "trgt_pathogenic_vcf_dir"]
