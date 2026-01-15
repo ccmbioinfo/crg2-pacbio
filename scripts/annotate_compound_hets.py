@@ -73,6 +73,9 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--pedigree", type=str, required=True, help="Path to pedigree file"
     )
+    parser.add_argument(
+        "--sample_order", type=str, required=True, help="Path to VCF sample order file"
+    )
     parser.add_argument("--family", type=str, required=True, help="Family ID")
     return parser.parse_args()
 
@@ -123,7 +126,7 @@ def filter_heterozygous_variants(
 def extract_sample_ids_from_columns(df: pd.DataFrame, prefix: str) -> list:
     """Extract sample IDs from columns with given prefix."""
     if prefix == "gts.":
-        return sorted(
+        return list(
             {
                 re.sub(r"^gts\.", "", col)
                 for col in df.columns
@@ -131,7 +134,7 @@ def extract_sample_ids_from_columns(df: pd.DataFrame, prefix: str) -> list:
             }
         )
     elif prefix.endswith("_GT"):
-        return sorted(col.rsplit("_", 1)[0] for col in df.columns if "_GT" in col)
+        return list(col.rsplit("_", 1)[0] for col in df.columns if "_GT" in col)
     return []
 
 
@@ -162,6 +165,7 @@ def process_sequence_variants(
     fam_dict: Dict[str, str],
     ensembl: pd.DataFrame,
     ensembl_to_NCBI_df: pd.DataFrame,
+    sample_order_path: str,
     logger: logging.Logger,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Process sequence variants and return high_impact and variant_gt_details dataframes."""
@@ -215,9 +219,7 @@ def process_sequence_variants(
     )
 
     # Extract sample IDs
-    sample_ids = extract_sample_ids_from_columns(high_impact, "gts.")
-    print(sample_ids)
-    
+    sample_ids = pd.read_csv(sample_order_path, header=None)[0].tolist() # comma delimited PS IDs in PS column from gemini db are in the order of the samples in the VCF
     # Split PS column
     if len(sample_ids) > 1:
         ps_split_cols = high_impact["PS"].str.split(",", expand=True)
@@ -692,11 +694,8 @@ def main():
     ensembl = pd.read_csv(args.ensembl, low_memory=False)
     ensembl_to_NCBI_df = pd.read_csv(args.ensembl_to_NCBI_df, low_memory=False)
     high_impact, sequence_variant_gt_details = process_sequence_variants(
-        args.high_med, args.low, proband_id, fam_dict, ensembl, ensembl_to_NCBI_df, logger
+        args.high_med, args.low, proband_id, fam_dict, ensembl, ensembl_to_NCBI_df, args.sample_order, logger
     )
-    
-    # Extract sample IDs from sequence variants
-    sample_ids = extract_sample_ids_from_columns(high_impact, "gts.")
     
     # Process structural variants
     SV_gt_details = process_structural_variants(
