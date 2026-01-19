@@ -1,5 +1,3 @@
-PIPELINE_VERSION="0.9.0"
-
 include: "rules/common.smk"
 include: "rules/annotation.smk"
 include: "rules/snvreport.smk"
@@ -28,11 +26,13 @@ if config["run"]["ped"]:
 
 rule all:
     input:
-        "small_variants/coding/{family}".format(family=project),
+        "reports/{family}.wgs.coding.CH.csv".format(family=project),
+        "reports/{family}.sv.CH.csv".format(family=project),
+        "reports/{family}.cnv.CH.csv".format(family=project),
+        "reports/{family}.compound.het.status.csv".format(family=project),
         "small_variants/panel/{family}".format(family=project),
         "small_variants/panel-flank/{family}".format(family=project),
         "small_variants/wgs-high-impact/{family}".format(family=project),
-        "sv/{family}.pbsv.csv".format(family=project),
         "repeat_outliers/{family}.repeat.outliers.annotated.csv".format(family=project),
         "pathogenic_repeats/{family}.known.path.str.loci.csv".format(family=project),
         expand("TRGT_denovo/{family}_{child}.TRGT.denovo.annotated.csv",
