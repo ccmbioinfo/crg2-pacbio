@@ -55,7 +55,7 @@ noncoding_pred <- function(cadd, ncer, remm, linsight){
   remm <- ifelse(remm == "None", NA, remm)
   linsight <- ifelse(linsight == "None", NA, linsight)
   # https://doi.org/10.1016/j.gpb.2022.02.002 table 3 best threshold
-  cadd_pred <- cadd > 14.19 # paper used CADD v1.3, we use 1.6, so score here is from personal work
+  cadd_pred <- cadd > 10
   ncer_pred <- ncer > 95.95
   remm_pred <- remm > 0.9585 
   linsight_pred <- linsight > 0.9828
