@@ -17,11 +17,11 @@ tools:
   cre: "~/crg2-pacbio/scripts/cre"
   crg: "~/crg"
   crg2_pacbio: "~/crg2-pacbio"
-  annotSV: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/annotate_SV/tools/AnnotSV-3.1.1"
-  trgt: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/TRGTv2.1.0/trgt-v2.1.0-x86_64-unknown-linux-gnu/trgt"
-  trgt-denovo: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/trgt-denovo-v0.2.0/trgt-denovo"
-  mosdepth: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/mosdepth-0.3.11/mosdepth"
-  trgt-lps: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/TRGT-LPSv0.4.0/trgt-lps-v0.4.0"
+  annotSV: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/AnnotSV-3.1.1"
+  trgt: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/TRGTv2.1.0/trgt-v2.1.0-x86_64-unknown-linux-gnu/trgt"
+  trgt-denovo: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/trgt-denovo-v0.2.0/trgt-denovo"
+  mosdepth: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/mosdepth-0.3.11/mosdepth"
+  trgt-lps: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/TRGT-LPSv0.4.0/trgt-lps-v0.4.0"
 
 ref:
   name: GRCh38.86
@@ -56,8 +56,8 @@ annotation:
     ensembl: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/Homo_sapiens.GRCh38.109.chr.processed.csv"
     gnomad_constraint: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/gnomAD/v4.1/constraint/gnomad.v4.1.constraint_metrics.tsv"
   sv_report:
-    inhouse_c4r: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/C4R_SV_db/pbsv.allsamples.counts.2025-12-04.bed"
-    cnv_inhouse_c4r: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/C4R_CNV_db/hificnv.allsamples.counts.2025-12-18.bed"
+    inhouse_c4r: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/C4R_LRWGS_db/pbsv.allsamples.counts.2025-12-04.bed"
+    cnv_inhouse_c4r: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/C4R_LRWGS_db/hificnv.allsamples.counts.2025-12-18.bed"
     inhouse_tg: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TG_LRWGS_db/pbsv.allsamples.counts.2025-12-04.bed"
     cnv_inhouse_tg: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TG_LRWGS_db/hificnv.allsamples.counts.2025-12-17.bed"
     gnomad_SV: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/gnomAD/v4.1/SV/gnomad.v4.1.sv.sites.processed.bed"
@@ -72,16 +72,17 @@ methbat:
   regions_bed: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/methylation/hg38_200bp_tiles.bed"
 
 pbcpgtools:
-  binary: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/pb-CpG-tools-v2.3.2-x86_64-unknown-linux-gnu/bin/aligned_bam_to_cpg_scores"
-  model: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/tools/pb-CpG-tools-v2.3.2-x86_64-unknown-linux-gnu/models/pileup_calling_model.v1.tflite"
+  binary: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/pb-CpG-tools-v2.3.2-x86_64-unknown-linux-gnu/bin/aligned_bam_to_cpg_scores"
+  model: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/pb-CpG-tools-v2.3.2-x86_64-unknown-linux-gnu/models/pileup_calling_model.v1.tflite"
 
 params:
   snpeff:
     java_opts: "-Xms750m -Xmx20g"
 
 trgt:
-  control_alleles: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/code/scripts/trgt/crg2-pacbio/scripts/VCFs/cmh_0.4.0.sorted.no.missing.95perc.vcf.gz"
-  control_alleles_tsv: "/hpf/largeprojects/ccmbio/mcouse/pacbio_report_dev/results/create_cmh_allele_db/repeat_outliers/allele_db/CMH.trgt.v0.5.0.alleles.1436.samples.20240624.tsv"
-  C4R_outliers: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/C4R_all_outliers_batch/outliers/aggregated_outliers_2025-05-05.csv"
-  TR_constraint: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_1/TRGT/proband_only_workflow/annotations/Danzi_et_al_2025_supp_table_3.csv"
-  control_lps: "/hpf/largeprojects/ccmbio/ccmmarvin_shared/pacbio_longread_pilot_phase_2/results/CMH_LPS/combined/CMH_combined_LPS.tsv.gz"
+  control_alleles: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRGT/CMH/VCF/cmh_0.4.0.sorted.no.missing.95perc.vcf.gz"
+  control_alleles_tsv: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRGT/CMH/VCF/CMH.trgt.v0.5.0.alleles.1436.samples.20240624.tsv"
+  C4R_outliers: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRGT/C4R/aggregated_outliers_2025-05-05.csv"
+  TR_constraint: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRGT/TR_constraint/Danzi_et_al_2025_supp_table_3.csv"
+  control_lps: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRGT/CMH/LPS/CMH_combined_LPS.tsv.gz"
+v
