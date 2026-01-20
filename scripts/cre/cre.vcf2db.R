@@ -508,7 +508,7 @@ select_and_write2 <- function(variants, samples, prefix, type)
                             "Gnomad_af_grpmax", "Gnomad_af", "Gnomad_ac", "Gnomad_hom", "Gnomad_male_ac","Gnomad_fafmax_faf95_max", "Gnomad_filter",
                             "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt",
                             "Regeneron_exome_AF", "Regeneron_exome_AC",
-                            "TG_LRWGS_AC", "TG_LRWGS_samples",
+                            "TG_LRWGS_AC", "TG_LRWGS_samples", "TG_LRWGS_hom",
                             "Ensembl_transcript_id", "rsIDs"),
                             protein_cols,
                             c("Gnomad_oe_lof_score", "Gnomad_oe_ci_lower","Gnomad_oe_ci_upper","Gnomad_oe_mis_score", "Gnomad_mis_z_score","Gnomad_pLI_score","Gnomad_pnull_score","Gnomad_prec_score"),
