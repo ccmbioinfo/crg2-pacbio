@@ -57,8 +57,10 @@ rule trgt_denovo:
             father_bam=`cat {input.samples} | grep -P "${{father_ID}}\t" | awk '{{print $2}}' | sed 's/.haplotagged.bam/.trgt/'`
             mother_bam=`cat {input.samples} | grep -P "${{mother_ID}}\t" | awk '{{print $2}}' | sed 's/.haplotagged.bam/.trgt/'`
             for prefix in $child_bam $father_bam $mother_bam; do
-                ln -s ${{prefix}}.sorted.phased.vcf.gz ${{prefix}}.sorted.vcf.gz
-                ln -s ${{prefix}}.sorted.phased.vcf.gz.tbi ${{prefix}}.sorted.vcf.gz.tbi
+                if [[ ! -f ${{prefix}}.sorted.vcf.gz ]]; then
+                    ln -s ${{prefix}}.sorted.phased.vcf.gz ${{prefix}}.sorted.vcf.gz
+                    ln -s ${{prefix}}.sorted.phased.vcf.gz.tbi ${{prefix}}.sorted.vcf.gz.tbi
+                fi
             done
         fi 
 
