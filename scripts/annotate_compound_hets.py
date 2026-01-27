@@ -1,4 +1,5 @@
 import argparse
+from datetime import date
 from functools import reduce
 import glob
 import logging
@@ -175,6 +176,23 @@ def map_zygosity_from_gt_type(gt_type: int) -> str:
     else:
         return ZYGOSITY_MISSING
 
+def write_report(df: pd.DataFrame, family: str, report_type: str, logger: logging.Logger) -> None:
+    """Write report to file."""
+    today = date.today()
+    today = today.strftime("%Y-%m-%d")
+    df.to_csv(f"reports/{family}.{report_type}.CH.{today}.csv", index=False)
+    # Write a symlink instead of a new copy for the Snakemake target
+    symlink_path = f"reports/{family}.{report_type}.CH.csv"
+    target_path = f"reports/{family}.{report_type}.CH.{today}.csv"
+    try:
+        if os.path.islink(symlink_path) or os.path.exists(symlink_path):
+            os.remove(symlink_path)
+        os.symlink(os.path.basename(target_path), symlink_path)
+    except Exception as e:
+        logger.warning(f"Could not create symlink {symlink_path} -> {target_path}: {e}")
+
+    logger.info(f"Wrote {report_type} report to reports/{family}.{report_type}.CH.{today}.csv")
+
 
 def process_sequence_variants(
     high_med_path: str,
@@ -315,9 +333,8 @@ def process_structural_variants(
         (SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01) & (SV["TG_nhomalt_max"] <= 5)
     ].copy()
     logger.info(
-        "Identified %d rare genic %s (gnomAD AF <= 0.01)",
+        "Identified rare genic %s variants (gnomAD AF <= 0.01)",
         variant_type,
-        len(SV_rare_high_impact),
     )
     
     # Create variant ID
@@ -642,13 +659,7 @@ def annotate_reports(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
     sequence_variant_report = sequence_variant_report.fillna(MISSING_VALUE)
-    sequence_variant_report.to_csv(
-        f"reports/{family}.wgs.coding.CH.csv", index=False
-    )
-    logger.info(
-        "Wrote annotated sequence variant report to %s.wgs.coding.CH.csv",
-        family,
-    )
+    write_report(sequence_variant_report, family, "wgs.coding", logger)
 
     # Annotate panel sequence variant report
     panel_variant_report_path = glob.glob(f"{panel_variant_report_dir}/*.wgs*csv")[0]
@@ -657,8 +668,7 @@ def annotate_reports(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
     panel_variant_report = panel_variant_report.fillna(MISSING_VALUE)
-    panel_variant_report.to_csv(f"reports/{family}.panel.CH.csv", index=False)
-    logger.info("Wrote annotated panel sequence variant report to %s.panel.CH.csv", family)
+    write_report(panel_variant_report, family, "panel", logger)
 
     # Annotate panel-flank sequence variant report
     panel_flank_variant_report_path = glob.glob(f"{panel_flank_variant_report_dir}/*.wgs*csv")[0]
@@ -667,8 +677,7 @@ def annotate_reports(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
     panel_flank_variant_report = panel_flank_variant_report.fillna(MISSING_VALUE)
-    panel_flank_variant_report.to_csv(f"reports/{family}.panel-flank.CH.csv", index=False)
-    logger.info("Wrote annotated panel-flank sequence variant report to %s.panel-flank.CH.csv", family)
+    write_report(panel_flank_variant_report, family, "panel-flank", logger)
 
     # Annotate wgs high-impact sequence variant report
     wgs_high_impact_variant_report_path = glob.glob(f"{wgs_high_impact_variant_report_dir}/*.wgs.high.impact*csv")[0]
@@ -677,8 +686,7 @@ def annotate_reports(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
     wgs_high_impact_variant_report = wgs_high_impact_variant_report.fillna(MISSING_VALUE)
-    wgs_high_impact_variant_report.to_csv(f"reports/{family}.wgs.high.impact.CH.csv", index=False)
-    logger.info("Wrote annotated wgs high-impact sequence variant report to %s.wgs.high.impact.CH.csv", family)
+    write_report(wgs_high_impact_variant_report, family, "wgs.high.impact", logger)
 
     # Annotate SV report
     SV = pd.read_csv(sv_path, low_memory=False)
@@ -702,8 +710,7 @@ def annotate_reports(
         for d in CH_status_series
     ]
     SV = SV.fillna(MISSING_VALUE)
-    SV.to_csv(f"reports/{family}.sv.CH.csv", index=False)
-    logger.info("Wrote annotated SV report to %s.pbsv.CH.csv", family)
+    write_report(SV, family, "sv", logger)
 
     # Annotate CNV report
     CNV = pd.read_csv(cnv_path, low_memory=False)
@@ -727,8 +734,7 @@ def annotate_reports(
         for d in CH_status_series
     ]
     CNV = CNV.fillna(MISSING_VALUE)
-    CNV.to_csv(f"reports/{family}.cnv.CH.csv", index=False)
-    logger.info("Wrote annotated CNV report to %s.cnv.CH.csv", family)
+    write_report(CNV, family, "cnv", logger)
 
 
 def main():
