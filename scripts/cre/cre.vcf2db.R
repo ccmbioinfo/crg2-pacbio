@@ -171,12 +171,16 @@ create_report <- function(family, samples, type){
     # promoterAI score parsing
     variants <- add_placeholder(variants, "promoterAI_score_parsed", "")
     for (i in 1:nrow(variants)){
-        if (variants[i,"promoterAI_score"] == "None" | variants[i,"promoterAI_score"] == "No" | variants[i,"promoterAI_score"] == ""){
+        if (is.null(variants[i,"promoterAI_score"])){
             variants[i, "promoterAI_score_parsed"] <- 0
         } else {
-            promoterAI <- strsplit(variants[i,"promoterAI_score"], ",", fixed = T)[[1]]
-            promoterAI_abs_max <- max(abs(as.numeric(promoterAI)))
-            variants[i, "promoterAI_score_parsed"] <- promoterAI_abs_max
+            if (variants[i,"promoterAI_score"] == "None" | variants[i,"promoterAI_score"] == "No" | variants[i,"promoterAI_score"] == ""){
+                variants[i, "promoterAI_score_parsed"] <- 0
+            } else {
+                promoterAI <- strsplit(variants[i,"promoterAI_score"], ",", fixed = T)[[1]]
+                promoterAI_abs_max <- max(abs(as.numeric(promoterAI)))
+                variants[i, "promoterAI_score_parsed"] <- promoterAI_abs_max
+            }
         }
     }
     # select high impact variants: 
