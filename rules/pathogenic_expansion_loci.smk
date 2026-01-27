@@ -78,7 +78,7 @@ rule merge_vcfs:
 
 rule annotate_pathogenic_repeats:
     input: "pathogenic_repeats/{family}.known.path.str.loci.vcf"
-    output: "pathogenic_repeats/{family}.known.path.str.loci.csv"
+    output: "reports/{family}.known.path.str.loci.csv"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         disease_thresholds = config["annotation"]["pathogenic_repeats"]["disease_thresholds"]

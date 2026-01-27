@@ -30,12 +30,12 @@ rule all:
         "reports/{family}.sv.CH.csv".format(family=project),
         "reports/{family}.cnv.CH.csv".format(family=project),
         "reports/{family}.compound.het.status.csv".format(family=project),
-        "small_variants/panel/{family}".format(family=project),
-        "small_variants/panel-flank/{family}".format(family=project),
-        "small_variants/wgs-high-impact/{family}".format(family=project),
-        "repeat_outliers/{family}.repeat.outliers.annotated.csv".format(family=project),
-        "pathogenic_repeats/{family}.known.path.str.loci.csv".format(family=project),
-        expand("TRGT_denovo/{family}_{child}.TRGT.denovo.annotated.csv",
+        "reports/{family}.panel.CH.csv".format(family=project),
+        "reports/{family}.panel-flank.CH.csv".format(family=project),
+        "reports/{family}.wgs.high.impact.CH.csv".format(family=project),
+        "reports/{family}.repeat.outliers.annotated.csv".format(family=project),
+        "reports/{family}.known.path.str.loci.csv".format(family=project),
+        expand("reports/{family}_{child}.TRGT.denovo.annotated.csv",
                family=project,
                child=children) if config["run"]["ped"] else []
 

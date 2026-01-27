@@ -118,7 +118,7 @@ rule find_repeat_outliers:
         control_vcf = config["trgt"]["control_alleles"], 
         lps = "repeat_outliers/{family}.trgt.lps.combined.tsv.gz",
         control_lps = config["trgt"]["control_lps"]
-    output: "repeat_outliers/{family}.repeat.outliers.tsv"
+    output: "reports/{family}.repeat.outliers.tsv"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"]
     log:  "logs/repeat_outliers/{family}.repeat.outliers.log"

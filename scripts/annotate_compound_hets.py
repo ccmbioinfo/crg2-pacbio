@@ -62,6 +62,24 @@ def parse_arguments() -> argparse.Namespace:
         required=True,
         help="Path to directory containing sequence variant report CSV",
     )
+    parser.add_argument(
+        "--panel_variant_report_dir",
+        type=str,
+        required=True,
+        help="Path to directory containing panel variant report CSV",
+    )
+    parser.add_argument(
+        "--panel_flank_variant_report_dir",
+        type=str,
+        required=True,
+        help="Path to directory containing panel-flank variant report CSV",
+    )
+    parser.add_argument(
+        "--wgs_high_impact_variant_report_dir",
+        type=str,
+        required=True,
+        help="Path to directory containing WGS high-impact variant report CSV",
+    )
     parser.add_argument("--sv", type=str, required=True, help="Path to SV report CSV")
     parser.add_argument("--cnv", type=str, required=True, help="Path to CNV report CSV")
     parser.add_argument(
@@ -590,6 +608,9 @@ def determine_compound_het_status(
 def annotate_reports(
     all_variants: pd.DataFrame,
     sequence_variant_report_dir: str,
+    panel_variant_report_dir: str,
+    panel_flank_variant_report_dir: str,
+    wgs_high_impact_variant_report_dir: str,
     sv_path: str,
     cnv_path: str,
     family: str,
@@ -628,6 +649,36 @@ def annotate_reports(
         "Wrote annotated sequence variant report to %s.wgs.coding.CH.csv",
         family,
     )
+
+    # Annotate panel sequence variant report
+    panel_variant_report_path = glob.glob(f"{panel_variant_report_dir}/*.wgs*csv")[0]
+    panel_variant_report = pd.read_csv(panel_variant_report_path)
+    panel_variant_report = panel_variant_report.merge(
+        gene_CH_status, on="Ensembl_gene_id", how="left"
+    )
+    panel_variant_report = panel_variant_report.fillna(MISSING_VALUE)
+    panel_variant_report.to_csv(f"reports/{family}.panel.CH.csv", index=False)
+    logger.info("Wrote annotated panel sequence variant report to %s.panel.CH.csv", family)
+
+    # Annotate panel-flank sequence variant report
+    panel_flank_variant_report_path = glob.glob(f"{panel_flank_variant_report_dir}/*.wgs*csv")[0]
+    panel_flank_variant_report = pd.read_csv(panel_flank_variant_report_path)
+    panel_flank_variant_report = panel_flank_variant_report.merge(
+        gene_CH_status, on="Ensembl_gene_id", how="left"
+    )
+    panel_flank_variant_report = panel_flank_variant_report.fillna(MISSING_VALUE)
+    panel_flank_variant_report.to_csv(f"reports/{family}.panel-flank.CH.csv", index=False)
+    logger.info("Wrote annotated panel-flank sequence variant report to %s.panel-flank.CH.csv", family)
+
+    # Annotate wgs high-impact sequence variant report
+    wgs_high_impact_variant_report_path = glob.glob(f"{wgs_high_impact_variant_report_dir}/*.wgs.high.impact*csv")[0]
+    wgs_high_impact_variant_report = pd.read_csv(wgs_high_impact_variant_report_path)
+    wgs_high_impact_variant_report = wgs_high_impact_variant_report.merge(
+        gene_CH_status, on="Ensembl_gene_id", how="left"
+    )
+    wgs_high_impact_variant_report = wgs_high_impact_variant_report.fillna(MISSING_VALUE)
+    wgs_high_impact_variant_report.to_csv(f"reports/{family}.wgs.high.impact.CH.csv", index=False)
+    logger.info("Wrote annotated wgs high-impact sequence variant report to %s.wgs.high.impact.CH.csv", family)
 
     # Annotate SV report
     SV = pd.read_csv(sv_path, low_memory=False)
@@ -820,6 +871,9 @@ def main():
     annotate_reports(
         all_variants,
         args.sequence_variant_report_dir,
+        args.panel_variant_report_dir,
+        args.panel_flank_variant_report_dir,
+        args.wgs_high_impact_variant_report_dir,
         args.sv,
         args.cnv,
         family,
