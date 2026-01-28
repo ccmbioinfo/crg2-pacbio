@@ -228,9 +228,9 @@ def process_sequence_variants(
     compound_hets.replace_NCBI_IDs_with_Ensembl_IDs(high_impact, ensembl, ensembl_to_NCBI_df)
 
     # Filter by TG inhouse allele count
-    high_impact["TG_LRWGS_ac"].replace(np.nan, 0, inplace=True)
-    high_impact["TG_LRWGS_ac"] = high_impact["TG_LRWGS_ac"].astype(int)
-    high_impact = high_impact[high_impact["TG_LRWGS_ac"] < 20]
+    high_impact["TG_LRWGS_hom"].replace(np.nan, 0, inplace=True)
+    high_impact["TG_LRWGS_hom"] = high_impact["TG_LRWGS_hom"].astype(int)
+    high_impact = high_impact[high_impact["TG_LRWGS_hom"] <= 5]
     
     # Create variant ID
     high_impact["Variant_id"] = high_impact.apply(

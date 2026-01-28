@@ -29,6 +29,7 @@ sQuery="select \
         ensembl_gene_id as Ensembl_gene_id,\
         gnomad_af_grpmax as Gnomad_af_grpmax,\
         tg_lrwgs_ac as TG_LRWGS_ac,\
+        tg_lrwgs_hom as TG_LRWGS_hom,\
         cadd_phred as Cadd_score,\
         COALESCE(spliceai_score, '') as SpliceAI_score,
         promoterAI as promoterAI_score,
