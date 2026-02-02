@@ -1,0 +1,5 @@
+remove_sections:
+  - bcftools-stats_singletones
+  - bcftools-stats_sequencing_depth
+  - bcftools-stats_sites_per_sample
+  - bcftools-stats_ts_tv

@@ -60,9 +60,40 @@ def format_pedigree(wildcards):
 
     return f"{family}.ped"
 
+def format_pedigree_qc(wildcards):
+    family = wildcards.family
+    ped = config["run"]["ped"]
+
+    if ped == "":
+        return None
+    else:
+        ped = pd.read_csv(
+            ped,
+            sep=r"\s+",
+            header=None,
+            names=["fam_id", "individual_id", "pat_id", "mat_id", "sex", "phenotype"],
+        )
+    
+    ped = ped[ped.notnull().all(axis=1)]
+    ped = ped.iloc[:, :6]
+
+    ped["fam_id"] = family
+
+    out = f"qc/ped/{family}.ped"
+    os.makedirs("qc/ped", exist_ok=True)
+
+    ped.to_csv(out, sep="\t", index=False, header=False)
+    return out
+
 def get_pbsv_vcf(wildcards):
     family = project
     input_vcf = units.loc[family, "pbsv_vcf"]
+
+    return input_vcf
+
+def get_smallvariants_vcf(wildcards):
+    family = project
+    input_vcf = units.loc[family, "small_variant_vcf"]
 
     return input_vcf
 

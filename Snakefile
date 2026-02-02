@@ -7,6 +7,7 @@ include: "rules/pathogenic_expansion_loci.smk"
 include: "rules/denovo_TR.smk"
 include: "rules/compound_hets.smk"
 include: "rules/cnvreport.smk"
+include: "rules/qc.smk"
 
 def get_children_ids(ped_file):
     import pandas as pd
@@ -35,6 +36,7 @@ rule all:
         "small_variants/wgs-high-impact/{family}".format(family=project),
         "repeat_outliers/{family}.repeat.outliers.annotated.csv".format(family=project),
         "pathogenic_repeats/{family}.known.path.str.loci.csv".format(family=project),
+        "qc/multiqc/{family}.multiqc_report.html".format(family=project),
         expand("TRGT_denovo/{family}_{child}.TRGT.denovo.annotated.csv",
                family=project,
                child=children) if config["run"]["ped"] else []
