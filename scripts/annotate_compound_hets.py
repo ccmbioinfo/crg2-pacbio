@@ -877,10 +877,7 @@ def main():
         }
     )
     
-    wide_variants.to_csv(f"reports/{family}.compound.het.status.csv", index=False)
-    logger.info(
-        "Wrote combined variant annotations to %s.compound.het.status.csv", family
-    )
+    write_report(wide_variants, family, "compound.het.status", logger)
     
     # Annotate reports
     annotate_reports(
