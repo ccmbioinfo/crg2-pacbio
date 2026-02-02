@@ -4,6 +4,7 @@ from functools import reduce
 import glob
 import logging
 import os
+from os.path import basename, splitext
 import pandas as pd
 import pyranges as pr
 import numpy as np
@@ -91,6 +92,9 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--pedigree", type=str, required=True, help="Path to pedigree file"
+    )
+    parser.add_argument(
+        "--hpo", type=str, required=True, help="Path to HPO terms file from Phenotips 'Suggested Genes'"
     )
     parser.add_argument(
         "--sample_order", type=str, required=True, help="Path to VCF sample order file"
@@ -632,6 +636,7 @@ def annotate_reports(
     cnv_path: str,
     family: str,
     ensembl_to_NCBI_df: pd.DataFrame,
+    hpo: str,
     logger: logging.Logger,
 ) -> None:
     """Annotate variant reports with compound het status."""
@@ -655,6 +660,7 @@ def annotate_reports(
     # Annotate sequence variant report
     sequence_variant_report_path = glob.glob(f"{sequence_variant_report_dir}/*.wgs.coding.*.csv")[0]
     sequence_variant_report = pd.read_csv(sequence_variant_report_path)
+    sequence_variant_report = compound_hets.add_hpo_terms_to_report(sequence_variant_report, hpo)
     sequence_variant_report = sequence_variant_report.merge(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
@@ -664,6 +670,7 @@ def annotate_reports(
     # Annotate panel sequence variant report
     panel_variant_report_path = glob.glob(f"{panel_variant_report_dir}/*.wgs*csv")[0]
     panel_variant_report = pd.read_csv(panel_variant_report_path)
+    panel_variant_report = compound_hets.add_hpo_terms_to_report(panel_variant_report, hpo)
     panel_variant_report = panel_variant_report.merge(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
@@ -673,6 +680,7 @@ def annotate_reports(
     # Annotate panel-flank sequence variant report
     panel_flank_variant_report_path = glob.glob(f"{panel_flank_variant_report_dir}/*.wgs*csv")[0]
     panel_flank_variant_report = pd.read_csv(panel_flank_variant_report_path)
+    panel_flank_variant_report = compound_hets.add_hpo_terms_to_report(panel_flank_variant_report, hpo)
     panel_flank_variant_report = panel_flank_variant_report.merge(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
@@ -682,6 +690,7 @@ def annotate_reports(
     # Annotate wgs high-impact sequence variant report
     wgs_high_impact_variant_report_path = glob.glob(f"{wgs_high_impact_variant_report_dir}/*.wgs.high.impact*csv")[0]
     wgs_high_impact_variant_report = pd.read_csv(wgs_high_impact_variant_report_path)
+    wgs_high_impact_variant_report = compound_hets.add_hpo_terms_to_report(wgs_high_impact_variant_report, hpo)
     wgs_high_impact_variant_report = wgs_high_impact_variant_report.merge(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
@@ -884,6 +893,7 @@ def main():
         args.cnv,
         family,
         ensembl_to_NCBI_df,
+        args.hpo,
         logger,
     )
     

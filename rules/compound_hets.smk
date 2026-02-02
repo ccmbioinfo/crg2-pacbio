@@ -65,6 +65,7 @@ rule identify_compound_hets:
         --ensembl {input.ensembl}  \
         --ensembl_to_NCBI_df {input.ensembl_to_NCBI_df}  \
         --pedigree {input.pedigree}  \
+        --hpo {input.HPO}  \
         --sequence_variant_report_dir {input.small_variant_report_dir}  \
         --panel_variant_report_dir {input.panel_variant_report_dir}  \
         --panel_flank_variant_report_dir {input.panel_flank_variant_report_dir}  \

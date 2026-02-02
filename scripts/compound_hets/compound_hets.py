@@ -553,3 +553,20 @@ def replace_NCBI_IDs_with_Ensembl_IDs(variant_df, ensembl_df, ensembl_to_NCBI_df
         gene = row["Gene"]
         if gene in ID_dict and pd.notnull(ID_dict[gene]):
             variant_df.at[idx, "Ensembl_gene_id"] = ID_dict[gene] 
+
+def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFrame:
+    """
+    Add HPO terms to a sequence variant report dataframe.
+
+    Args:
+        report (pd.DataFrame): The sequence varinat report dataframe to add HPO terms to.
+        hpo_terms (str): The path to the HPO terms file from Phenotips 'Suggested Genes'.
+    """
+    hpo_df = pd.read_csv(hpo_terms, comment='#', skip_blank_lines=True, sep="\t",  encoding="ISO-8859-1", engine='python').drop(columns=["HPO IDs"])
+    # Phenotips TSV has a space in column name: " Gene symbol"
+    hpo_df.columns = hpo_df.columns.str.strip()
+    hpo_df = hpo_df.rename(columns={'Gene symbol': 'Gene Symbol'})
+    hpo_df = hpo_df.set_index("Gene ID").drop(columns=["Gene Symbol"])
+    report = report.join(hpo_df, on="Ensembl_gene_id").rename(columns={"Number of occurrences": "HPO_count", "Features": "HPO_terms"})
+    
+    return report
