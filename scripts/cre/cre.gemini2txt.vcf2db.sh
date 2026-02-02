@@ -88,6 +88,7 @@ sQuery="select \
         colorsdb_nhomalt as CoLoRSdb_nhomalt,\
         tg_lrwgs_ac as TG_LRWGS_AC,\
         tg_lrwgs_samples as TG_LRWGS_samples,\
+        tg_lrwgs_hom as TG_LRWGS_hom,\
         sift_score as Sift_score,\
         polyphen_score as Polyphen_score,\
         cadd_phred as Cadd_score,\

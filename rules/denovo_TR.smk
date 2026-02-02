@@ -83,7 +83,7 @@ rule trgt_denovo:
 
 rule annotate_trgt_denovo:
     input: "TRGT_denovo/{family}_{child}.TRGT.denovo.tsv"
-    output: "TRGT_denovo/{family}_{child}.TRGT.denovo.annotated.csv"
+    output: "reports/{family}_{child}.TRGT.denovo.annotated.csv"
     params:
       crg2_pacbio = config["tools"]["crg2_pacbio"],
       genes = config["annotation"]["general"]["ensembl"],

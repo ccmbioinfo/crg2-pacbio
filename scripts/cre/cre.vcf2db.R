@@ -171,12 +171,16 @@ create_report <- function(family, samples, type){
     # promoterAI score parsing
     variants <- add_placeholder(variants, "promoterAI_score_parsed", "")
     for (i in 1:nrow(variants)){
-        if (variants[i,"promoterAI_score"] == "None" | variants[i,"promoterAI_score"] == "No" | variants[i,"promoterAI_score"] == ""){
+        if (is.null(variants[i,"promoterAI_score"])){
             variants[i, "promoterAI_score_parsed"] <- 0
         } else {
-            promoterAI <- strsplit(variants[i,"promoterAI_score"], ",", fixed = T)[[1]]
-            promoterAI_abs_max <- max(abs(as.numeric(promoterAI)))
-            variants[i, "promoterAI_score_parsed"] <- promoterAI_abs_max
+            if (variants[i,"promoterAI_score"] == "None" | variants[i,"promoterAI_score"] == "No" | variants[i,"promoterAI_score"] == ""){
+                variants[i, "promoterAI_score_parsed"] <- 0
+            } else {
+                promoterAI <- strsplit(variants[i,"promoterAI_score"], ",", fixed = T)[[1]]
+                promoterAI_abs_max <- max(abs(as.numeric(promoterAI)))
+                variants[i, "promoterAI_score_parsed"] <- promoterAI_abs_max
+            }
         }
     }
     # select high impact variants: 
@@ -518,7 +522,7 @@ select_and_write2 <- function(variants, samples, prefix, type)
                             "Gnomad_af_grpmax", "Gnomad_af", "Gnomad_ac", "Gnomad_hom", "Gnomad_male_ac","Gnomad_fafmax_faf95_max", "Gnomad_filter",
                             "CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt",
                             "Regeneron_exome_AF", "Regeneron_exome_AC",
-                            "TG_LRWGS_AC", "TG_LRWGS_samples",
+                            "TG_LRWGS_AC", "TG_LRWGS_samples", "TG_LRWGS_hom",
                             "Ensembl_transcript_id", "rsIDs"),
                             protein_cols,
                             c("Gnomad_oe_lof_score", "Gnomad_oe_ci_lower","Gnomad_oe_ci_upper","Gnomad_oe_mis_score", "Gnomad_mis_z_score","Gnomad_pLI_score","Gnomad_pnull_score","Gnomad_prec_score"),

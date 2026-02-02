@@ -1,10 +1,12 @@
 import argparse
 from functools import reduce
+import logging
 import pandas as pd
 import pyranges as pr
 import numpy as np
 import re
 
+logger = logging.getLogger(__name__)
 
 def parse_promoterAI_score(score):
     """Parse the promoterAI score.
@@ -106,8 +108,12 @@ def infer_pedigree_roles(pedigree: str) -> dict:
                 (pedigree["phenotype"] == "2")
             ]["individual_ID"].values[0]  
         except IndexError:
-            logging.error("No affected individuals found in pedigree")
-            raise IndexError("No affected individuals found in pedigree")
+            try:
+                logger.info("No affected individuals found in pedigree; trying first child")
+                child = pedigree[(pedigree["paternal_ID"] != "0") & (pedigree["maternal_ID"] != "0")]["individual_ID"].values[0]
+            except IndexError:
+                logging.error("No affected individuals found in pedigree")
+                raise IndexError("No affected individuals found in pedigree")
     father = pedigree[pedigree["individual_ID"] == child]["paternal_ID"].values[0]
     mother = pedigree[pedigree["individual_ID"] == child]["maternal_ID"].values[0]
     fam_dict = {"child": child, "father": father, "mother": mother}
