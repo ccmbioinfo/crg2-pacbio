@@ -56,9 +56,9 @@ annotation:
     ensembl: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/Homo_sapiens.GRCh38.109.chr.processed.csv"
     gnomad_constraint: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/gnomAD/v4.1/constraint/gnomad.v4.1.constraint_metrics.tsv"
   sv_report:
-    inhouse_c4r: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/C4R_LRWGS_db/pbsv.allsamples.counts.2025-12-04.bed"
+    inhouse_c4r: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/C4R_LRWGS_db/pbsv.allsamples.counts.2026-02-02.bed"
     cnv_inhouse_c4r: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/C4R_LRWGS_db/hificnv.allsamples.counts.2025-12-18.bed"
-    inhouse_tg: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TG_LRWGS_db/pbsv.allsamples.counts.2025-12-04.bed"
+    inhouse_tg: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TG_LRWGS_db/pbsv.allsamples.counts.2026-02-02.bed"
     cnv_inhouse_tg: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TG_LRWGS_db/hificnv.allsamples.counts.2025-12-17.bed"
     gnomad_SV: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/gnomAD/v4.1/SV/gnomad.v4.1.sv.sites.processed.bed"
     dgv: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/DGV/DGV.GS.hg38.tsv"

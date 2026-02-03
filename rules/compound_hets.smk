@@ -49,7 +49,7 @@ rule identify_compound_hets:
         wgs_high_impact_variant_report_CH="reports/{family}.wgs.high.impact.CH.csv",
         SV_report_CH="reports/{family}.sv.CH.csv",
         CNV_report_CH="reports/{family}.cnv.CH.csv",
-        compound_het_status="reports/{family}.compound.het.status.csv",
+        compound_het_status="reports/{family}.compound.het.status.CH.csv",
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"]
     conda:
@@ -65,6 +65,7 @@ rule identify_compound_hets:
         --ensembl {input.ensembl}  \
         --ensembl_to_NCBI_df {input.ensembl_to_NCBI_df}  \
         --pedigree {input.pedigree}  \
+        --hpo {input.HPO}  \
         --sequence_variant_report_dir {input.small_variant_report_dir}  \
         --panel_variant_report_dir {input.panel_variant_report_dir}  \
         --panel_flank_variant_report_dir {input.panel_flank_variant_report_dir}  \
