@@ -49,7 +49,7 @@ rule identify_compound_hets:
         wgs_high_impact_variant_report_CH="reports/{family}.wgs.high.impact.CH.csv",
         SV_report_CH="reports/{family}.sv.CH.csv",
         CNV_report_CH="reports/{family}.cnv.CH.csv",
-        compound_het_status="reports/{family}.compound.het.status.csv",
+        compound_het_status="reports/{family}.compound.het.status.CH.csv",
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"]
     conda:

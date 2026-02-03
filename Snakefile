@@ -30,7 +30,7 @@ rule all:
         "reports/{family}.wgs.coding.CH.csv".format(family=project),
         "reports/{family}.sv.CH.csv".format(family=project),
         "reports/{family}.cnv.CH.csv".format(family=project),
-        "reports/{family}.compound.het.status.csv".format(family=project),
+        "reports/{family}.compound.het.status.CH.csv".format(family=project),
         "reports/{family}.panel.CH.csv".format(family=project),
         "reports/{family}.panel-flank.CH.csv".format(family=project),
         "reports/{family}.wgs.high.impact.CH.csv".format(family=project),
