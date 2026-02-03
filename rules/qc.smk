@@ -1,6 +1,25 @@
+rule peddy_unphase_vcf:
+    input:
+        vcf=get_smallvariants_vcf
+    output:
+        vcf="qc/peddy/{family}.unphased.vcf.gz",
+        tbi="qc/peddy/{family}.unphased.vcf.gz.tbi"
+    log:
+        "logs/qc/peddy/{family}.unphase.log"
+    conda:
+        "../envs/peddy.yaml"
+    shell:
+        '''
+        mkdir -p qc/peddy
+        bcftools view {input.vcf} \
+        | sed 's/|/\//g' \
+        | bgzip -c > {output.vcf}
+        tabix -p vcf {output.vcf}
+        '''
+
 rule peddy:
     input:
-        vcf=get_smallvariants_vcf,
+        vcf="qc/peddy/{family}.unphased.vcf.gz",
         ped=format_pedigree_qc
     output:
         pca="qc/peddy/{family}.background_pca.json",
@@ -27,7 +46,7 @@ rule peddy:
           --plot \
           {input.vcf} \
           {input.ped} \
-          &> {log}
+          2>&1 | tee {log}
         '''
 
 rule nanoplot:
