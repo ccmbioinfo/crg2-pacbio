@@ -391,8 +391,8 @@ def process_structural_variants(
         ]
     logger.info(
         "Retained %d heterozygous %s for proband %s",
-        variant_type,
         len(SV_rare_high_impact),
+        variant_type,
         proband_id,
     )
 
