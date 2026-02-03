@@ -312,7 +312,7 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols, variant_type):
             # only keep matches where the size fraction is greater than 0.8, e.g.  an insertion of 1000bp will not be matched to a 100bp insertion at the same position
             window_INS_BND["SVLEN"] = window_INS_BND["SVLEN"].abs()
             window_INS_BND["size_fraction"] = window_INS_BND.apply(lambda x: (min([x["SVLEN"], x["SVLEN_pop"]]))/(max([x["SVLEN"], x["SVLEN_pop"]])), axis=1)
-            window_INS_BND = window_INS_BND[window_INS_BND["size_fraction"] >= 0.8]
+            window_INS_BND = window_INS_BND[(window_INS_BND["size_fraction"] >= 0.8) | (window_INS_BND["SVTYPE"] == "BND")]
             window_INS_BND = window_INS_BND.drop(columns=["size_fraction"])
 
             # now concatenate the window and SVLEN-based matches
