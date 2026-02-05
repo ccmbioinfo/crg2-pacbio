@@ -35,11 +35,22 @@ plots_force_interactive: true
 report_section_order:
   peddy_relatedness:
     order: 1000
+table_cond_formatting_colours:
+  - ped_high: "#2b9f2bcc"
+  - ped_mid: "#faa051cc"
+  - ped_low: "#6da4cae6"
+  - blue: "#337ab7"
+  - lbue: "#5bc0de"
+  - pass: "#5cb85c"
+  - warn: "#f0ad4e"
+  - fail: "#d9534f"
+  - male: "#5bc0de"
+  - female: "#d9534f"
 table_cond_formatting_rules:
   peddy_relatedness-Peddy_Relatedness:
-    fail:
-      - gt: 0.5
-    warn:
-      - gt: 0.25
-    pass:
+    ped_low:
       - lt: 0.25
+    ped_mid:
+      - lt: 0.5
+    ped_high:
+      - gt: 0.5
