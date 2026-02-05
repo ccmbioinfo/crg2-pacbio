@@ -49,6 +49,29 @@ rule peddy:
           2>&1 | tee {log}
         '''
 
+rule peddy_relatedness_mqc:
+    input:
+        pedcheck="qc/peddy/{family}.ped_check.csv"
+    output:
+        tsv="qc/multiqc_custom/{family}/peddy_relatedness_mqc.tsv"
+    log:
+        "logs/qc/peddy/{family}.relatedness_mqc.log"
+    shell:
+        '''
+        mkdir -p qc/multiqc_custom/{wildcards.family}
+        awk -F',' '
+        BEGIN {{
+            OFS="\t";
+            print "Pair_ID","Sample_A","Sample_B","Peddy_Relatedness"
+        }}
+        NR>1 {{
+            pid = $1 "_" $2
+            rel = $3
+            print pid, $1, $2, rel
+        }}
+        ' {input.pedcheck} > {output.tsv}
+        '''
+
 rule nanoplot:
     input:
         bam=get_bam
@@ -178,6 +201,7 @@ rule verifybam:
 rule multiqc:
     input:
         peddy_html=f"qc/peddy/{project}.html",
+        peddy_relatedness="qc/multiqc_custom/{family}/peddy_relatedness_mqc.tsv",
         nanoplot_stats=expand("qc/nanoplot/{family}_{sample}/{family}_{sample}.txt", family=project, sample=samples.index),
         bcftools_stats=expand("qc/bcftools/{family}_{sample}.stats", family=project, sample=samples.index),
         selfsm=expand("qc/verifybam/{family}_{sample}.selfSM", family=project, sample=samples.index),
@@ -198,4 +222,17 @@ rule multiqc:
         --config {workflow.basedir}/rules/multiqc_config.yaml \
         -o qc/multiqc \
         &> {log}
+        '''
+
+rule publish_multiqc_report:
+    input:
+        report="qc/multiqc/{family}.multiqc_report.html"
+    output:
+        published="reports/{family}.multiqc_report.html"
+    log:
+        "logs/qc/multiqc/{family}.publish.log"
+    shell:
+        '''
+        mkdir -p reports
+        cp {input.report} {output.published}
         '''
