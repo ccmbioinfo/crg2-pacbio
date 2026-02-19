@@ -202,7 +202,6 @@ create_report <- function(family, samples, type){
     }
 
     if (type == 'wgs.high.impact'){
-        variants <- variants[variants$Noncoding_path_pred != "0//3" & variants$Noncoding_path_pred != "0//4",]
         variants <- variants[variants$Variation != "intergenic_variant",]
         variants <- variants[!is.na(variants$Gene),]
     }
