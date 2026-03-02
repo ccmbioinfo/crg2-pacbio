@@ -83,6 +83,9 @@ def apply_filter_benign(annotsv_df):
 
 
 def merge_full_split_annos(annotsv_df):
+    def join_str(s):
+        vals = [str(x) for x in s.tolist() if pd.notna(x)]
+        return ";".join(vals)
     annotsv_split = annotsv_df[annotsv_df["Annotation_mode"] == "split"]
     annotsv_full = annotsv_df[annotsv_df["Annotation_mode"] == "full"]
     DDD_cols = ["DDD_status", "DDD_mode", "DDD_consequence", "DDD_disease", "DDD_pmid"]
@@ -108,29 +111,29 @@ def merge_full_split_annos(annotsv_df):
         annotsv_split.groupby("AnnotSV_ID")
         .agg(
             {
-                "GenCC_disease": ";".join,
-                "GenCC_moi": ";".join,
-                "GenCC_classification": ";".join,
-                "GenCC_pmid": ";".join,
-                "Tx": ";".join,
-                "Tx_start": ";".join,
-                "Tx_end": ";".join,
-                "Overlapped_tx_length": ";".join,
-                "Overlapped_CDS_length": ";".join,
-                "Overlapped_CDS_percent": ";".join,
-                "Frameshift": ";".join,
-                "Exon_count": ";".join,
-                "Location": ";".join,
-                "Location2": ";".join,
-                "Nearest_SS_type": ";".join,
-                "Dist_nearest_SS": ";".join,
-                "Intersect_start": ";".join,
-                "Intersect_end": ";".join,
-                "DDD_status": ";".join,
-                "DDD_mode": ";".join,
-                "DDD_consequence": ";".join,
-                "DDD_disease": ";".join,
-                "DDD_pmid": ";".join,
+                "GenCC_disease": join_str,
+                "GenCC_moi": join_str,
+                "GenCC_classification": join_str,
+                "GenCC_pmid": join_str,
+                "Tx": join_str,
+                "Tx_start": join_str,
+                "Tx_end": join_str,
+                "Overlapped_tx_length": join_str,
+                "Overlapped_CDS_length": join_str,
+                "Overlapped_CDS_percent": join_str,
+                "Frameshift": join_str,
+                "Exon_count": join_str,
+                "Location": join_str,
+                "Location2": join_str,
+                "Nearest_SS_type": join_str,
+                "Dist_nearest_SS": join_str,
+                "Intersect_start": join_str,
+                "Intersect_end": join_str,
+                "DDD_status": join_str,
+                "DDD_mode": join_str,
+                "DDD_consequence": join_str,
+                "DDD_disease": join_str,
+                "DDD_pmid": join_str,
             }
         )
         .reset_index()
@@ -172,7 +175,13 @@ def add_hpo(hpo, gene):
 
 
 def add_omim(omim_df, gene):
-    genes = [g for g in re.split('[;&]', gene) if g]
+#    genes = [g for g in re.split('[;&]', gene) if g]
+    try:
+        genes = [g for g in re.split('[;&]', gene) if g]
+    except TypeError:
+        print("Omim")
+        print(gene)
+        return [".","."]
     phenos = []
     inheritance = []
     for gene in genes:
@@ -200,9 +209,26 @@ def add_omim(omim_df, gene):
         inheritance = "."
     return [phenos, inheritance]
 
+def get_format_alt_value(sample_field, format_field, tag):
+    try:
+        keys = format_field.split(":")
+        vals = sample_field.split(":")
+        idx = keys.index(tag)
+        pair = vals[idx].split(",")
+        return pair [1] if len(pair) > 1 else "."
+    except Exception:
+        return "."
 
-def get_genotype(sample_GT_AD_DP):
-    genotype = sample_GT_AD_DP.split(":")[0]
+def get_format_value(sample_field, format_field, tag):
+    try:
+        keys = format_field.split(":")
+        vals = sample_field.split(":")
+        return vals[keys.index(tag)]
+    except Exception:
+        return "."
+
+def get_genotype(sample_GT):
+    genotype = sample_GT.split(":")[0]
     if genotype == "0/1" or genotype == "0|1" or genotype == "1|0":
         zyg = "het"
     elif genotype == "1/1":
@@ -216,28 +242,9 @@ def get_genotype(sample_GT_AD_DP):
         zyg = genotype
     return [zyg, genotype]
 
-def get_phase_set(sample_GT_AD_DP):
-    try:
-        ps = sample_GT_AD_DP.split(":")[3]
-    except IndexError:
-        ps = "."
-    return ps
-
-def get_alt_depth(sample_GT_AD_DP):
-    try:
-        alt_depth = sample_GT_AD_DP.split(":")[1].split(",")[1]
-    except:
-        alt_depth = 0
-    return alt_depth
-
-
-def get_depth(sample_GT_AD_DP):
-    depth = sample_GT_AD_DP.split(":")[2]
-    return depth
-
-def get_CN(sample_GT_AD_DP):
+def get_CN(sample_GT):
     # copy number: for CNV calls
-    CN = sample_GT_AD_DP.split(":")[1]
+    CN = sample_GT.split(":")[1]
     return CN
 
 def get_exon_counts(annotsv_df, exon_bed):
@@ -309,10 +316,17 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols, variant_type):
         # look for population INS/BND within 50 bp of sample INS/BND 
         window_INS_BND = annotsv_INS_BND_bed.window(pop_svs_INS_BND_bed, w=50).to_dataframe(names=intersect_cols)
         if len(window_INS_BND) > 0:
+            for c in ["SVLEN", "SVLEN_pop"]:
+                window_INS_BND[c] = pd.to_numeric(window_INS_BND[c], errors="coerce")
             # only keep matches where the size fraction is greater than 0.8, e.g.  an insertion of 1000bp will not be matched to a 100bp insertion at the same position
             window_INS_BND["SVLEN"] = window_INS_BND["SVLEN"].abs()
-            window_INS_BND["size_fraction"] = window_INS_BND.apply(lambda x: (min([x["SVLEN"], x["SVLEN_pop"]]))/(max([x["SVLEN"], x["SVLEN_pop"]])), axis=1)
-            window_INS_BND = window_INS_BND[(window_INS_BND["size_fraction"] >= 0.8) | (window_INS_BND["SVTYPE"] == "BND")]
+            window_INS_BND["size_fraction"] = window_INS_BND.apply(
+                lambda x: (min([x["SVLEN"], x["SVLEN_pop"]])) / (max([x["SVLEN"], x["SVLEN_pop"]])),
+                axis=1,
+            )
+            window_INS_BND = window_INS_BND[
+                (window_INS_BND["size_fraction"] >= 0.8) | (window_INS_BND["SVTYPE"] == "BND")
+            ]
             window_INS_BND = window_INS_BND.drop(columns=["size_fraction"])
 
             # now concatenate the window and SVLEN-based matches
@@ -327,9 +341,15 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols, variant_type):
 
     # make a column with SV details, e.g DEL:1:25266309-25324509
     pop_name = cols[0].split("_")[0]
-    intersect[f"{pop_name}_SV"] = intersect[
-        ["CHROM_pop", "POS_pop", "END_pop", "SVTYPE_pop"]
-    ].apply(lambda x: f"{x[3]}:{x[0]}:{x[1]}-{x[2]}", axis=1)
+    intersect[f"{pop_name}_SV"] = (
+        intersect["SVTYPE_pop"].astype(str)
+        + ":"
+        + intersect["CHROM_pop"].astype(str)
+        + ":"
+        + intersect["POS_pop"].astype(str)
+        + "-"
+        + intersect["END_pop"].astype(str)
+    )
     cols.append(f"{pop_name}_SV")
     intersect = intersect[["CHROM", "POS", "END", "SVTYPE", "ID"] + cols]
     # round AFs
@@ -393,108 +413,6 @@ def annotate_UCSC(chr, pos, end):
     )
     UCSC_full_URL = f'{UCSC_base_URL}{chr}:{pos}-{end}","UCSC_link")'
     return UCSC_full_URL
-
-
-def annotate_pb_regions(annotsv_df, regions, region_name):
-    """
-    Annotate SVs against PacBio odd regions or PacBio dark regions (bed files where fourth column indicates region affected)
-    """
-    annotsv_bed = annotsv_df_to_bed(annotsv_df)
-    regions = pd.read_csv(regions, sep="\t")
-    regions_bed = BedTool.from_dataframe(regions)
-    intersect = annotsv_bed.intersect(
-        regions_bed,
-        wa=True,
-        wb=True,
-    ).to_dataframe()
-    intersect.columns = [
-        "CHROM",
-        "POS",
-        "END",
-        "SVTYPE",
-        "SVLEN",
-        "ID",
-        "CHROM_region",
-        "POS_region",
-        "END_region",
-        region_name,
-    ]
-    # make a column with region details, e.g 1:25266309-25324509
-    region_details_name = ("_").join(region_name.split("_")[:-1])
-    intersect[region_details_name] = intersect[
-        ["CHROM_region", "POS_region", "END_region"]
-    ].apply(lambda x: f"{x[0]}:{x[1]}-{x[2]}", axis=1)
-    # calculate percent of sample SV overlapped by region
-    intersect[f"{region_details_name}_perc_overlap"] = intersect[
-        ["POS", "END", "POS_region", "END_region"]
-    ].apply(lambda x: calculate_sample_SV_overlap(x[0], x[1], x[2], x[3]), axis=1)
-    intersect = intersect[
-        [
-            "CHROM",
-            "POS",
-            "END",
-            "SVTYPE",
-            "ID",
-            region_name,
-            region_details_name,
-            f"{region_details_name}_perc_overlap",
-        ]
-    ]
-    cols = [col for col in intersect.columns if "PB" in col]
-    # merge PB region dataframe with annotSV df
-    for col in ["POS", "END"]:
-        intersect[col] = intersect[col].astype(int)
-    intersect["CHROM"] = intersect["CHROM"].astype(str)
-    annotsv_odd_region_svs = pd.merge(
-        annotsv_df,
-        intersect,
-        how="left",
-        on=["CHROM", "POS", "END", "SVTYPE", "ID"],
-    ).fillna(value={col: "." for col in cols})
-    return annotsv_odd_region_svs
-
-
-def group_by_odd_regions(annotsv_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    One hit may be associated with multiple odd regions features and therefore multiple rows
-    Aggregate by odd regions and join features to remove duplicate rows
-    """
-    annotsv_df["PB_odd_region_perc_overlap"] = annotsv_df["PB_odd_region_perc_overlap"].astype(str)
-    annotsv_odd_regions_dedup = annotsv_df.groupby(["CHROM", "POS", "END", "SVTYPE", "ID"]).agg(
-        {
-            "PB_odd_region_type": ";".join,
-            "PB_odd_region": ";".join,
-            "PB_odd_region_perc_overlap": ";".join,
-        }
-    )
-    # merge with original loci table
-    annotsv_df = annotsv_df.drop(["PB_odd_region_type", "PB_odd_region", "PB_odd_region_perc_overlap"], axis=1)
-    annotsv_odd_regions_merged = annotsv_df.merge(annotsv_odd_regions_dedup, on=["CHROM", "POS", "END", "SVTYPE", "ID"], how="left")
-    annotsv_odd_regions_merged_dedup = annotsv_odd_regions_merged.drop_duplicates(keep="first")
-
-    return annotsv_odd_regions_merged_dedup
-
-
-def group_by_dark_regions(annotsv_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    One hit may be associated with multiple dark regions features and therefore multiple rows
-    Aggregate by dark regions and join features to remove duplicate rows
-    """
-    annotsv_df["PB_dark_region_perc_overlap"] = annotsv_df["PB_dark_region_perc_overlap"].astype(str)
-    annotsv_dark_regions_dedup = annotsv_df.groupby(["CHROM", "POS", "END", "SVTYPE", "ID"]).agg(
-        {
-            "PB_dark_region_gene": ";".join,
-            "PB_dark_region": ";".join,
-            "PB_dark_region_perc_overlap": ";".join,
-        }
-    )
-    # merge with original loci table
-    annotsv_df = annotsv_df.drop(["PB_dark_region_gene", "PB_dark_region", "PB_dark_region_perc_overlap"], axis=1)
-    annotsv_dark_regions_merged = annotsv_df.merge(annotsv_dark_regions_dedup, on=["CHROM", "POS", "END", "SVTYPE", "ID"], how="left")
-    annotsv_dark_regions_merged_dedup = annotsv_dark_regions_merged.drop_duplicates(keep="first")
-
-    return annotsv_dark_regions_merged_dedup
-
 
 def annotate_repeats(annotsv_df, repeats, variant_type):
     #  sample SV must be fully encompassed by repeat
@@ -579,11 +497,61 @@ def parse_snpeff(snpeff_df, variant_type):
         svtype_list.append(svtype)
         try:
             end = [i for i in info if "END=" in i][0].split("=")[1]
-            if svtype == "BND" or svtype == "INS":
-                end = int(end) + 1
+            if svtype == "INS":
+                raw_pos = int(pos)
+                raw_end = int(end)
+
+                ciend_found = False
+                ciend_r = 0
+                for i in info:
+                    if i.startswith("CIEND="):
+                        ciend_r = int(i.split("=")[1].split(",")[1])
+                        ciend_found = True
+                        break
+
+                if ciend_found:
+                    end = raw_end + ciend_r + 1
+                elif raw_end <= raw_pos:
+                    end = raw_end + 1
+                else:
+                    end = raw_end
+                cipos_l = 0
+                for i in info:
+                    if i.startswith("CIPOS="):
+                        cipos_l = int(i.split("=")[1].split(",")[0])
+                        break
+                if cipos_l != 0:
+                    pos = raw_pos + int(cipos_l)
+            elif svtype in ("DEL", "DUP", "BND"):
+                CIEND = 0
+                for i in info:
+                    if "CIEND=" in i:
+                        CIEND = int(i.split("=")[1].split(",")[1])
+                        break
+                end = int(end) + int(CIEND)
             elif variant_type == "CNV":
                 CIEND = [i for i in info if "CIEND=" in i][0].split("=")[1].split(",")[1]
                 end = int(end) + int(CIEND)
+            elif svtype == "INV":
+                raw_pos = int(pos)
+                raw_end = int(end)
+
+                cipos_l = 0
+                cipos_r = 0
+                ciend_r = None
+
+                for i in info:
+                    if i.startswith("CIPOS="):
+                        cipos_l = int(i.split("=", 1)[1].split(",")[0])
+                        cipos_r = int(i.split("=", 1)[1].split(",")[1])
+                    elif i.startswith("CIEND="):
+                        ciend_r = int(i.split("=", 1)[1].split(",")[1])
+
+                pos = raw_pos + cipos_l
+                if ciend_r is not None:
+                    end = raw_end + ciend_r
+                else:
+                    end = raw_end + cipos_r
         except IndexError:
             end = int(pos) + 1
         end_list.append(end)
@@ -592,11 +560,22 @@ def parse_snpeff(snpeff_df, variant_type):
             ann_list.append(ann)
         except IndexError:
             ann_list.append("NA")
-        if svtype == "BND":
-            CIPOS = [i for i in info if "CIPOS=" in i][0].split("=")[1].split(",")[0]
+        if svtype in ("DEL", "DUP", "BND"):
+            CIPOS = 0
+            for i in info:
+                if "CIPOS=" in i:
+                    CIPOS = int(i.split("=")[1].split(",")[0])
+                    break
             pos = int(pos) + int(CIPOS)
         elif variant_type == "CNV":
-            CIPOS = [i for i in info if "CIPOS=" in i][0].split("=")[1].split(",")[0]
+            CIPOS_exist = False
+            for i in info:
+                if "CIPOS=" in i:
+                    CIPOS = i.split("=")[1].split(",")[0]
+                    CIPOS_exist = True
+                elif CIPOS_exist == False:
+                    CIPOS = 0
+#            CIPOS = [i for i in info if "CIPOS=" in i][0].split("=")[1].split(",")[0]
             pos = int(pos) + int(CIPOS)
         pos_list.append(pos)
     snpeff_df["SVTYPE"] = svtype_list
@@ -680,7 +659,13 @@ def calculate_sample_SV_overlap(sample_pos, sample_end, database_pos, database_e
 
 
 def add_clingen(clingen_df, gene, colname):
-    genes = [g for g in re.split('[;&]', gene) if g]
+#    genes = [g for g in re.split('[;&]', gene) if g]
+    try:
+        genes = [g for g in re.split('[;&]', gene) if g]
+    except TypeError:
+        print("ClinGen")
+        print(gene)
+        return "NA"
     clingen = []
     for gene in genes:
         # split by - for intergenic variants, which are annotated as <upstream_gene>-<downstream_gene>
@@ -703,6 +688,8 @@ def add_clingen_regions(annotsv_df, clingen_regions_df):
     """
     Annotate SVs against ClinGen regions
     """
+    def join_str(s):
+        return ";".join([str(x) for x in s.tolist() if pd.notna(x)])
     # parse Genomic Location to extract CHROM, START, END
     clingen_regions_df["CHROM"] = clingen_regions_df["Genomic Location"].str.split(":").str[0].apply(lambda x: x.replace("chr", ""))
     clingen_regions_df["START"] = clingen_regions_df["Genomic Location"].str.split(":").str[1].str.split("-").str[0]
@@ -741,9 +728,13 @@ def add_clingen_regions(annotsv_df, clingen_regions_df):
         ]
         
         # make a column with region details, e.g 1:25266309-25324509
-        intersect["clingen_region"] = intersect[
-            ["CHROM_region", "POS_region", "END_region"]
-        ].apply(lambda x: f"{x[0]}:{int(x[1])}-{int(x[2])}", axis=1)
+        intersect["clingen_region"] = (
+            intersect["CHROM_region"].astype(str)
+            + ":"
+            + pd.to_numeric(intersect["POS_region"], errors="coerce").fillna(0).astype(int).astype(str)
+            + "-"
+            + pd.to_numeric(intersect["END_region"], errors="coerce").fillna(0).astype(int).astype(str)
+        )
 
         # calculate percent of sample SV overlapped by region
         intersect["sample_SV_clingen_region_perc_overlap"] = intersect.apply(
@@ -752,9 +743,9 @@ def add_clingen_regions(annotsv_df, clingen_regions_df):
         # group by SV to aggregate multiple overlapping regions
         intersect_agg = intersect.groupby(["CHROM", "POS", "END", "SVTYPE", "ID"]).agg(
             {
-                "clingen_region_curation": ";".join,
-                "clingen_region": ";".join,
-                "sample_SV_clingen_region_perc_overlap": ";".join,
+                "clingen_region_curation": join_str,
+                "clingen_region": join_str,
+                "sample_SV_clingen_region_perc_overlap": join_str,
             }
         ).reset_index()
         
@@ -777,6 +768,18 @@ def add_clingen_regions(annotsv_df, clingen_regions_df):
         annotsv_df["sample_SV_clingen_region_perc_overlap"] = "."
     return annotsv_df
 
+def shorten_gene_list(value):
+    if pd.isna(value):
+        return value
+    s = str(value).strip()
+    if s in {".", "", "NA", "nan"}:
+        return s
+
+    genes = [g.strip() for g in s.split(";") if g.strip()]
+    if len(genes) <= 2:
+        return s
+
+    return f"{genes[0]};[...truncated...];{genes[-1]}"
 
 def add_BND_structure(svtype, info, alt):
     if svtype == "BND":
@@ -875,54 +878,25 @@ def main(
     gnomad,
     dgv,
     ensembl,
-    inhouse_c4r,
-    cnv_inhouse_c4r,
-    inhouse_tg,
-    cnv_inhouse_tg,
-    colorsdb,
-    dark_regions,
-    odd_regions,
     repeats,
-    c4r,
     clingen_HI,
     clingen_TS,
     clingen_disease,
-    clingen_regions
+    clingen_regions,
+    samples_tsv
 ):
-    print(c4r)
+#    print(c4r)
     # filter out SVs < 50bp
     df_len = df[apply_filter_length(df)]
     df_len = df_len.astype(str)
     # merge full and split AnnotSV annos
     df_merge = merge_full_split_annos(df_len)
-    sample_cols = [col for col in df.columns if "PB" in col]
+    samples_df = pd.read_csv(samples_tsv, sep="\t", dtype=str)["sample"]
+    sample_cols = [s for s in samples_df if s in df.columns]
     if len(sample_cols) == 0:
-        # for TCAG sequence IDs
-        regexp = re.compile("[0-9][0-9]-[0-9]+")
-        sample_cols = [col for col in df.columns if re.match(regexp, col)]
-    if len(sample_cols) == 0:
-        # C4R TCAG IDs
-        sample_cols = [col for col in df.columns if "RLG" in col]
-    if len(sample_cols) == 0:
-        # genesteps TCAG IDs
-        sample_cols = [col for col in df.columns if "RGS" in col]
-    if len(sample_cols) == 0:
-        # C4R IDs
-        regexp = re.compile("\d+[A-Z]*_[A-Z]*\d+")
-        sample_cols = [col for col in df.columns if re.match(regexp, col)]
-    if len(sample_cols) == 0:
-        # DECODER IDs
-        sample_cols = [col for col in df.columns if "SK" in col]
-    if len(sample_cols) == 0:
-        # genoderm IDs
-        for col in df.columns:
-            print(col)
-        sample_cols =  [col for col in df.columns if "GD" in col]
-    if len(sample_cols) == 0:
-       # ataxia IDS
-       sample_cols =  [col for col in df.columns if "GYM" in col or "HSC" in col]
-    if len(sample_cols) == 0:
-        print("no sample cols identified")
+        print(f"No sample columns from {samples_tsv} found in AnnotSV table.")
+        print(f"Expected sample IDs: {samples_df}")
+        print(f"Available columns: {list(df.columns)}")
         sys.exit(1)
                      
     # extract genotype and alt allele depth
@@ -937,25 +911,31 @@ def main(
             df_merge[f"{sample}_CN"] = [
                 get_CN(row[sample]) for index, row in df_merge.iterrows()
             ]
-        else:
-            df_merge[f"{sample}_AD"] = [
-                get_alt_depth(row[sample]) for index, row in df_merge.iterrows()
-            ]
-            df_merge[f"{sample}_DP"] = [
-                get_depth(row[sample]) for index, row in df_merge.iterrows()
-            ]
-            df_merge[f"{sample}_PS"] = [
-                get_phase_set(row[sample]) for index, row in df_merge.iterrows()
+        df_merge[f"{sample}_PR_alt"] = [
+            get_format_alt_value(row[sample], row["FORMAT"], "PR") for index, row in df_merge.iterrows()
         ]
+        df_merge[f"{sample}_SR_alt"] = [
+        get_format_alt_value(row[sample], row["FORMAT"], "SR") for index, row in df_merge.iterrows()
+        ]
+        df_merge[f"{sample}_VF_alt"] = [
+        get_format_alt_value(row[sample], row["FORMAT"], "VF") for index, row in df_merge.iterrows()
+        ]
+        df_merge[f"{sample}_GQ"] = [
+            get_format_value(row[sample], row["FORMAT"], "GQ") for index, row in df_merge.iterrows()
+        ]
+        df_merge[f"{sample}_FS"] = [
+            get_format_value(row[sample], row["FORMAT"], "FS") for index, row in df_merge.iterrows()
+        ]
+
+
     zyg_cols = [col for col in df_merge.columns if "_zyg" in col]
     gt_cols = [col for col in df_merge.columns if "_GT" in col]
+    pr_alt_cols = [col for col in df_merge.columns if "_PR_alt" in col]
+    sr_alt_cols = [col for col in df_merge.columns if "_SR_alt" in col]
+    vf_alt_cols = [col for col in df_merge.columns if "_VF_alt" in col]
+    gq_cols = [col for col in df_merge.columns if "_GQ" in col]
+    fs_cols = [col for col in df_merge.columns if "_FS" in col]
     cn_cols = [col for col in df_merge.columns if "_CN" in col]
-    ad_cols = [col for col in df_merge.columns if "_AD" in col]
-    dp_cols = [col for col in df_merge.columns if "_DP" in col]
-    ps_cols = [col for col in df_merge.columns if "_PS" in col]
-
-    # filter out benign SVs with AF > 1%
-    # df_merge_notbenign = df_merge[apply_filter_benign(df_merge)]
 
     # add snpeff annos
     snpeff_df = parse_snpeff(snpeff_df, variant_type)
@@ -967,6 +947,7 @@ def main(
     df_merge = merge_annotsv_snpeff(df_merge, snpeff_df)
 
     # add HPO terms by gene matching
+    df_merge["HPO"] = "."
     try:
         df_merge["HPO"] = [
             add_hpo(hpo, gene) for gene in df_merge["ENSEMBL_GENE"].values
@@ -1004,51 +985,6 @@ def main(
     ]
     df_merge = annotate_pop_svs(df_merge, dgv, dgv_cols, variant_type)
 
-    # add C4R inhouse db SV/CNV counts
-    print("Adding C4R frequencies")
-    inhouse_cols = [
-        "C4R_ID",
-        "C4R_AC",
-        "C4R_nhomalt",
-        "seen_in_C4R",
-        "seen_in_C4R_count",
-    ]
-    if variant_type == "SV" and inhouse_c4r:
-        df_merge = annotate_pop_svs(df_merge, inhouse_c4r, inhouse_cols, variant_type)
-    elif variant_type == "CNV" and cnv_inhouse_c4r:
-        df_merge = annotate_pop_svs(df_merge, cnv_inhouse_c4r, inhouse_cols, variant_type)
-    else:
-        # Initialize columns with default values
-        for col in inhouse_cols:
-            df_merge[col] = 0
-
-    inhouse_cols = [col for col in inhouse_cols if col != "C4R_ID"]
-
-    # add TG inhouse db SV/CNV counts
-    print("Adding TG frequencies")
-    tg_cols = [
-        "TG_ID",
-        "TG_AC",
-        "TG_nhomalt",
-        "seen_in_TG",
-        "seen_in_TG_count",
-    ]
-    if variant_type == "SV" and inhouse_tg:
-        df_merge  = annotate_pop_svs(df_merge, inhouse_tg, tg_cols, variant_type)
-    elif variant_type == "CNV" and cnv_inhouse_tg:
-        df_merge  = annotate_pop_svs(df_merge, cnv_inhouse_tg, tg_cols, variant_type)
-    else:
-        # Initialize columns with default values
-        for col in tg_cols:
-            df_merge[col] = 0
-
-    tg_cols = [col for col in tg_cols if col != "TG_ID"]
-
-    # add CoLoRSdb SVs
-    print("Adding CoLoRSdb SV frequencies")
-    colorsdb_cols = ["CoLoRSdb_AF", "CoLoRSdb_AC", "CoLoRSdb_AC_Hemi", "CoLoRSdb_nhomalt"]
-    df_merge = annotate_pop_svs(df_merge, colorsdb, colorsdb_cols, variant_type)
-
     # add exon counts
     df_merge = get_exon_counts(df_merge, exon_bed)
 
@@ -1066,14 +1002,6 @@ def main(
         annotate_UCSC(chrom, pos, end)
         for chrom, pos, end in zip(df_merge["CHROM"], df_merge["POS"], df_merge["END"])
     ]
-
-    # add PacBio dark regions
-    df_merge = annotate_pb_regions(df_merge, dark_regions, "PB_dark_region_gene")
-    df_merge = group_by_dark_regions(df_merge) # aggregate dark regions and join features to remove duplicate rows
-
-    # add PacBio odd regions
-    df_merge = annotate_pb_regions(df_merge, odd_regions, "PB_odd_region_type")
-    df_merge = group_by_odd_regions(df_merge) # aggregate odd regions and join features to remove duplicate rows
 
     # add PacBio repeats used in repeat expansion finding tool
     df_merge = annotate_repeats(df_merge, repeats, variant_type)
@@ -1096,16 +1024,24 @@ def main(
     # add clingen region curations
     df_merge = add_clingen_regions(df_merge, clingen_regions)
 
+    # if SVLEN is greater than 500,000 reduce the size of "GENE_NAME" and "ENSEMBL_GENE" to include only the first and last
+    svlen_numeric = pd.to_numeric(df_merge["SVLEN"], errors="coerce")
+    long_sv_mask = svlen_numeric.abs() > 500000
+
+    for col in ["GENE_NAME", "ENSEMBL_GENE"]:
+        df_merge.loc[long_sv_mask, col] = df_merge.loc[long_sv_mask, col].apply(shorten_gene_list)
+
     # define columns to be included in report
     hpo_cols = ["HPO"] if isinstance(hpo, pd.DataFrame) else []
-
-    # exclude C4R counts if not part of C4R study
-    if c4r != "True":
-        inhouse_cols = [col for col in inhouse_cols if col != "seen_in_C4R"]
 
     # add BND directionality information to INFO column
     df_merge["INFO_extended"] = df_merge.apply(
         lambda row: add_BND_structure(row["SVTYPE"], row["INFO"], row["ALT"]), axis=1
+    )
+    df_merge["INFO_extended"] = df_merge["INFO_extended"].apply(
+    lambda s: ";".join(
+        [x for x in str(s).split(";") if not x.startswith("CONTIG=")]
+    )
     )
     df_merge = df_merge.drop(["INFO"], axis=1)
     df_merge = df_merge.rename(columns={"INFO_extended": "INFO"})
@@ -1141,16 +1077,15 @@ def main(
         + hpo_cols
         + zyg_cols
         + gt_cols
-        + ad_cols
-        + dp_cols
-        + ps_cols
+        + pr_alt_cols
+        + sr_alt_cols
+        + vf_alt_cols 
+        + gq_cols
+        + fs_cols
         + cn_cols
         + ["Tx", "Frameshift", "EXONS_SPANNED", "Nearest_SS_type", "Dist_nearest_SS"]
         + gnomad_cols
         + dgv_cols
-        + inhouse_cols
-        + tg_cols
-        + colorsdb_cols
         + [
             "ExAC_delZ",
             "ExAC_dupZ",
@@ -1166,12 +1101,6 @@ def main(
             "Repeat_type_right",
             "SegDup_left",
             "SegDup_right",
-            "PB_dark_region_gene",
-            "PB_dark_region",
-            "PB_dark_region_perc_overlap",
-            "PB_odd_region_type",
-            "PB_odd_region",
-            "PB_odd_region_perc_overlap",
             "Adotto_tandem_repeat",
             "ENCODE_blacklist_characteristics_left",
             "ENCODE_blacklist_characteristics_right",
@@ -1238,56 +1167,14 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
-        "-inhouse_c4r",
-        help="C4R inhouse database (SV only)",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "-cnv_inhouse_c4r",
-        help="C4R inhouse database for CNV calls (CNV only)",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "-inhouse_tg",
-        help="TG inhouse database (SV only)",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "-cnv_inhouse_tg",
-        help="TG inhouse database for CNV calls (CNV only)",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "-colorsdb",
-        help="CoLoRSdb SVs in bed format",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "-dark_regions",
-        help="PacBio dark regions",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "-odd_regions",
-        help="PacBio odd regions",
+        "-samples",
+        help="samples.tsv with a 'sample' col",
         type=str,
         required=True,
     )
     parser.add_argument(
         "-repeats",
         help="Adotto repeats",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "-c4r",
-        help="C4R sample?",
         type=str,
         required=True,
     )
@@ -1318,17 +1205,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Validate that appropriate databases are provided based on variant_type
-    if args.variant_type == "SV":
-        if not args.inhouse_c4r:
-            parser.error("-inhouse_c4r is required for SV variant type")
-        if not args.inhouse_tg:
-            parser.error("-inhouse_tg is required for SV variant type")
-    elif args.variant_type == "CNV":
-        if not args.cnv_inhouse_c4r:
-            parser.error("-cnv_inhouse_c4r is required for CNV variant type")
-        if not args.cnv_inhouse_tg:
-            parser.error("-cnv_inhouse_tg is required for CNV variant type")
 
     # pull chrom, pos, end, SVtype, format fields and DDD annotations from AnnotSV text file
     df = pd.read_csv(args.annotsv, sep="\t", low_memory=False)
@@ -1379,17 +1255,10 @@ if __name__ == "__main__":
         args.gnomad,
         args.dgv,
         args.ensembl,
-        args.inhouse_c4r,
-        args.cnv_inhouse_c4r,
-        args.inhouse_tg,
-        args.cnv_inhouse_tg,
-        args.colorsdb,
-        args.dark_regions,
-        args.odd_regions,
         args.repeats,
-        args.c4r,
         clingen_HI,
         clingen_TS,
         clingen_disease,
         clingen_regions,
+        args.samples
     )
