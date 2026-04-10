@@ -9,7 +9,7 @@ import pandas as pd
 import pyranges as pr
 import numpy as np
 import re
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from compound_hets import compound_hets
 from annotation import annotate
@@ -87,6 +87,15 @@ def parse_arguments() -> argparse.Namespace:
         type=str,
         required=True,
         help="Path to directory containing WGS high-impact variant report CSV",
+    )
+    parser.add_argument(
+        "--wgs_denovo_variant_report_dir",
+        type=str,
+        default=None,
+        help=(
+            "Directory containing WGS de novo variant report CSV "
+            "Used only when --seq_type is short (e.g. short-read pipeline); ignored for long."
+        ),
     )
     parser.add_argument("--sv", type=str, required=True, help="Path to SV report CSV")
     parser.add_argument("--cnv", type=str, required=True, help="Path to CNV report CSV")
@@ -663,6 +672,8 @@ def annotate_reports(
     panel_variant_report_dir: str,
     panel_flank_variant_report_dir: str,
     wgs_high_impact_variant_report_dir: str,
+    seq_type: str,
+    wgs_denovo_variant_report_dir: Optional[str],
     sv_path: str,
     cnv_path: str,
     family: str,
@@ -670,7 +681,11 @@ def annotate_reports(
     hpo: str,
     logger: logging.Logger,
 ) -> None:
-    """Annotate variant reports with compound het status."""
+    """Annotate variant reports with compound het status.
+
+    De novo report CH columns are written only when seq_type is "short" and
+    wgs_denovo_variant_report_dir is set.
+    """
     # Create gene-level compound het status table
     gene_CH_status = all_variants[
         ["Ensembl_gene_id", "Variant_type", "compound_het_status"]
@@ -727,6 +742,30 @@ def annotate_reports(
     )
     wgs_high_impact_variant_report = wgs_high_impact_variant_report.fillna(MISSING_VALUE)
     write_report(wgs_high_impact_variant_report, family, "wgs.high.impact", logger)
+
+    # De novo sequence variant report (short-read pipelines only)
+    if seq_type == "short" and wgs_denovo_variant_report_dir:
+        denovo_paths = glob.glob(
+            os.path.join(wgs_denovo_variant_report_dir, "*.wgs*.csv")
+        )
+        if not denovo_paths:
+            raise FileNotFoundError(
+                f"No de novo report CSV matching *.wgs.*.csv under {wgs_denovo_variant_report_dir!r}"
+            )
+        denovo_variant_report_path = denovo_paths[0]
+        denovo_variant_report = pd.read_csv(denovo_variant_report_path)
+        denovo_variant_report = compound_hets.add_hpo_terms_to_report(
+            denovo_variant_report, hpo
+        )
+        denovo_variant_report = denovo_variant_report.merge(
+            gene_CH_status, on="Ensembl_gene_id", how="left"
+        )
+        denovo_variant_report = denovo_variant_report.fillna(MISSING_VALUE)
+        write_report(denovo_variant_report, family, "wgs.denovo", logger)
+    elif seq_type == "short" and not wgs_denovo_variant_report_dir:
+        logger.info(
+            "Skipping de novo report CH annotation (seq_type=short but --wgs_denovo_variant_report_dir not set)"
+        )
 
     # Annotate SV report
     SV = pd.read_csv(sv_path, low_memory=False)
@@ -917,6 +956,8 @@ def main():
         args.panel_variant_report_dir,
         args.panel_flank_variant_report_dir,
         args.wgs_high_impact_variant_report_dir,
+        args.seq_type,
+        args.wgs_denovo_variant_report_dir,
         args.sv,
         args.cnv,
         family,
