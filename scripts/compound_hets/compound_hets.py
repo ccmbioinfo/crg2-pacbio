@@ -84,7 +84,7 @@ def infer_pedigree_roles(pedigree: str) -> dict:
     """Map pedigree roles to individual IDs."""
     pedigree = pd.read_csv(
         pedigree,
-        sep=" ",
+        sep=None,
         header=None,
         names=[
             "family_ID",
@@ -94,6 +94,7 @@ def infer_pedigree_roles(pedigree: str) -> dict:
             "sex",
             "phenotype",
         ],
+        engine='python'
     )
     pedigree = pedigree.astype(str)
     # just take ID of first affected child if there are multiple affected children

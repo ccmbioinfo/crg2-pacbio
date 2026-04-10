@@ -50,6 +50,12 @@ def parse_arguments() -> argparse.Namespace:
         description="Annotate compound het status across variant types."
     )
     parser.add_argument(
+        "--seq_type",
+        type=str,
+        required=True,
+        help="Sequence type (long or short)",
+    )
+    parser.add_argument(
         "--high_med",
         type=str,
         required=True,
@@ -102,6 +108,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--family", type=str, required=True, help="Family ID")
     return parser.parse_args()
 
+def norm_sample_id(s: str) -> str:
+  return s.replace("-", "_") # vcf2db replaces '-' with '_' in sample IDs
+
+def norm_sample_id_dict(sample_ids: list) -> Dict[str, str]:
+  return {norm_sample_id(s): s for s in sample_ids}
 
 def setup_pedigree(pedigree_path: str, family: str, logger: logging.Logger) -> Tuple[str, str, Dict[str, str]]:
     """Load pedigree and extract family information."""
@@ -206,6 +217,7 @@ def process_sequence_variants(
     ensembl: pd.DataFrame,
     ensembl_to_NCBI_df: pd.DataFrame,
     sample_order_path: str,
+    seq_type: str,
     logger: logging.Logger,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Process sequence variants and return high_impact and variant_gt_details dataframes."""
@@ -232,14 +244,22 @@ def process_sequence_variants(
     compound_hets.replace_NCBI_IDs_with_Ensembl_IDs(high_impact, ensembl, ensembl_to_NCBI_df)
 
     # Filter by TG inhouse allele count
-    high_impact["TG_LRWGS_hom"].replace(np.nan, 0, inplace=True)
-    high_impact["TG_LRWGS_hom"] = high_impact["TG_LRWGS_hom"].astype(int)
-    high_impact = high_impact[high_impact["TG_LRWGS_hom"] <= 5]
-    
+    if seq_type == "long":
+        high_impact["TG_LRWGS_hom"].replace(np.nan, 0, inplace=True)
+        high_impact["TG_LRWGS_hom"] = high_impact["TG_LRWGS_hom"].astype(int)
+        high_impact = high_impact[high_impact["TG_LRWGS_hom"] <= 5]
+
+        
     # Create variant ID
     high_impact["Variant_id"] = high_impact.apply(
         lambda x: create_variant_id(x["Chrom"], x["Pos"], x["Ref"], x["Alt"]), axis=1
     )
+
+    # Extract sample IDs
+    sample_ids = pd.read_csv(sample_order_path, header=None)[0].tolist() # comma delimited PS IDs in PS column from gemini db are in the order of the samples in the VCF
+    sample_ids_dict = norm_sample_id_dict(sample_ids) # vcf2db replaces '-' with '_' in sample IDs
+    for sample_id in sample_ids_dict.keys():
+        high_impact.columns = high_impact.columns.str.replace(sample_id, sample_ids_dict[sample_id])
 
     # Filter heterozygous variants
     high_impact = filter_heterozygous_variants(
@@ -258,23 +278,20 @@ def process_sequence_variants(
         proband_id,
     )
 
-    # Extract sample IDs
-    sample_ids = pd.read_csv(sample_order_path, header=None)[0].tolist() # comma delimited PS IDs in PS column from gemini db are in the order of the samples in the VCF
+
     # Split PS column
-    if len(sample_ids) > 1:
-        ps_split_cols = high_impact["PS"].str.split(",", expand=True)
-        for idx, sample in enumerate(sample_ids):
-            high_impact[f"PS.{sample}"] = ps_split_cols[idx]
-    else:
-        high_impact[f"PS.{sample_ids[0]}"] = high_impact["PS"]
-    high_impact.drop(columns=["PS"], inplace=True)
+    if seq_type == "long":
+        if len(sample_ids) > 1:
+            ps_split_cols = high_impact["PS"].str.split(",", expand=True)
+            for idx, sample in enumerate(sample_ids):
+                high_impact[f"PS.{sample}"] = ps_split_cols[idx]
+        else:
+            high_impact[f"PS.{sample_ids[0]}"] = high_impact["PS"]
+        high_impact.drop(columns=["PS"], inplace=True)
 
     logger.debug("Extracted %d sample IDs from sequence variant table", len(sample_ids))
 
     # Melt sample columns
-    variant_ps = compound_hets.melt_sample_columns(
-        high_impact, "Variant_id", "PS.", "PS", sample_ids
-    )
     variant_gts = compound_hets.melt_sample_columns(
         high_impact, "Variant_id", "gts.", "GT", sample_ids
     )
@@ -285,11 +302,19 @@ def process_sequence_variants(
         high_impact, "Variant_id", "gt_quals.", "GT_qual", sample_ids
     )
 
-    # Merge melted dataframes
-    dfs = [variant_ps, variant_gts, variant_gt_type, variant_qual]
+    if seq_type == "long":
+        variant_ps = compound_hets.melt_sample_columns(
+            high_impact, "Variant_id", "PS.", "PS", sample_ids
+        )
+        dfs = [variant_ps, variant_gts, variant_gt_type, variant_qual]
+    else:
+        dfs = [variant_gts, variant_gt_type, variant_qual]
+    
     sequence_variant_gt_details = merge_melted_dataframes(
         dfs, ["Variant_id", "Ref", "Alt", "Sample"]
     )
+    if seq_type == "short":
+        sequence_variant_gt_details["PS"] = MISSING_VALUE
     
     # Fix missing genotypes
     sequence_variant_gt_details.loc[
@@ -326,6 +351,7 @@ def process_structural_variants(
     proband_id: str,
     fam_dict: Dict[str, str],
     variant_type: str,
+    seq_type: str,
     logger: logging.Logger,
 ) -> pd.DataFrame:
     """Process structural variants and return variant_gt_details dataframe."""
@@ -333,9 +359,14 @@ def process_structural_variants(
     SV = pd.read_csv(sv_path, low_memory=False)
     
     # Filter rare genic variants
-    SV_rare_high_impact = SV[
-        (SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01) & (SV["TG_nhomalt_max"] <= 5)
-    ].copy()
+    try:
+        SV_rare_high_impact = SV[
+            (SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01) & (SV["TG_nhomalt_max"] <= 5)
+        ].copy()
+    except KeyError:
+        SV_rare_high_impact = SV[
+            (SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01)
+        ].copy()
     logger.info(
         "Identified rare genic %s variants (gnomAD AF <= 0.01)",
         variant_type,
@@ -400,7 +431,7 @@ def process_structural_variants(
     sample_ids = extract_sample_ids_from_columns(SV, "_GT")
     
     # Melt sample columns
-    if variant_type == VARIANT_TYPE_CNV:
+    if variant_type == VARIANT_TYPE_CNV or seq_type == "short":
         # CNVs don't have PS columns, create dummy dataframe with PS values as "."
         variant_ids = SV_rare_high_impact["Variant_id"].unique()
         variant_ps = pd.DataFrame({
@@ -760,17 +791,17 @@ def main():
     ensembl = pd.read_csv(args.ensembl, low_memory=False)
     ensembl_to_NCBI_df = pd.read_csv(args.ensembl_to_NCBI_df, low_memory=False)
     high_impact, sequence_variant_gt_details = process_sequence_variants(
-        args.high_med, args.low, proband_id, fam_dict, ensembl, ensembl_to_NCBI_df, args.sample_order, logger
+        args.high_med, args.low, proband_id, fam_dict, ensembl, ensembl_to_NCBI_df, args.sample_order, args.seq_type, logger
     )
     
     # Process structural variants
     SV_gt_details = process_structural_variants(
-        args.sv, proband_id, fam_dict, VARIANT_TYPE_SV, logger
+        args.sv, proband_id, fam_dict, VARIANT_TYPE_SV, args.seq_type, logger
     )
     
     # Process CNVs
     CNV_gt_details = process_structural_variants(
-        args.cnv, proband_id, fam_dict, VARIANT_TYPE_CNV, logger
+        args.cnv, proband_id, fam_dict, VARIANT_TYPE_CNV, args.seq_type, logger
     )
     
     # Combine all variant types
