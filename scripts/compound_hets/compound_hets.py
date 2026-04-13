@@ -567,6 +567,7 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
     # Phenotips TSV has a space in column name: " Gene symbol"
     hpo_df.columns = hpo_df.columns.str.strip()
     hpo_df = hpo_df.rename(columns={'Gene symbol': 'Gene Symbol'})
+    hpo_df = hpo_df.dropna(subset=["Gene Symbol"])
     hpo_df = hpo_df.set_index("Gene ID").drop(columns=["Gene Symbol"])
     report = report.join(hpo_df, on="Ensembl_gene_id").rename(columns={"Number of occurrences": "HPO_count", "Features": "HPO_terms"})
     
