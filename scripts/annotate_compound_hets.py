@@ -289,14 +289,13 @@ def process_sequence_variants(
 
 
     # Split PS column
-    if seq_type == "long":
-        if len(sample_ids) > 1:
-            ps_split_cols = high_impact["PS"].str.split(",", expand=True)
-            for idx, sample in enumerate(sample_ids):
-                high_impact[f"PS.{sample}"] = ps_split_cols[idx]
-        else:
-            high_impact[f"PS.{sample_ids[0]}"] = high_impact["PS"]
-        high_impact.drop(columns=["PS"], inplace=True)
+    if len(sample_ids) > 1:
+        ps_split_cols = high_impact["PS"].str.split(",", expand=True)
+        for idx, sample in enumerate(sample_ids):
+            high_impact[f"PS.{sample}"] = ps_split_cols[idx]
+    else:
+        high_impact[f"PS.{sample_ids[0]}"] = high_impact["PS"]
+    high_impact.drop(columns=["PS"], inplace=True)
 
     logger.debug("Extracted %d sample IDs from sequence variant table", len(sample_ids))
 
@@ -311,19 +310,14 @@ def process_sequence_variants(
         high_impact, "Variant_id", "gt_quals.", "GT_qual", sample_ids
     )
 
-    if seq_type == "long":
-        variant_ps = compound_hets.melt_sample_columns(
-            high_impact, "Variant_id", "PS.", "PS", sample_ids
-        )
-        dfs = [variant_ps, variant_gts, variant_gt_type, variant_qual]
-    else:
-        dfs = [variant_gts, variant_gt_type, variant_qual]
+    variant_ps = compound_hets.melt_sample_columns(
+        high_impact, "Variant_id", "PS.", "PS", sample_ids
+    )
+    dfs = [variant_ps, variant_gts, variant_gt_type, variant_qual]
     
     sequence_variant_gt_details = merge_melted_dataframes(
         dfs, ["Variant_id", "Ref", "Alt", "Sample"]
     )
-    if seq_type == "short":
-        sequence_variant_gt_details["PS"] = MISSING_VALUE
     
     # Fix missing genotypes
     sequence_variant_gt_details.loc[

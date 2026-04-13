@@ -13,9 +13,9 @@ seq_type=$3
 
 if [[ "$seq_type" == "long" ]]
 then
-    long_read_cols="PS, tg_lrwgs_ac as TG_LRWGS_ac, tg_lrwgs_hom as TG_LRWGS_hom,"
+    long_read_cols="PS as PS, tg_lrwgs_ac as TG_LRWGS_ac, tg_lrwgs_hom as TG_LRWGS_hom,"
 else
-    long_read_cols="00,"
+    long_read_cols="PS as PS,"
 fi
 
 max_af=0.01
