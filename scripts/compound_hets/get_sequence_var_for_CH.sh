@@ -9,6 +9,15 @@ then
 fi
 
 severity_threshold=$2
+seq_type=$3
+
+if [[ "$seq_type" == "long" ]]
+then
+    long_read_cols="PS as PS, tg_lrwgs_ac as TG_LRWGS_ac, tg_lrwgs_hom as TG_LRWGS_hom,"
+else
+    long_read_cols="PS as PS,"
+fi
+
 max_af=0.01
 alt_depth=3
 
@@ -28,12 +37,10 @@ sQuery="select \
         COALESCE(clinvar_pathogenic, '') || COALESCE( ';' || NULLIF(clinvar_sig,''), '') || COALESCE( ';' || NULLIF(clinvar_sig_conf,''), '') as Clinvar, \
         ensembl_gene_id as Ensembl_gene_id,\
         gnomad_af_grpmax as Gnomad_af_grpmax,\
-        tg_lrwgs_ac as TG_LRWGS_ac,\
-        tg_lrwgs_hom as TG_LRWGS_hom,\
         cadd_phred as Cadd_score,\
         COALESCE(spliceai_score, '') as SpliceAI_score,
         promoterAI as promoterAI_score,
-        PS as PS,"
+        $long_read_cols"
 
 while read sample
 do

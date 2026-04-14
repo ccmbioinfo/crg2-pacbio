@@ -9,7 +9,7 @@ import pandas as pd
 import pyranges as pr
 import numpy as np
 import re
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from compound_hets import compound_hets
 from annotation import annotate
@@ -50,6 +50,12 @@ def parse_arguments() -> argparse.Namespace:
         description="Annotate compound het status across variant types."
     )
     parser.add_argument(
+        "--seq_type",
+        type=str,
+        required=True,
+        help="Sequence type (long or short)",
+    )
+    parser.add_argument(
         "--high_med",
         type=str,
         required=True,
@@ -82,6 +88,15 @@ def parse_arguments() -> argparse.Namespace:
         required=True,
         help="Path to directory containing WGS high-impact variant report CSV",
     )
+    parser.add_argument(
+        "--wgs_denovo_variant_report_dir",
+        type=str,
+        default=None,
+        help=(
+            "Directory containing WGS de novo variant report CSV "
+            "Used only when --seq_type is short (e.g. short-read pipeline); ignored for long."
+        ),
+    )
     parser.add_argument("--sv", type=str, required=True, help="Path to SV report CSV")
     parser.add_argument("--cnv", type=str, required=True, help="Path to CNV report CSV")
     parser.add_argument(
@@ -102,6 +117,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--family", type=str, required=True, help="Family ID")
     return parser.parse_args()
 
+def norm_sample_id(s: str) -> str:
+  return s.replace("-", "_") # vcf2db replaces '-' with '_' in sample IDs
+
+def norm_sample_id_dict(sample_ids: list) -> Dict[str, str]:
+  return {norm_sample_id(s): s for s in sample_ids}
 
 def setup_pedigree(pedigree_path: str, family: str, logger: logging.Logger) -> Tuple[str, str, Dict[str, str]]:
     """Load pedigree and extract family information."""
@@ -180,14 +200,15 @@ def map_zygosity_from_gt_type(gt_type: int) -> str:
     else:
         return ZYGOSITY_MISSING
 
-def write_report(df: pd.DataFrame, family: str, report_type: str, logger: logging.Logger) -> None:
+def write_report(df: pd.DataFrame, family: str, report_type: str, seq_type: str, logger: logging.Logger) -> None:
     """Write report to file."""
     today = date.today()
     today = today.strftime("%Y-%m-%d")
-    df.to_csv(f"reports/{family}.{report_type}.CH.{today}.csv", index=False)
+    suffix = "csv" if seq_type == "long" else "hg38.csv"
+    df.to_csv(f"reports/{family}.{report_type}.CH.{today}.{suffix}", index=False)
     # Write a symlink instead of a new copy for the Snakemake target
-    symlink_path = f"reports/{family}.{report_type}.CH.csv"
-    target_path = f"reports/{family}.{report_type}.CH.{today}.csv"
+    symlink_path = f"reports/{family}.{report_type}.CH.{suffix}"
+    target_path = f"reports/{family}.{report_type}.CH.{today}.{suffix}"
     try:
         if os.path.islink(symlink_path) or os.path.exists(symlink_path):
             os.remove(symlink_path)
@@ -195,7 +216,7 @@ def write_report(df: pd.DataFrame, family: str, report_type: str, logger: loggin
     except Exception as e:
         logger.warning(f"Could not create symlink {symlink_path} -> {target_path}: {e}")
 
-    logger.info(f"Wrote {report_type} report to reports/{family}.{report_type}.CH.{today}.csv")
+    logger.info(f"Wrote {report_type} report to reports/{family}.{report_type}.CH.{today}.{suffix}")
 
 
 def process_sequence_variants(
@@ -206,6 +227,7 @@ def process_sequence_variants(
     ensembl: pd.DataFrame,
     ensembl_to_NCBI_df: pd.DataFrame,
     sample_order_path: str,
+    seq_type: str,
     logger: logging.Logger,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Process sequence variants and return high_impact and variant_gt_details dataframes."""
@@ -232,14 +254,22 @@ def process_sequence_variants(
     compound_hets.replace_NCBI_IDs_with_Ensembl_IDs(high_impact, ensembl, ensembl_to_NCBI_df)
 
     # Filter by TG inhouse allele count
-    high_impact["TG_LRWGS_hom"].replace(np.nan, 0, inplace=True)
-    high_impact["TG_LRWGS_hom"] = high_impact["TG_LRWGS_hom"].astype(int)
-    high_impact = high_impact[high_impact["TG_LRWGS_hom"] <= 5]
-    
+    if seq_type == "long":
+        high_impact["TG_LRWGS_hom"].replace(np.nan, 0, inplace=True)
+        high_impact["TG_LRWGS_hom"] = high_impact["TG_LRWGS_hom"].astype(int)
+        high_impact = high_impact[high_impact["TG_LRWGS_hom"] <= 5]
+
+        
     # Create variant ID
     high_impact["Variant_id"] = high_impact.apply(
         lambda x: create_variant_id(x["Chrom"], x["Pos"], x["Ref"], x["Alt"]), axis=1
     )
+
+    # Extract sample IDs
+    sample_ids = pd.read_csv(sample_order_path, header=None)[0].tolist() # comma delimited PS IDs in PS column from gemini db are in the order of the samples in the VCF
+    sample_ids_dict = norm_sample_id_dict(sample_ids) # vcf2db replaces '-' with '_' in sample IDs
+    for sample_id in sample_ids_dict.keys():
+        high_impact.columns = high_impact.columns.str.replace(sample_id, sample_ids_dict[sample_id])
 
     # Filter heterozygous variants
     high_impact = filter_heterozygous_variants(
@@ -258,8 +288,7 @@ def process_sequence_variants(
         proband_id,
     )
 
-    # Extract sample IDs
-    sample_ids = pd.read_csv(sample_order_path, header=None)[0].tolist() # comma delimited PS IDs in PS column from gemini db are in the order of the samples in the VCF
+
     # Split PS column
     if len(sample_ids) > 1:
         ps_split_cols = high_impact["PS"].str.split(",", expand=True)
@@ -272,9 +301,6 @@ def process_sequence_variants(
     logger.debug("Extracted %d sample IDs from sequence variant table", len(sample_ids))
 
     # Melt sample columns
-    variant_ps = compound_hets.melt_sample_columns(
-        high_impact, "Variant_id", "PS.", "PS", sample_ids
-    )
     variant_gts = compound_hets.melt_sample_columns(
         high_impact, "Variant_id", "gts.", "GT", sample_ids
     )
@@ -285,8 +311,11 @@ def process_sequence_variants(
         high_impact, "Variant_id", "gt_quals.", "GT_qual", sample_ids
     )
 
-    # Merge melted dataframes
+    variant_ps = compound_hets.melt_sample_columns(
+        high_impact, "Variant_id", "PS.", "PS", sample_ids
+    )
     dfs = [variant_ps, variant_gts, variant_gt_type, variant_qual]
+    
     sequence_variant_gt_details = merge_melted_dataframes(
         dfs, ["Variant_id", "Ref", "Alt", "Sample"]
     )
@@ -326,6 +355,7 @@ def process_structural_variants(
     proband_id: str,
     fam_dict: Dict[str, str],
     variant_type: str,
+    seq_type: str,
     logger: logging.Logger,
 ) -> pd.DataFrame:
     """Process structural variants and return variant_gt_details dataframe."""
@@ -333,9 +363,14 @@ def process_structural_variants(
     SV = pd.read_csv(sv_path, low_memory=False)
     
     # Filter rare genic variants
-    SV_rare_high_impact = SV[
-        (SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01) & (SV["TG_nhomalt_max"] <= 5)
-    ].copy()
+    try:
+        SV_rare_high_impact = SV[
+            (SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01) & (SV["TG_nhomalt_max"] <= 5)
+        ].copy()
+    except KeyError:
+        SV_rare_high_impact = SV[
+            (SV["VARIANT"] != "intergenic_region") & (SV["gnomad_maxAF"] <= 0.01)
+        ].copy()
     logger.info(
         "Identified rare genic %s variants (gnomAD AF <= 0.01)",
         variant_type,
@@ -400,7 +435,7 @@ def process_structural_variants(
     sample_ids = extract_sample_ids_from_columns(SV, "_GT")
     
     # Melt sample columns
-    if variant_type == VARIANT_TYPE_CNV:
+    if variant_type == VARIANT_TYPE_CNV or seq_type == "short":
         # CNVs don't have PS columns, create dummy dataframe with PS values as "."
         variant_ids = SV_rare_high_impact["Variant_id"].unique()
         variant_ps = pd.DataFrame({
@@ -632,6 +667,8 @@ def annotate_reports(
     panel_variant_report_dir: str,
     panel_flank_variant_report_dir: str,
     wgs_high_impact_variant_report_dir: str,
+    seq_type: str,
+    wgs_denovo_variant_report_dir: Optional[str],
     sv_path: str,
     cnv_path: str,
     family: str,
@@ -639,7 +676,11 @@ def annotate_reports(
     hpo: str,
     logger: logging.Logger,
 ) -> None:
-    """Annotate variant reports with compound het status."""
+    """Annotate variant reports with compound het status.
+
+    De novo report CH columns are written only when seq_type is "short" and
+    wgs_denovo_variant_report_dir is set.
+    """
     # Create gene-level compound het status table
     gene_CH_status = all_variants[
         ["Ensembl_gene_id", "Variant_type", "compound_het_status"]
@@ -665,7 +706,7 @@ def annotate_reports(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
     sequence_variant_report = sequence_variant_report.fillna(MISSING_VALUE)
-    write_report(sequence_variant_report, family, "wgs.coding", logger)
+    write_report(sequence_variant_report, family, "wgs.coding", seq_type, logger)
 
     # Annotate panel sequence variant report
     panel_variant_report_path = glob.glob(f"{panel_variant_report_dir}/*.wgs*csv")[0]
@@ -675,7 +716,7 @@ def annotate_reports(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
     panel_variant_report = panel_variant_report.fillna(MISSING_VALUE)
-    write_report(panel_variant_report, family, "panel", logger)
+    write_report(panel_variant_report, family, "panel", seq_type, logger)
 
     # Annotate panel-flank sequence variant report
     panel_flank_variant_report_path = glob.glob(f"{panel_flank_variant_report_dir}/*.wgs*csv")[0]
@@ -685,7 +726,7 @@ def annotate_reports(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
     panel_flank_variant_report = panel_flank_variant_report.fillna(MISSING_VALUE)
-    write_report(panel_flank_variant_report, family, "panel-flank", logger)
+    write_report(panel_flank_variant_report, family, "panel-flank", seq_type, logger)
 
     # Annotate wgs high-impact sequence variant report
     wgs_high_impact_variant_report_path = glob.glob(f"{wgs_high_impact_variant_report_dir}/*.wgs.high.impact*csv")[0]
@@ -695,7 +736,31 @@ def annotate_reports(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
     wgs_high_impact_variant_report = wgs_high_impact_variant_report.fillna(MISSING_VALUE)
-    write_report(wgs_high_impact_variant_report, family, "wgs.high.impact", logger)
+    write_report(wgs_high_impact_variant_report, family, "wgs.high.impact", seq_type, logger)
+
+    # De novo sequence variant report (short-read pipelines only)
+    if seq_type == "short" and wgs_denovo_variant_report_dir:
+        denovo_paths = glob.glob(
+            os.path.join(wgs_denovo_variant_report_dir, "*.wgs*.csv")
+        )
+        if not denovo_paths:
+            raise FileNotFoundError(
+                f"No de novo report CSV matching *.wgs.*.csv under {wgs_denovo_variant_report_dir!r}"
+            )
+        denovo_variant_report_path = denovo_paths[0]
+        denovo_variant_report = pd.read_csv(denovo_variant_report_path)
+        denovo_variant_report = compound_hets.add_hpo_terms_to_report(
+            denovo_variant_report, hpo
+        )
+        denovo_variant_report = denovo_variant_report.merge(
+            gene_CH_status, on="Ensembl_gene_id", how="left"
+        )
+        denovo_variant_report = denovo_variant_report.fillna(MISSING_VALUE)
+        write_report(denovo_variant_report, family, "wgs.denovo", seq_type, logger)
+    elif seq_type == "short" and not wgs_denovo_variant_report_dir:
+        logger.info(
+            "Skipping de novo report CH annotation (seq_type=short but --wgs_denovo_variant_report_dir not set)"
+        )
 
     # Annotate SV report
     SV = pd.read_csv(sv_path, low_memory=False)
@@ -719,7 +784,7 @@ def annotate_reports(
         for d in CH_status_series
     ]
     SV = SV.fillna(MISSING_VALUE)
-    write_report(SV, family, "sv", logger)
+    write_report(SV, family, "sv", seq_type, logger)
 
     # Annotate CNV report
     CNV = pd.read_csv(cnv_path, low_memory=False)
@@ -743,7 +808,7 @@ def annotate_reports(
         for d in CH_status_series
     ]
     CNV = CNV.fillna(MISSING_VALUE)
-    write_report(CNV, family, "cnv", logger)
+    write_report(CNV, family, "cnv", seq_type, logger)
 
 
 def main():
@@ -760,17 +825,17 @@ def main():
     ensembl = pd.read_csv(args.ensembl, low_memory=False)
     ensembl_to_NCBI_df = pd.read_csv(args.ensembl_to_NCBI_df, low_memory=False)
     high_impact, sequence_variant_gt_details = process_sequence_variants(
-        args.high_med, args.low, proband_id, fam_dict, ensembl, ensembl_to_NCBI_df, args.sample_order, logger
+        args.high_med, args.low, proband_id, fam_dict, ensembl, ensembl_to_NCBI_df, args.sample_order, args.seq_type, logger
     )
     
     # Process structural variants
     SV_gt_details = process_structural_variants(
-        args.sv, proband_id, fam_dict, VARIANT_TYPE_SV, logger
+        args.sv, proband_id, fam_dict, VARIANT_TYPE_SV, args.seq_type, logger
     )
     
     # Process CNVs
     CNV_gt_details = process_structural_variants(
-        args.cnv, proband_id, fam_dict, VARIANT_TYPE_CNV, logger
+        args.cnv, proband_id, fam_dict, VARIANT_TYPE_CNV, args.seq_type, logger
     )
     
     # Combine all variant types
@@ -877,7 +942,7 @@ def main():
         }
     )
     
-    write_report(wide_variants, family, "compound.het.status", logger)
+    write_report(wide_variants, family, "compound.het.status", args.seq_type, logger)
     
     # Annotate reports
     annotate_reports(
@@ -886,6 +951,8 @@ def main():
         args.panel_variant_report_dir,
         args.panel_flank_variant_report_dir,
         args.wgs_high_impact_variant_report_dir,
+        args.seq_type,
+        args.wgs_denovo_variant_report_dir,
         args.sv,
         args.cnv,
         family,
