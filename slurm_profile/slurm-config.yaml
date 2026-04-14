@@ -24,6 +24,7 @@ __default__:
   output: "slurm/%x-%j.out"
 
 allsnvreport:
+  time: "50:00:00"
   mem: "60G"
 
 vcf2db:
