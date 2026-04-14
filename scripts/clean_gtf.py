@@ -47,7 +47,7 @@ if __name__ == "__main__":
     ensembl_df.columns = map(str.lower, ensembl_df.columns)
     ensembl_df = ensembl_df.rename(columns={"gene_id": "name"})
 
-    ensembl_df.to_csv("Homo_sapiens.GRCh38.112.gtf_subset.csv", index=False)
+    ensembl_df.to_csv(f"{args.ensembl_gtf}_subset.csv", index=False)
 
     # clean refseq gff (for some reason gtf throws errors with pyranges)
     refseq = pyranges.read_gff3(args.refseq_gff3)
