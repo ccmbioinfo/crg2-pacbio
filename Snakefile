@@ -9,9 +9,6 @@ include: "rules/compound_hets.smk"
 include: "rules/cnvreport.smk"
 include: "rules/qc.smk"
 
-if str(config["run"].get("acmg_sf", "")).lower() == "true":
-    include: "rules/acmg_sf.smk"
-    
 def get_children_ids(ped_file):
     import pandas as pd
     pedigree = pd.read_csv(ped_file, sep=" ", header=None, 
@@ -24,11 +21,16 @@ def get_children_ids(ped_file):
 
 samples = pd.read_table(config["run"]["samples"], dtype=str).set_index("sample", drop=False)
 
+    
 ##### Target rules #####
 project = config["run"]["project"]
 if config["run"]["ped"]:
 	children = get_children_ids(config["run"]["ped"])
 
+#conditionally include acmf_sf rule
+if str(config["run"].get("acmg_sf", "")).lower() == "true":
+    include: "rules/acmg_sf.smk"
+    
 sf_suffix = ".SF" if str(config["run"].get("acmg_sf", "")).lower() == "true" else ""
 
 rule all:
