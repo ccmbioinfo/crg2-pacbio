@@ -26,4 +26,4 @@ rule add_acmg_sf_column:
     conda:
         "../envs/common.yaml"
     script:
-        config["tools"]["cphi_dragen"] + "/workflow/scripts/add_acmg_sf_column.py"
+        config["tools"]["cphi-dragen-anno"] + "/workflow/scripts/add_acmg_sf_column.py"
