@@ -38,7 +38,7 @@ rule all:
         "reports/{family}.wgs.coding.CH{sf}.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.sv.CH{sf}.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.cnv.CH{sf}.csv".format(family=project, sf=sf_suffix),
-        "reports/{family}.compound.het.status.CH{sf}.csv".format(family=project, sf=sf_suffix),
+        "reports/{family}.compound.het.status.CH.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.panel.CH{sf}.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.panel-flank.CH{sf}.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.wgs.high.impact.CH{sf}.csv".format(family=project, sf=sf_suffix),
@@ -46,6 +46,6 @@ rule all:
         "reports/{family}.known.path.str.loci.csv".format(family=project),
         "reports/{family}.multiqc_report.html".format(family=project),
         expand("reports/{family}_{child}.TRGT.denovo.annotated.csv",
-               family=project,
-               child=children) if len(children) > 0 else []
+            family=project,
+            child=children) if len(children) > 0 else []
 

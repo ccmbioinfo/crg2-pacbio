@@ -1,11 +1,12 @@
 acmg_sf_input_report_type = [
     "wgs.coding.CH",
-    "panel.CH",
-    "panel-flank.CH",
     "wgs.high.impact.CH",
     "sv.CH",
     "cnv.CH",
 ]
+if config["run"].get("hpo", ""):
+    acmg_sf_input_report_type.append("panel.CH")
+    acmg_sf_input_report_type.append("panel-flank.CH")
 
 if len(children) > 0:
     acmg_sf_input_report_type.append("wgs.denovo.CH")
@@ -26,4 +27,4 @@ rule add_acmg_sf_column:
     conda:
         "../envs/common.yaml"
     script:
-        config["tools"]["cphi-dragen-anno"] + "/workflow/scripts/add_acmg_sf_column.py"
+        "../scripts/add_acmg_sf_column.py"

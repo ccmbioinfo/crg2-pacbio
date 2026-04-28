@@ -75,4 +75,3 @@ rule identify_compound_hets:
         --sample_order {input.sample_order}  \
         --family {wildcards.family}) > {log} 2>&1
         """
- 
