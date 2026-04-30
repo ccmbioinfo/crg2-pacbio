@@ -25,7 +25,7 @@ samples = pd.read_table(config["run"]["samples"], dtype=str).set_index("sample",
 ##### Target rules #####
 project = config["run"]["project"]
 if config["run"]["ped"]:
-	children = get_children_ids(config["run"]["ped"])
+    children = get_children_ids(config["run"]["ped"])
 
 #conditionally include acmf_sf rule
 if str(config["run"].get("acmg_sf", "")).lower() == "true":
@@ -33,18 +33,24 @@ if str(config["run"].get("acmg_sf", "")).lower() == "true":
     
 sf_suffix = ".SF" if str(config["run"].get("acmg_sf", "")).lower() == "true" else ""
 
+hpo_reports = []
+if config["run"].get("hpo", ""):
+    hpo_reports = [
+        "reports/{family}.panel.CH.csv".format(family=project),
+        "reports/{family}.panel-flank.CH.csv".format(family=project),
+    ]
+    
 rule all:
     input:
         "reports/{family}.wgs.coding.CH{sf}.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.sv.CH{sf}.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.cnv.CH{sf}.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.compound.het.status.CH{sf}.csv".format(family=project, sf=sf_suffix),
-        "reports/{family}.panel.CH{sf}.csv".format(family=project, sf=sf_suffix),
-        "reports/{family}.panel-flank.CH{sf}.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.wgs.high.impact.CH{sf}.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.repeat.outliers.annotated.csv".format(family=project),
         "reports/{family}.known.path.str.loci.csv".format(family=project),
         "reports/{family}.multiqc_report.html".format(family=project),
+        *hpo_reports,
         expand("reports/{family}_{child}.TRGT.denovo.annotated.csv",
                family=project,
                child=children) if len(children) > 0 else []

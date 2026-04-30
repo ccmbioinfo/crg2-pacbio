@@ -705,7 +705,7 @@ def annotate_reports(
     sequence_variant_report = pd.read_csv(sequence_variant_report_path)
     if hpo and os.path.isfile(hpo):
         sequence_variant_report = compound_hets.add_hpo_terms_to_report(sequence_variant_report, hpo)
-    else
+    else:
         logger.warning("Note: no HPO file provided; wgs.coding.CH will be created without HPO columns")
     
     sequence_variant_report = sequence_variant_report.merge(

@@ -28,6 +28,8 @@ rule get_VCF_sample_order:
     shell:
         "bcftools query -l {input.vcf} > {output.sample_order}"
 
+hpo_available = config["run"].get("hpo", "")
+
 rule identify_compound_hets:
     input:
         high_med_variants="small_variants/{family}.HIGH-MED.impact.variants.tsv",
@@ -40,20 +42,27 @@ rule identify_compound_hets:
         CNV_report="cnv/{family}.cnv.csv",
         ensembl=config["annotation"]["general"]["ensembl"],
         ensembl_to_NCBI_df=config["annotation"]["ensembl_to_NCBI_df"],
-        HPO=config["run"]["hpo"],
+        **({
+            "panel_variant_report_dir": "small_variants/panel/{family}",
+            "panel_flank_variant_report_dir": "small_variants/panel-flank/{family}",
+            "HPO": config["run"]["hpo"],
+        } if hpo_available else {})
         pedigree=config["run"]["ped"],
         sample_order="small_variants/{family}.sample.order.txt",
     output:
         sequence_variant_report_CH="reports/{family}.wgs.coding.CH.csv",
-        panel_variant_report_CH="reports/{family}.panel.CH.csv",
-        panel_flank_variant_report_CH="reports/{family}.panel-flank.CH.csv",
         wgs_high_impact_variant_report_CH="reports/{family}.wgs.high.impact.CH.csv",
         SV_report_CH="reports/{family}.sv.CH.csv",
         CNV_report_CH="reports/{family}.cnv.CH.csv",
         compound_het_status="reports/{family}.compound.het.status.CH.csv",
+        **({
+        "panel_variant_report_CH": "reports/{family}.panel.CH.csv",
+        "panel_flank_variant_report_CH": "reports/{family}.panel-flank.CH.csv",
+        } if hpo_on else {})
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
-        seq_type="long"
+        seq_type="long",
+        hpo_panel_args=("--hpo {input.HPO} --panel_variant_report_dir {input.panel_variant_report_dir} --panel_flank_variant_report_dir {input.panel_flank_variant_report_dir}" if hpo_available else "")
     conda:
         "../envs/str_sv.yaml"
     log:
@@ -67,10 +76,8 @@ rule identify_compound_hets:
         --ensembl {input.ensembl}  \
         --ensembl_to_NCBI_df {input.ensembl_to_NCBI_df}  \
         --pedigree {input.pedigree}  \
-        --hpo {input.HPO}  \
+        {params.hpo_panel_args}  \
         --sequence_variant_report_dir {input.small_variant_report_dir}  \
-        --panel_variant_report_dir {input.panel_variant_report_dir}  \
-        --panel_flank_variant_report_dir {input.panel_flank_variant_report_dir}  \
         --wgs_high_impact_variant_report_dir {input.wgs_high_impact_variant_report_dir}  \
         --sample_order {input.sample_order}  \
         --family {wildcards.family}) > {log} 2>&1
