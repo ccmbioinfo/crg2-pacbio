@@ -35,8 +35,6 @@ rule identify_compound_hets:
         high_med_variants="small_variants/{family}.HIGH-MED.impact.variants.tsv",
         low_variants="small_variants/{family}.LOW.impact.variants.tsv",
         small_variant_report_dir="small_variants/coding/{family}",
-        panel_variant_report_dir="small_variants/panel/{family}",
-        panel_flank_variant_report_dir="small_variants/panel-flank/{family}",
         wgs_high_impact_variant_report_dir="small_variants/wgs-high-impact/{family}",
         SV_report="sv/{family}.sv.csv",
         CNV_report="cnv/{family}.cnv.csv",
@@ -58,7 +56,7 @@ rule identify_compound_hets:
         **({
         "panel_variant_report_CH": "reports/{family}.panel.CH.csv",
         "panel_flank_variant_report_CH": "reports/{family}.panel-flank.CH.csv",
-        } if hpo_on else {})
+        } if hpo_available else {}),
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         seq_type="long",
