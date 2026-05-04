@@ -44,7 +44,7 @@ rule identify_compound_hets:
             "panel_variant_report_dir": "small_variants/panel/{family}",
             "panel_flank_variant_report_dir": "small_variants/panel-flank/{family}",
             "HPO": config["run"]["hpo"],
-        } if hpo_available else {})
+        } if hpo_available else {}),
         pedigree=config["run"]["ped"],
         sample_order="small_variants/{family}.sample.order.txt",
     output:
