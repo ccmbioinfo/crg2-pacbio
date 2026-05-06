@@ -51,7 +51,7 @@ rule all:
         "reports/{family}.known.path.str.loci.csv".format(family=project),
         "reports/{family}.multiqc_report.html".format(family=project),
         *hpo_reports,
-        expand("reports/{family}_{child}.TRGT.denovo.annotated.{sf}.csv",
+        expand("reports/{family}_{child}.TRGT.denovo.annotated.csv",
                family=project,
                child=children) if len(children) > 0 else []
 

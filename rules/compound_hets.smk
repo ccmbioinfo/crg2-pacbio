@@ -30,6 +30,15 @@ rule get_VCF_sample_order:
 
 hpo_available = config["run"].get("hpo", "")
 
+def get_hpo_panel_args(wildcards, input):
+    if hpo_available:
+        return (
+            f"--hpo {input.HPO} "
+            f"--panel_variant_report_dir {input.panel_variant_report_dir} "
+            f"--panel_flank_variant_report_dir {input.panel_flank_variant_report_dir}"
+        )
+    return ""
+
 rule identify_compound_hets:
     input:
         high_med_variants="small_variants/{family}.HIGH-MED.impact.variants.tsv",
@@ -60,7 +69,7 @@ rule identify_compound_hets:
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         seq_type="long",
-        hpo_panel_args=("--hpo {input.HPO} --panel_variant_report_dir {input.panel_variant_report_dir} --panel_flank_variant_report_dir {input.panel_flank_variant_report_dir}" if hpo_available else ""),
+        hpo_panel_args=get_hpo_panel_args,
         acmg_sf_flag = str(config["run"].get("acmg_sf", "false")).lower()
     conda:
         "../envs/str_sv.yaml"

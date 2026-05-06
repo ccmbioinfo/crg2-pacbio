@@ -23,4 +23,4 @@ rule add_acmg_sf_column:
     conda:
         "../envs/common.yaml"
     script:
-        "../scripts/add_acmg_sf_column.py"
+        "../scripts/add_acmg_sf_annotation.py"

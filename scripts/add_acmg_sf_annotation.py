@@ -28,7 +28,7 @@ def find_acmg_sf_gene_matches(report_gene_string, acmg_sf_genes):
 
 #create acmg report with variants from SNV, SV, and CNV reports
 def make_variant_key(row, input_report_type):
-    if input_report_type in ["wgs.coding.CH", "wgs.high.impact.CH", "wgs.denovo.CH"]:
+    if input_report_type in ["wgs.coding.CH", "wgs.high.impact.CH"]:
         return f"{get_value(row, 'Position')}:{get_value(row, 'Ref')}:{get_value(row, 'Alt')}"
     if input_report_type in ["sv.CH", "cnv.CH"]:
         chrom = str(get_value(row, "CHROM"))
@@ -129,7 +129,6 @@ def make_acmg_sf_report_rows(df, family, input_report_type, acmg_col):
             "gnomad_af": gnomad_af,
             "ucsc_link": ucsc_link,
             "in_high_impact_report": ".",
-            "in_denovo_report": ".",
             "variant_reported_in": input_report_type,
             "variant_key": make_variant_key(row, input_report_type),
         })
@@ -137,12 +136,12 @@ def make_acmg_sf_report_rows(df, family, input_report_type, acmg_col):
     return pd.DataFrame(report_rows)
 
 def update_acmg_sf_report_flags(df, input_report_type, acmg_col, acmg_sf_report_csv):
-    if input_report_type not in ["wgs.high.impact.CH", "wgs.denovo.CH"]:
+    if input_report_type not in ["wgs.high.impact.CH"]:
         return
 
     if not os.path.exists(acmg_sf_report_csv):
         log_message(
-            f"{acmg_sf_report_csv} does not exist yet; cannot update {input_report_type} flags"
+            f"{acmg_sf_report_csv} does not exist; cannot update {input_report_type} flags"
         )
         return
 
@@ -161,18 +160,9 @@ def update_acmg_sf_report_flags(df, input_report_type, acmg_col, acmg_sf_report_
     if "in_high_impact_report" not in acmg_sf_report.columns:
         acmg_sf_report["in_high_impact_report"] = False
 
-    if "in_denovo_report" not in acmg_sf_report.columns:
-        acmg_sf_report["in_denovo_report"] = False
-
     if input_report_type == "wgs.high.impact.CH":
         acmg_sf_report["in_high_impact_report"] = (
             acmg_sf_report["in_high_impact_report"].astype(bool)
-            | acmg_sf_report["variant_key"].isin(flag_variant_keys)
-        )
-
-    if input_report_type == "wgs.denovo.CH":
-        acmg_sf_report["in_denovo_report"] = (
-            acmg_sf_report["in_denovo_report"].astype(bool)
             | acmg_sf_report["variant_key"].isin(flag_variant_keys)
         )
 
@@ -235,7 +225,7 @@ def main(family, input_report_type, input_csv, output_csv, acmg_sf_tsv, acmg_sf_
     acmg_sf_report_csv = f"reports/{family}.acmg_sf_report.csv"
 
     main_acmg_report_types = ["wgs.coding.CH", "sv.CH", "cnv.CH"]
-    flag_only_report_types = ["wgs.high.impact.CH", "wgs.denovo.CH"]
+    flag_only_report_types = ["wgs.high.impact.CH"]
 
     if input_report_type in main_acmg_report_types:
         acmg_sf_report = make_acmg_sf_report_rows(
