@@ -39,6 +39,11 @@ def get_hpo_panel_args(wildcards, input):
         )
     return ""
 
+def output_status(output_path):
+    if str(config["run"].get("acmg_sf", "")).lower() == "true":
+        return temp(output_path)
+    return(output_path)
+
 rule identify_compound_hets:
     input:
         high_med_variants="small_variants/{family}.HIGH-MED.impact.variants.tsv",
@@ -57,10 +62,10 @@ rule identify_compound_hets:
         pedigree=config["run"]["ped"],
         sample_order="small_variants/{family}.sample.order.txt",
     output:
-        sequence_variant_report_CH="reports/{family}.wgs.coding.CH.csv",
-        wgs_high_impact_variant_report_CH="reports/{family}.wgs.high.impact.CH.csv",
-        SV_report_CH="reports/{family}.sv.CH.csv",
-        CNV_report_CH="reports/{family}.cnv.CH.csv",
+        sequence_variant_report_CH=output_status("reports/{family}.wgs.coding.CH.csv"),
+        wgs_high_impact_variant_report_CH=output_status("reports/{family}.wgs.high.impact.CH.csv"),
+        SV_report_CH=output_status("reports/{family}.sv.CH.csv"),
+        CNV_report_CH=output_status("reports/{family}.cnv.CH.csv"),
         compound_het_status="reports/{family}.compound.het.status.CH.csv",
         **({
         "panel_variant_report_CH": "reports/{family}.panel.CH.csv",

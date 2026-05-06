@@ -24,6 +24,7 @@ samples = pd.read_table(config["run"]["samples"], dtype=str).set_index("sample",
     
 ##### Target rules #####
 project = config["run"]["project"]
+children = []
 if config["run"]["ped"]:
     children = get_children_ids(config["run"]["ped"])
 
