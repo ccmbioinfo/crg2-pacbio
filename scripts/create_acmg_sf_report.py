@@ -115,7 +115,6 @@ def make_acmg_sf_report_rows(df, family, input_report_type, acmg_col):
             "UCSC_LINK": ucsc_link,
             "IN_HIGH_IMPACT_REPORT": ".",
             "VARIANT_REPORTED_IN": input_report_type,
-            "VARIANT_KEY": make_variant_key(row, input_report_type),
         })
 
     return pd.DataFrame(report_rows)
@@ -178,7 +177,6 @@ def get_empty_acmg_sf_report():
         "UCSC_LINK",
         "IN_HIGH_IMPACT_REPORT",
         "VARIANT_REPORTED_IN",
-        "VARIANT_KEY",
     ])
 
 def main(family, input_reports, output_csv, acmg_sf_version):

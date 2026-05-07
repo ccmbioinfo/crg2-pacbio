@@ -35,7 +35,7 @@ if str(config["run"].get("acmg_sf", "")).lower() == "true":
 acmg_sf_enabled = str(config["run"].get("acmg_sf", "")).lower() == "true"
 sf_suffix = ".SF" if acmg_sf_enabled else ""
 
-acmg_sf_report_output = ["reports/{family}.acmg_sf_report.csv".format(family=project)] if acmg_sf_enabled else []
+acmg_sf_report_output = ["reports/{family}.ACMG.SF.csv".format(family=project)] if acmg_sf_enabled else []
 
 hpo_reports = []
 if config["run"].get("hpo", ""):
