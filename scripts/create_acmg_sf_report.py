@@ -115,6 +115,7 @@ def make_acmg_sf_report_rows(df, family, input_report_type, acmg_col):
             "UCSC_LINK": ucsc_link,
             "IN_HIGH_IMPACT_REPORT": ".",
             "VARIANT_REPORTED_IN": input_report_type,
+            "VARIANT_KEY": make_variant_key(row, input_report_type),
         })
 
     return pd.DataFrame(report_rows)
@@ -134,12 +135,10 @@ def update_acmg_sf_report_flags(acmg_sf_report, df, input_report_type, acmg_col)
     )
 
     if "IN_HIGH_IMPACT_REPORT" not in acmg_sf_report.columns:
-        acmg_sf_report["IN_HIGH_IMPACT_REPORT"] = False
+        acmg_sf_report["IN_HIGH_IMPACT_REPORT"] = "."
 
-    acmg_sf_report["IN_HIGH_IMPACT_REPORT"] = (
-        acmg_sf_report["IN_HIGH_IMPACT_REPORT"].astype(bool)
-        | acmg_sf_report["VARIANT_KEY"].isin(flag_variant_keys)
-    )
+    matched_high_impact = acmg_sf_report["VARIANT_KEY"].isin(flag_variant_keys)
+    acmg_sf_report.loc[matched_high_impact, "IN_HIGH_IMPACT_REPORT"] = "Yes"
 
     return acmg_sf_report
 
@@ -177,6 +176,7 @@ def get_empty_acmg_sf_report():
         "UCSC_LINK",
         "IN_HIGH_IMPACT_REPORT",
         "VARIANT_REPORTED_IN",
+        "VARIANT_KEY",
     ])
 
 def main(family, input_reports, output_csv, acmg_sf_version):
@@ -265,7 +265,10 @@ def main(family, input_reports, output_csv, acmg_sf_version):
             input_report_type=input_report_type,
             acmg_col=acmg_col,
         )
-
+        
+    if "VARIANT_KEY" in acmg_sf_report.columns:
+        acmg_sf_report = acmg_sf_report.drop(columns=["VARIANT_KEY"])
+    
     acmg_sf_report.to_csv(output_csv, index=False)
     log_message(f"{output_csv} created with {len(acmg_sf_report)} rows")
 
