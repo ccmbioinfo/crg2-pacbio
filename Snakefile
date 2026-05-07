@@ -32,7 +32,10 @@ if config["run"]["ped"]:
 if str(config["run"].get("acmg_sf", "")).lower() == "true":
     include: "rules/acmg_sf.smk"
     
-sf_suffix = ".SF" if str(config["run"].get("acmg_sf", "")).lower() == "true" else ""
+acmg_sf_enabled = str(config["run"].get("acmg_sf", "")).lower() == "true"
+sf_suffix = ".SF" if acmg_sf_enabled else ""
+
+acmg_sf_report_output = ["reports/{family}.acmg_sf_report.csv".format(family=project)] if acmg_sf_enabled else []
 
 hpo_reports = []
 if config["run"].get("hpo", ""):
@@ -52,6 +55,7 @@ rule all:
         "reports/{family}.known.path.str.loci.csv".format(family=project),
         "reports/{family}.multiqc_report.html".format(family=project),
         *hpo_reports,
+        *acmg_sf_report_output,
         expand("reports/{family}_{child}.TRGT.denovo.annotated.csv",
                family=project,
                child=children) if len(children) > 0 else []
