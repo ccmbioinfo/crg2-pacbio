@@ -55,7 +55,7 @@ annotation:
     promoters: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/non_coding/promoters/GRCh38-PLS.bed"
     ensembl: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/Homo_sapiens.GRCh38.109.chr.processed.csv"
     gnomad_constraint: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/gnomAD/v4.1/constraint/gnomad.v4.1.constraint_metrics.tsv"
-    acmg_sf_list: "/home/mspivak/CPHI-DRAGEN-anno/resources/acmg_sf_list/ACMG_SF_v3.3.tsv"
+    acmg_sf_list: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/ACMG/ACMG_SF_v3.3.tsv"
     acmg_sf_version: "3.3"
   sv_report:
     inhouse_c4r: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/C4R_LRWGS_db/pbsv.allsamples.counts.2026-02-02.bed"
