@@ -73,14 +73,16 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--panel_variant_report_dir",
         type=str,
-        required=True,
-        help="Path to directory containing panel variant report CSV",
+        required=False,
+        default=None,
+        help="Path to directory containing panel variant report CSV (optional but requires hpo file)",
     )
     parser.add_argument(
         "--panel_flank_variant_report_dir",
         type=str,
-        required=True,
-        help="Path to directory containing panel-flank variant report CSV",
+        required=False,
+        default=None,
+        help="Path to directory containing panel-flank variant report CSV (optional but requires hpo file)",
     )
     parser.add_argument(
         "--wgs_high_impact_variant_report_dir",
@@ -109,7 +111,10 @@ def parse_arguments() -> argparse.Namespace:
         "--pedigree", type=str, required=True, help="Path to pedigree file"
     )
     parser.add_argument(
-        "--hpo", type=str, required=True, help="Path to HPO terms file from Phenotips 'Suggested Genes'"
+        "--hpo", type=str, required=False, default=None, help="Path to HPO terms file from Phenotips 'Suggested Genes' (optional)"
+    )
+    parser.add_argument(
+        "--acmg_sf", type=str, required=False, default="false", help= "Whether ACMG secondary findings annotation will be run"
     )
     parser.add_argument(
         "--sample_order", type=str, required=True, help="Path to VCF sample order file"
@@ -200,15 +205,31 @@ def map_zygosity_from_gt_type(gt_type: int) -> str:
     else:
         return ZYGOSITY_MISSING
 
-def write_report(df: pd.DataFrame, family: str, report_type: str, seq_type: str, logger: logging.Logger) -> None:
+
+# create dated outputs for final files; skip coding, sv, cnv reports if files will be further processed for acmg secondary finding annotation
+def write_report(df: pd.DataFrame, family: str, report_type: str, seq_type: str, logger: logging.Logger, acmg_sf_enabled: bool = False,) -> None:
     """Write report to file."""
     today = date.today()
     today = today.strftime("%Y-%m-%d")
     suffix = "csv" if seq_type == "long" else "hg38.csv"
+    
+    # Write a symlink instead of a new copy for the Snakemake target, unless target will be further annotated
+    acmg_input_report_types = {"wgs.coding", "wgs.high.impact", "sv", "cnv", "wgs.denovo"}
+    write_undated_only = acmg_sf_enabled and report_type in acmg_input_report_types
+
+    if write_undated_only:
+        output_path = f"reports/{family}.{report_type}.CH.{suffix}"
+        df.to_csv(output_path, index=False)
+        logger.info(
+            f"ACMG SF enabled; wrote intermediate {report_type} report directly to {output_path}"
+        )
+        return
+
     df.to_csv(f"reports/{family}.{report_type}.CH.{today}.{suffix}", index=False)
-    # Write a symlink instead of a new copy for the Snakemake target
+
     symlink_path = f"reports/{family}.{report_type}.CH.{suffix}"
     target_path = f"reports/{family}.{report_type}.CH.{today}.{suffix}"
+        
     try:
         if os.path.islink(symlink_path) or os.path.exists(symlink_path):
             os.remove(symlink_path)
@@ -664,8 +685,8 @@ def determine_compound_het_status(
 def annotate_reports(
     all_variants: pd.DataFrame,
     sequence_variant_report_dir: str,
-    panel_variant_report_dir: str,
-    panel_flank_variant_report_dir: str,
+    panel_variant_report_dir: Optional[str],
+    panel_flank_variant_report_dir: Optional[str],
     wgs_high_impact_variant_report_dir: str,
     seq_type: str,
     wgs_denovo_variant_report_dir: Optional[str],
@@ -673,8 +694,9 @@ def annotate_reports(
     cnv_path: str,
     family: str,
     ensembl_to_NCBI_df: pd.DataFrame,
-    hpo: str,
+    hpo: Optional[str],
     logger: logging.Logger,
+    acmg_sf_enabled: bool = False,
 ) -> None:
     """Annotate variant reports with compound het status.
 
@@ -701,42 +723,56 @@ def annotate_reports(
     # Annotate sequence variant report
     sequence_variant_report_path = glob.glob(f"{sequence_variant_report_dir}/*.wgs.coding.*.csv")[0]
     sequence_variant_report = pd.read_csv(sequence_variant_report_path)
-    sequence_variant_report = compound_hets.add_hpo_terms_to_report(sequence_variant_report, hpo)
+    if hpo and os.path.isfile(hpo):
+        sequence_variant_report = compound_hets.add_hpo_terms_to_report(sequence_variant_report, hpo)
+    else:
+        logger.warning("Note: no HPO file provided; wgs.coding.CH will be created without HPO columns")
+    
     sequence_variant_report = sequence_variant_report.merge(
         gene_CH_status, on="Ensembl_gene_id", how="left"
     )
     sequence_variant_report = sequence_variant_report.fillna(MISSING_VALUE)
-    write_report(sequence_variant_report, family, "wgs.coding", seq_type, logger)
+    write_report(sequence_variant_report, family, "wgs.coding", seq_type, logger, acmg_sf_enabled)
 
-    # Annotate panel sequence variant report
-    panel_variant_report_path = glob.glob(f"{panel_variant_report_dir}/*.wgs*csv")[0]
-    panel_variant_report = pd.read_csv(panel_variant_report_path)
-    panel_variant_report = compound_hets.add_hpo_terms_to_report(panel_variant_report, hpo)
-    panel_variant_report = panel_variant_report.merge(
-        gene_CH_status, on="Ensembl_gene_id", how="left"
-    )
-    panel_variant_report = panel_variant_report.fillna(MISSING_VALUE)
-    write_report(panel_variant_report, family, "panel", seq_type, logger)
+    # Annotate panel sequence variant report if hpo file provided
+    if hpo and os.path.isfile(hpo) and panel_variant_report_dir and os.path.isdir(panel_variant_report_dir):
+        panel_variant_report_path = glob.glob(f"{panel_variant_report_dir}/*.wgs*csv")[0]
+        panel_variant_report = pd.read_csv(panel_variant_report_path)
+        panel_variant_report = compound_hets.add_hpo_terms_to_report(panel_variant_report, hpo)
+        panel_variant_report = panel_variant_report.merge(
+            gene_CH_status, on="Ensembl_gene_id", how="left"
+        )
+        panel_variant_report = panel_variant_report.fillna(MISSING_VALUE)
+        write_report(panel_variant_report, family, "panel", seq_type, logger)
+    else:
+        logger.warning("No HPO file or panel directory provided; panel.CH report will not be created.")
+        
 
-    # Annotate panel-flank sequence variant report
-    panel_flank_variant_report_path = glob.glob(f"{panel_flank_variant_report_dir}/*.wgs*csv")[0]
-    panel_flank_variant_report = pd.read_csv(panel_flank_variant_report_path)
-    panel_flank_variant_report = compound_hets.add_hpo_terms_to_report(panel_flank_variant_report, hpo)
-    panel_flank_variant_report = panel_flank_variant_report.merge(
-        gene_CH_status, on="Ensembl_gene_id", how="left"
-    )
-    panel_flank_variant_report = panel_flank_variant_report.fillna(MISSING_VALUE)
-    write_report(panel_flank_variant_report, family, "panel-flank", seq_type, logger)
-
+    # Annotate panel-flank sequence variant report if hpo file provided 
+    if hpo and os.path.isfile(hpo) and panel_flank_variant_report_dir and os.path.isdir(panel_flank_variant_report_dir):
+        panel_flank_variant_report_path = glob.glob(f"{panel_flank_variant_report_dir}/*.wgs*csv")[0]
+        panel_flank_variant_report = pd.read_csv(panel_flank_variant_report_path)
+        panel_flank_variant_report = compound_hets.add_hpo_terms_to_report(panel_flank_variant_report, hpo)
+        panel_flank_variant_report = panel_flank_variant_report.merge(
+            gene_CH_status, on="Ensembl_gene_id", how="left"
+        )
+        panel_flank_variant_report = panel_flank_variant_report.fillna(MISSING_VALUE)
+        write_report(panel_flank_variant_report, family, "panel-flank", seq_type, logger)
+    else:
+        logger.warning("No HPO file or panel-flank directory provided; panel.flank.CH report will not be created.")
+        
     # Annotate wgs high-impact sequence variant report
     wgs_high_impact_variant_report_path = glob.glob(f"{wgs_high_impact_variant_report_dir}/*.wgs.high.impact*csv")[0]
     wgs_high_impact_variant_report = pd.read_csv(wgs_high_impact_variant_report_path)
-    wgs_high_impact_variant_report = compound_hets.add_hpo_terms_to_report(wgs_high_impact_variant_report, hpo)
+    if hpo and os.path.isfile(hpo):
+        wgs_high_impact_variant_report = compound_hets.add_hpo_terms_to_report(wgs_high_impact_variant_report, hpo)
+    else:
+        logger.warning("Note: no HPO file; wgs.high.impact.CH will be created without HPO columns") 
     wgs_high_impact_variant_report = wgs_high_impact_variant_report.merge(
-        gene_CH_status, on="Ensembl_gene_id", how="left"
+    gene_CH_status, on="Ensembl_gene_id", how="left"
     )
     wgs_high_impact_variant_report = wgs_high_impact_variant_report.fillna(MISSING_VALUE)
-    write_report(wgs_high_impact_variant_report, family, "wgs.high.impact", seq_type, logger)
+    write_report(wgs_high_impact_variant_report, family, "wgs.high.impact", seq_type, logger, acmg_sf_enabled)
 
     # De novo sequence variant report (short-read pipelines only)
     if seq_type == "short" and wgs_denovo_variant_report_dir:
@@ -749,14 +785,17 @@ def annotate_reports(
             )
         denovo_variant_report_path = denovo_paths[0]
         denovo_variant_report = pd.read_csv(denovo_variant_report_path)
-        denovo_variant_report = compound_hets.add_hpo_terms_to_report(
-            denovo_variant_report, hpo
-        )
+        if hpo and os.path.isfile(hpo):
+            denovo_variant_report = compound_hets.add_hpo_terms_to_report(
+                denovo_variant_report, hpo
+            )
+        else:
+            logger.warning("Note: no HPO file; wgs.denovo.CH will be created without HPO columns")
         denovo_variant_report = denovo_variant_report.merge(
             gene_CH_status, on="Ensembl_gene_id", how="left"
         )
         denovo_variant_report = denovo_variant_report.fillna(MISSING_VALUE)
-        write_report(denovo_variant_report, family, "wgs.denovo", seq_type, logger)
+        write_report(denovo_variant_report, family, "wgs.denovo", seq_type, logger, acmg_sf_enabled)
     elif seq_type == "short" and not wgs_denovo_variant_report_dir:
         logger.info(
             "Skipping de novo report CH annotation (seq_type=short but --wgs_denovo_variant_report_dir not set)"
@@ -784,7 +823,7 @@ def annotate_reports(
         for d in CH_status_series
     ]
     SV = SV.fillna(MISSING_VALUE)
-    write_report(SV, family, "sv", seq_type, logger)
+    write_report(SV, family, "sv", seq_type, logger, acmg_sf_enabled)
 
     # Annotate CNV report
     CNV = pd.read_csv(cnv_path, low_memory=False)
@@ -808,7 +847,7 @@ def annotate_reports(
         for d in CH_status_series
     ]
     CNV = CNV.fillna(MISSING_VALUE)
-    write_report(CNV, family, "cnv", seq_type, logger)
+    write_report(CNV, family, "cnv", seq_type, logger, acmg_sf_enabled)
 
 
 def main():
@@ -941,6 +980,8 @@ def main():
             np.nan: MISSING_VALUE,
         }
     )
+    #check if the ACMG secondary findings annotation has been enabled
+    acmg_sf_enabled = str(args.acmg_sf).strip().lower() == "true"
     
     write_report(wide_variants, family, "compound.het.status", args.seq_type, logger)
     
@@ -959,6 +1000,7 @@ def main():
         ensembl_to_NCBI_df,
         args.hpo,
         logger,
+        acmg_sf_enabled,
     )
     
     logger.info("Compound het annotation complete")

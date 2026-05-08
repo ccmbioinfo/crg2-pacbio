@@ -153,3 +153,14 @@ The workflow is as follows:
 
 To run the methylation outlier workflow, follow the instructions above for running the pipeline, but make sure your samples.tsv is configured for methylation outlier analysis, and use the `methylation_outliers.sh` job script instead of `crg2-pacbio.sh`.
 A description of the methyation outlier report and fields can be found [here](https://sickkidsca.sharepoint.com/:w:/r/sites/thecenterforcomputationalmedicineworkspace/Shared%20Documents/Translational%20Genomics/LRWGS/Report_documentation/PacBio_MethBat_methylation_outlier_report_TG_September_2025.docx?d=wd703d337a7394f71b0b1351af4ee4b20&csf=1&web=1&e=oI5bAz)
+
+
+### ACMG Secondary Findings annotation and report: reports/{family}.ACMG.SF.csv
+
+This is an optional annotation workflow that can be enabled by setting `config["run"]["acmg_sf"]` to `true`.
+Variants in wgs.coding, wgs.high.impact, sv, and cnv CH reports are annotated against an ACMG Secondary Finding gene list tsv. The current list being used is ACMG SF v3.3 (PMID: 40568962) downloaded from [ClinGen](https://search.clinicalgenome.org/kb/genes/acmgsf?page=1&size=25&order=asc&sort=symbol&search=).
+
+An `ACMG_SF_{version}` column is appended to each CH report CSV and a .SF suffix is appended to the file name. Variants in genes on the ACMG SF list are flagged with the matching gene symbol(s) separated by `;`. All other variants receive `.`.
+A combined family-level ACMG SF report is also generated: `reports/{family}.ACMG.SF.csv`.
+
+A description of the ACMG.SF report and fields can be found [here](https://github.com/ccmbioinfo/CPHI-DRAGEN-anno/blob/acmg_sf_annotation/docs/pipeline_docs/acmg_secondary_findings_gene_annotation.md)
