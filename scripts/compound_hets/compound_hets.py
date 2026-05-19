@@ -542,21 +542,22 @@ def replace_NCBI_IDs_with_Ensembl_IDs(variant_df, ensembl_df, ensembl_to_NCBI_df
         except:
             not_mapped.append(gene)
     # map NCBI IDs to Ensembl IDs
-    for gene in not_mapped:
-        print(gene)
-        NCBI_ID = [id for id in variant_df[variant_df["Gene"] == gene]["Ensembl_gene_id"].values if "ENSG" not in id][0]
-        try:
-            ensembl_id = map_NCBI_ID_to_ensembl(NCBI_ID, ensembl_to_NCBI_df)
-            ID_dict[gene] = ensembl_id
-        except:
-            not_mapped.append(gene)
+    if len(not_mapped) > 0:
+        for gene in not_mapped:
+            print(gene)
+            NCBI_ID = [id for id in variant_df[variant_df["Gene"] == gene]["Ensembl_gene_id"].values if "ENSG" not in id][0]
+            try:
+                ensembl_id = map_NCBI_ID_to_ensembl(NCBI_ID, ensembl_to_NCBI_df)
+                ID_dict[gene] = ensembl_id
+            except:
+                not_mapped.append(gene)
         
-    # map gene symbols to Ensembl IDs
-    mask = ~variant_df["Ensembl_gene_id"].str.contains("ENSG")
-    for idx, row in variant_df[mask].iterrows():
-        gene = row["Gene"]
-        if gene in ID_dict and pd.notnull(ID_dict[gene]):
-            variant_df.at[idx, "Ensembl_gene_id"] = ID_dict[gene] 
+        # map gene symbols to Ensembl IDs
+        mask = ~variant_df["Ensembl_gene_id"].str.contains("ENSG")
+        for idx, row in variant_df[mask].iterrows():
+            gene = row["Gene"]
+            if gene in ID_dict and pd.notnull(ID_dict[gene]):
+                variant_df.at[idx, "Ensembl_gene_id"] = ID_dict[gene] 
 
 def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFrame:
     """
