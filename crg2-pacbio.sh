@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=crg2-pacbio
-#SBATCH --time=50:00:00
+#SBATCH --time=75:00:00
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=4G
 #SBATCH --output=%x-%j.out
