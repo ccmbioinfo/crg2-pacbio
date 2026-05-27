@@ -212,8 +212,10 @@ def get_genotype(sample_GT_AD_DP):
         zyg = genotype
     elif genotype == "0/0":
         zyg =  "-"
-    elif genotype == "0/1 or 1/1":
+    elif genotype == "./1":
         zyg = "het or hom"
+    elif genotype == "1":
+        zyg = "hom"
     else:
         zyg = genotype
     return [zyg, genotype]
@@ -865,28 +867,31 @@ def annotate_breakpoint_gene(annotsv_df, ensembl, location):
     
     return annotsv_df
 
-def map_CN_to_GT(SVTYPE, CN, GT):
+def map_CN_to_GT(SVTYPE, CN, GT, CHROM):
     """
     Map HiFiCNV copy number to genotype
     HiFiCNV genotypes are placeholder values (all 0/1, https://github.com/PacificBiosciences/HiFiCNV/issues/32)
+    Based on DRAGEN's CN to GT mapping: https://help.dragen.illumina.com/dragen-v4.3/product-guide/dragen-v4.3/dragen-dna-pipeline/cnv-calling/cnv-output#note-on-genotype-annotation-in-germline-copy-number-calling
     """
-    DEL_CN_GT_dict = {
+    DEL_CN_GT_dict_diploid = {
         "0": "1/1",
         "1": "0/1",
         "2": "0/0"
-
-    }
-    # for DUPs, we don't know if a copy number of 3 or higher is a heterozygous or homozygous variant
-    # a copy number of 3 could be a heterozygous triplication event on one allele with a deletion on the other allele
-    DUP_CN_GT_dict = {
-        "2": "0/0",
     }
     if GT == "./.":
         return GT
-    if SVTYPE == "DEL":
-        GT = DEL_CN_GT_dict.get(CN, "0/1 or 1/1")
+    elif CHROM == "Y": # haploid
+        GT = "1"
+    elif CHROM == "X": # haploid (male) or diploid (female)
+        GT = "./1"
     else:
-        GT = DUP_CN_GT_dict.get(CN, "0/1 or 1/1")
+        if SVTYPE == "DEL":
+            GT = DEL_CN_GT_dict_diploid.get(CN, ".")
+        else:
+            if CN == "2":
+                GT = "./."
+            else:
+                GT = "./1"
 
     return GT
 
@@ -962,7 +967,7 @@ def main(
             ]
             # map genotype to copy number
             df_merge[f"{sample}_GT"] = [
-                map_CN_to_GT(row["SVTYPE"], row[f"{sample}_CN"], row[f"{sample}_GT"]) for index, row in df_merge.iterrows()
+                map_CN_to_GT(row["SVTYPE"], row[f"{sample}_CN"], row[f"{sample}_GT"], row["CHROM"]) for index, row in df_merge.iterrows()
             ]
             df_merge[f"{sample}_zyg"] = [
                 get_genotype(row[f"{sample}_GT"])[0] for index, row in df_merge.iterrows()
