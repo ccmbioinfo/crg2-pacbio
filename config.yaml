@@ -7,7 +7,7 @@ run:
   hpo: "" # proband-specific HPO terms
   ped: ""
   flank: 100000
-  acmg_sf: true
+  acmg_sf: false
 
 genes:
   ensembl: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/for_gene_panels/Homo_sapiens.GRCh38.112.gtf_subset.csv"
