@@ -212,6 +212,10 @@ def get_genotype(sample_GT_AD_DP):
         zyg = genotype
     elif genotype == "0/0":
         zyg =  "-"
+    elif genotype == "./1":
+        zyg = "het or hom"
+    elif genotype == "1":
+        zyg = "hom"
     else:
         zyg = genotype
     return [zyg, genotype]
@@ -863,7 +867,34 @@ def annotate_breakpoint_gene(annotsv_df, ensembl, location):
     
     return annotsv_df
 
- 
+def map_CN_to_GT(SVTYPE, CN, GT, CHROM):
+    """
+    Map HiFiCNV copy number to genotype
+    HiFiCNV genotypes are placeholder values (all 0/1, https://github.com/PacificBiosciences/HiFiCNV/issues/32)
+    Based on DRAGEN's CN to GT mapping: https://help.dragen.illumina.com/dragen-v4.3/product-guide/dragen-v4.3/dragen-dna-pipeline/cnv-calling/cnv-output#note-on-genotype-annotation-in-germline-copy-number-calling
+    """
+    DEL_CN_GT_dict_diploid = {
+        "0": "1/1",
+        "1": "0/1",
+        "2": "0/0"
+    }
+    if GT == "./.":
+        return GT
+    elif CHROM == "Y": # haploid
+        GT = "1"
+    elif CHROM == "X": # haploid (male) or diploid (female)
+        GT = "./1"
+    else:
+        if SVTYPE == "DEL":
+            GT = DEL_CN_GT_dict_diploid.get(CN, ".")
+        else:
+            if CN == "2":
+                GT = "./."
+            else:
+                GT = "./1"
+
+    return GT
+
 def main(
     df,
     snpeff_df,
@@ -927,9 +958,6 @@ def main(
                      
     # extract genotype and alt allele depth
     for sample in sample_cols:
-        df_merge[f"{sample}_zyg"] = [
-            get_genotype(row[sample])[0] for index, row in df_merge.iterrows()
-        ]
         df_merge[f"{sample}_GT"] = [
             get_genotype(row[sample])[1] for index, row in df_merge.iterrows()
         ]
@@ -937,7 +965,17 @@ def main(
             df_merge[f"{sample}_CN"] = [
                 get_CN(row[sample]) for index, row in df_merge.iterrows()
             ]
+            # map genotype to copy number
+            df_merge[f"{sample}_GT"] = [
+                map_CN_to_GT(row["SVTYPE"], row[f"{sample}_CN"], row[f"{sample}_GT"], row["CHROM"]) for index, row in df_merge.iterrows()
+            ]
+            df_merge[f"{sample}_zyg"] = [
+                get_genotype(row[f"{sample}_GT"])[0] for index, row in df_merge.iterrows()
+            ]
         else:
+            df_merge[f"{sample}_zyg"] = [
+                get_genotype(row[f"{sample}_GT"])[0] for index, row in df_merge.iterrows()
+            ]
             df_merge[f"{sample}_AD"] = [
                 get_alt_depth(row[sample]) for index, row in df_merge.iterrows()
             ]
@@ -1060,6 +1098,7 @@ def main(
     print("Adding start and end gene symbols")
     df_merge = annotate_breakpoint_gene(df_merge, ensembl, "START")
     df_merge = annotate_breakpoint_gene(df_merge, ensembl, "END")
+
 
     # add UCSC genome browser URL
     df_merge["UCSC_link"] = [
