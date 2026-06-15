@@ -61,4 +61,4 @@ rule all:
         expand("reports/{family}_{child}.TRGT.denovo.annotated.csv",
                family=project,
                child=children) if len(children) > 0 else []
- 
+
