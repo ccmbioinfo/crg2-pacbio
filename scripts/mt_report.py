@@ -152,7 +152,7 @@ def get_vcf_info(vcf,report,samples):
             sample_map = dict(zip(format_fields, sample_fields))
 
             depth = sample_map.get("DP", ".")
-            #uses the original AF field, not the artificial VAF field 
+            #use the VAF field from the mitorsaw vcf (DRAGEN report uses AF field)
             vaf = sample_map.get("VAF", ".")
             #AD is formatted as a tuple; [ref depth, alt depth]
             ad = sample_map.get("AD", ".")
