@@ -32,8 +32,8 @@ rule trgt_denovo:
         trgt_denovo = config["tools"]["trgt-denovo"],
         ref = config["ref"]["genome"],
         bed = config["annotation"]["general"]["adotto_repeats"]
-    output: "TRGT_denovo/{family}_{child}.TRGT.denovo.tsv"
-    log: "logs/denovo_TRs/{family}_{child}.TRGT-denovo.log"
+    output: "TRGT_denovo/{child}.TRGT.denovo.tsv"
+    log: "logs/denovo_TRs/{child}.TRGT-denovo.log"
     resources:
         threads = 8
     shell:
@@ -82,8 +82,8 @@ rule trgt_denovo:
         """   
 
 rule annotate_trgt_denovo:
-    input: "TRGT_denovo/{family}_{child}.TRGT.denovo.tsv"
-    output: "reports/{family}_{child}.TRGT.denovo.annotated.csv"
+    input: "TRGT_denovo/{child}.TRGT.denovo.tsv"
+    output: "reports/{child}.TRGT.denovo.annotated.csv"
     params:
       crg2_pacbio = config["tools"]["crg2_pacbio"],
       genes = config["annotation"]["general"]["ensembl"],
@@ -94,7 +94,7 @@ rule annotate_trgt_denovo:
       c4r = config["annotation"]["c4r"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
       c4r_outliers = config["trgt"]["C4R_outliers"]
-    log:  "logs/denovo_TRs/{family}_{child}.annotate.TRGT.denovo.log"
+    log:  "logs/denovo_TRs/{child}.annotate.TRGT.denovo.log"
     conda: 
         "../envs/str_sv.yaml"
     shell:

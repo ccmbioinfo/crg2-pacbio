@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import re
 from snakemake.utils import validate
 from snakemake.utils import min_version
 from datetime import date
@@ -24,6 +25,19 @@ if config["run"]["variants_for_methbat"] != "":
     variants_for_methbat = pd.read_table(config["run"]["variants_for_methbat"], dtype=str).set_index(["variant_type"], drop=False)
 
 project = config["run"]["project"]
+
+# Restrict the `sample` wildcard to the exact set of names declared in samples.tsv
+# and the `family` wildcard to the project name. Without this, Snakemake's default
+# `.+` wildcard regex makes paths like "{family}_{sample}" ambiguous whenever a
+# sample name contains "_" or ".". 
+_sample_name_pattern = "|".join(
+    sorted((re.escape(s) for s in samples["sample"]), key=len, reverse=True)
+)
+
+wildcard_constraints:
+    family=re.escape(project),
+    sample=_sample_name_pattern,
+    child=_sample_name_pattern
 
 def get_wrapper_path(*dirs):
     return "file:%s" % os.path.join(workflow.basedir, "wrappers", *dirs)

@@ -918,7 +918,8 @@ def main(
     clingen_HI,
     clingen_TS,
     clingen_disease,
-    clingen_regions
+    clingen_regions,
+    samples
 ):
     print(c4r)
     # filter out SVs < 50bp
@@ -926,35 +927,11 @@ def main(
     df_len = df_len.astype(str)
     # merge full and split AnnotSV annos
     df_merge = merge_full_split_annos(df_len)
-    sample_cols = [col for col in df.columns if "PB" in col]
-    if len(sample_cols) == 0:
-        # for TCAG sequence IDs
-        regexp = re.compile("[0-9][0-9]-[0-9]+")
-        sample_cols = [col for col in df.columns if re.match(regexp, col)]
-    if len(sample_cols) == 0:
-        # C4R TCAG IDs
-        sample_cols = [col for col in df.columns if "RLG" in col]
-    if len(sample_cols) == 0:
-        # genesteps TCAG IDs
-        sample_cols = [col for col in df.columns if "RGS" in col]
-    if len(sample_cols) == 0:
-        # C4R IDs
-        regexp = re.compile("\d+[A-Z]*_[A-Z]*\d+")
-        sample_cols = [col for col in df.columns if re.match(regexp, col)]
-    if len(sample_cols) == 0:
-        # DECODER IDs
-        sample_cols = [col for col in df.columns if "SK" in col]
-    if len(sample_cols) == 0:
-        # genoderm IDs
-        for col in df.columns:
-            print(col)
-        sample_cols =  [col for col in df.columns if "GD" in col]
-    if len(sample_cols) == 0:
-       # ataxia IDS
-       sample_cols =  [col for col in df.columns if "GYM" in col or "HSC" in col]
-    if len(sample_cols) == 0:
-        print("no sample cols identified")
-        sys.exit(1)
+    _sample_name_pattern = "|".join(
+    sorted((re.escape(s) for s in samples))
+)
+    sample_cols = [col for col in df.columns if re.match(_sample_name_pattern, col)]
+
                      
     # extract genotype and alt allele depth
     for sample in sample_cols:
@@ -1354,6 +1331,13 @@ if __name__ == "__main__":
         type=str,
         required=True,
     )
+    parser.add_argument(
+        "-samples",
+        help="samples TSV",
+        type=str,
+        required=True,
+    )
+    
 
     args = parser.parse_args()
 
@@ -1407,6 +1391,9 @@ if __name__ == "__main__":
     clingen_region_cols = ["ISCA ID", "ISCA Region Name", "cytoBand", "Genomic Location", "Haploinsufficiency Score", "Haploinsufficiency Description", "Haploinsufficiency PMID1", "Haploinsufficiency PMID2", "Haploinsufficiency PMID3", "Haploinsufficiency PMID4", "Haploinsufficiency PMID5", "Haploinsufficiency PMID6", "Triplosensitivity Score", "Triplosensitivity Description", "Triplosensitivity PMID1", "Triplosensitivity PMID2", "Triplosensitivity PMID3", "Triplosensitivity PMID4", "Triplosensitivity PMID5", "Triplosensitivity PMID6", "Date Last Evaluated", "Haploinsufficiency Disease ID", "Triplosensitivity Disease ID"]
     clingen_regions = pd.read_csv(args.clingen_regions, comment="#", sep="\t", names=clingen_region_cols)
 
+    # read samples TSV
+    samples = pd.read_csv(args.samples, sep="\t")["sample"].values
+
     main(
         df,
         snpeff_df,
@@ -1431,4 +1418,5 @@ if __name__ == "__main__":
         clingen_TS,
         clingen_disease,
         clingen_regions,
+        samples,
     )

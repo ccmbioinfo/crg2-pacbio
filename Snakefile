@@ -9,12 +9,13 @@ include: "rules/compound_hets.smk"
 include: "rules/cnvreport.smk"
 include: "rules/qc.smk"
 
+
 def get_children_ids(ped_file):
     import pandas as pd
-    pedigree = pd.read_csv(ped_file, sep=" ", header=None, 
+    pedigree = pd.read_csv(ped_file, sep=None, header=None, 
                           names=["family_ID", "individual_ID", "paternal_ID", "maternal_ID", "sex", "phenotype"])
     pedigree = pedigree.astype(str)
-    children = pedigree[pedigree["paternal_ID"] != "0"][pedigree["maternal_ID"] != "0"]["individual_ID"].apply(lambda x: x.split("_")[1]).values
+    children = pedigree[(pedigree["paternal_ID"] != "0") & (pedigree["paternal_ID"] != ".")][(pedigree["maternal_ID"] != "0") & (pedigree["maternal_ID"] != ".")]["individual_ID"].values
     family = pedigree["family_ID"].iloc[0]
 
     return children
@@ -56,7 +57,6 @@ rule all:
         "reports/{family}.multiqc_report.html".format(family=project),
         *hpo_reports,
         *acmg_sf_report_output,
-        expand("reports/{family}_{child}.TRGT.denovo.annotated.csv",
-               family=project,
+        expand("reports/{child}.TRGT.denovo.annotated.csv",
                child=children) if len(children) > 0 else []
 

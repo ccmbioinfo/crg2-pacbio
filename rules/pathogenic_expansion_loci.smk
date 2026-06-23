@@ -1,13 +1,13 @@
 rule genotype_pathogenic_loci:
     input: get_bam
     output: 
-        vcf = temp("pathogenic_repeats/{family}_{sample}.trgt.unsorted.vcf.gz"),
-        spanning_bam = "pathogenic_repeats/{family}_{sample}.trgt.unsorted.spanning.bam"
+        vcf = temp("pathogenic_repeats/{sample}.trgt.unsorted.vcf.gz"),
+        spanning_bam = "pathogenic_repeats/{sample}.trgt.unsorted.spanning.bam"
     params: 
         trgt = config["tools"]["trgt"],
         ref = config["ref"]["genome"],
         path_repeats = config["annotation"]["pathogenic_repeats"]["trgt_catalog"]
-    log: "logs/pathogenic_repeats/{family}_{sample}.trgt.log"
+    log: "logs/pathogenic_repeats/{sample}.trgt.log"
     conda:
         "../envs/samtools.yaml"
     shell: 
@@ -30,15 +30,15 @@ rule genotype_pathogenic_loci:
         {params.trgt} genotype --genome {params.ref} \
             --reads {input} \
             --repeats {params.path_repeats} \
-            --output-prefix pathogenic_repeats/{wildcards.family}_{wildcards.sample}.trgt.unsorted \
-            --sample-name {wildcards.family}_{wildcards.sample} \
+            --output-prefix pathogenic_repeats/{wildcards.sample}.trgt.unsorted \
+            --sample-name {wildcards.sample} \
             --karyotype $sex
         """
 
 rule sort_trgt_vcf:
-    input: "pathogenic_repeats/{family}_{sample}.trgt.unsorted.vcf.gz"
-    output: "pathogenic_repeats/{family}_{sample}.trgt.vcf.gz"
-    log: "logs/bcftools/{family}_{sample}.sort.trgt.log"
+    input: "pathogenic_repeats/{sample}.trgt.unsorted.vcf.gz"
+    output: "pathogenic_repeats/{sample}.trgt.vcf.gz"
+    log: "logs/bcftools/{sample}.sort.trgt.log"
     conda:
         "../envs/common.yaml"
     shell:
@@ -49,7 +49,7 @@ rule sort_trgt_vcf:
 
 rule merge_vcfs:
     input: 
-       vcfs=expand("pathogenic_repeats/{{family}}_{sample}.trgt.vcf.gz", sample=samples.index)
+       vcfs=expand("pathogenic_repeats/{sample}.trgt.vcf.gz", sample=samples.index)
     output: "pathogenic_repeats/{family}.known.path.str.loci.vcf"
     log: "logs/pathogenic_repeats/{family}.merge.repeat.vcfs.log"
     conda:

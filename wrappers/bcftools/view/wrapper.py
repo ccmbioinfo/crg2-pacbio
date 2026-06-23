@@ -27,9 +27,8 @@ if snakemake.params.get("samples"):
         sample_list = snakemake.params.samples
         samples = " -s " + ",".join(sample_list)
     except: # qc.smk/rule subset
-        family = snakemake.wildcards.family
         sample = snakemake.wildcards.sample
-        samples = f" -s {family}_{sample} "
+        samples = f" -s {sample} "
 else: 
     samples = "" 
 
