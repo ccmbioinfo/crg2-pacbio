@@ -91,5 +91,8 @@ rule generate_mt_report:
         "logs/report/mitochondrial/{family}.mitochondrial.report.log"
     conda:
         "../envs/mt_report.yaml"
+    params:
+        vaf_field="VAF",
+        report_suffix=""
     script:
         "../scripts/mt_report.py"

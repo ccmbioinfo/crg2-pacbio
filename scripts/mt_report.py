@@ -121,7 +121,7 @@ def sort_by_sample(df):
     return final.drop_duplicates(ignore_index=True)
 
   
-def get_vcf_info(vcf,report,samples):
+def get_vcf_info(vcf,report,samples,vaf_field):
 #loop over each sample and create sample depth, vaf, and alt depth columns
     for sample in samples:
         sample_depths = []
@@ -152,8 +152,7 @@ def get_vcf_info(vcf,report,samples):
             sample_map = dict(zip(format_fields, sample_fields))
 
             depth = sample_map.get("DP", ".")
-            #use the VAF field from the mitorsaw vcf (DRAGEN report uses AF field)
-            vaf = sample_map.get("VAF", ".")
+            vaf = sample_map.get(vaf_field, ".")
             #AD is formatted as a tuple; [ref depth, alt depth]
             ad = sample_map.get("AD", ".")
             
@@ -173,7 +172,7 @@ def get_vcf_info(vcf,report,samples):
     return report
 
 
-def check_sort(vcf,df):
+def check_sort(vcf,df,vaf_field):
     sample = df.SAMPLE.unique()
     if len(sample) == 1:
         log_message("Only one sample present in report")
@@ -181,7 +180,7 @@ def check_sort(vcf,df):
     else:
         log_message("Multiple samples present in report")
         updated_df = sort_by_sample(df)
-        updated_df=get_vcf_info(vcf,updated_df,sample)
+        updated_df=get_vcf_info(vcf,updated_df,sample,vaf_field)
         return updated_df
 
 def keep_only_pass(report):
@@ -442,7 +441,7 @@ def read_vcf(vcf):
 
     return vcf_df
 
-def main(vcf, report, family):
+def main(vcf, report, family, vaf_field="VAF", report_suffix=""):
     logfile = f"logs/report/mitochondrial/{family}.mitochondrial.report.log"
     logging.basicConfig(
         filename=logfile,
@@ -459,7 +458,7 @@ def main(vcf, report, family):
     final_report = remove_cols(report_df)
     final_report = create_collapsed_mitomap_columns(final_report)
     final_report = remove_raw_collapsed_mitomap_columns(final_report)
-    final_report = check_sort(vcf_df,final_report)
+    final_report = check_sort(vcf_df,final_report,vaf_field)
     final_report = reorder_cols(final_report)
     final_report.columns = [col.replace(" ", "_") for col in final_report.columns]
     final_report = final_report.fillna(".").replace(r"^\s*$", ".", regex=True)
@@ -468,11 +467,11 @@ def main(vcf, report, family):
     today = today.strftime("%Y-%m-%d")
 
     final_report.to_csv(
-        f"reports/{family}.mito.{today}.csv", index=False
+        f"reports/{family}.mito.{today}{report_suffix}.csv", index=False
     )
     # create a symlink instead of a new copy for the Snakemake target
-    symlink_path = f"reports/{family}.mito.csv"
-    target_path = f"reports/{family}.mito.{today}.csv"
+    symlink_path = f"reports/{family}.mito{report_suffix}.csv"
+    target_path = f"reports/{family}.mito.{today}{report_suffix}.csv"
     try:
         if os.path.islink(symlink_path) or os.path.exists(symlink_path):
             os.remove(symlink_path)
@@ -489,4 +488,6 @@ if __name__ == "__main__":
     family = snakemake.wildcards.family
     vcf= snakemake.input.vcf
     report=snakemake.input.report
-    main(vcf,report,family)
+    vaf_field = getattr(snakemake.params, "vaf_field", "VAF")
+    report_suffix = getattr(snakemake.params, "report_suffix", "")
+    main(vcf,report,family,vaf_field,report_suffix)
