@@ -62,6 +62,7 @@ annotation:
     gnomad_constraint: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/gnomAD/v4.1/constraint/gnomad.v4.1.constraint_metrics.tsv"
     acmg_sf_list: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/ACMG/ACMG_SF_v3.3.tsv"
     acmg_sf_version: "3.3"
+    mavedb_tsv: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/MaveDB/final/mavedb_final_compact.tsv"
   sv_report:
     inhouse_c4r: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/C4R_LRWGS_db/pbsv.allsamples.counts.2026-02-02.bed"
     cnv_inhouse_c4r: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/C4R_LRWGS_db/hificnv.allsamples.counts.2025-12-18.bed"

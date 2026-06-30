@@ -75,7 +75,9 @@ rule identify_compound_hets:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         seq_type="long",
         hpo_panel_args=get_hpo_panel_args,
-        acmg_sf_flag = str(config["run"].get("acmg_sf", "false")).lower()
+        acmg_sf_flag = str(config["run"].get("acmg_sf", "false")).lower(),
+        mavedb_tsv = config["annotation"]["general"]["mavedb_tsv"],
+        mavedb_script = workflow.basedir + "/scripts/add_mavedb_columns.py"
     conda:
         "../envs/str_sv.yaml"
     log:
@@ -94,6 +96,11 @@ rule identify_compound_hets:
         --wgs_high_impact_variant_report_dir {input.wgs_high_impact_variant_report_dir}  \
         --sample_order {input.sample_order}  \
         --family {wildcards.family}  \
-        --acmg_sf {params.acmg_sf_flag}) > {log} 2>&1
+        --acmg_sf {params.acmg_sf_flag} && \
+        python3 {params.mavedb_script} \
+        --family {wildcards.family} \
+        --reports-dir reports \
+        --suffix csv \
+        --mavedb-tsv {params.mavedb_tsv}) > {log} 2>&1
         """
  
