@@ -1,3 +1,2 @@
-scripts/annotation/__pycache__/
-slurm_profile/__pycache__/
-scripts/compound_hets/__pycache__/
+__pycache__/
+*.py[cod]
