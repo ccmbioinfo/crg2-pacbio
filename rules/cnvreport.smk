@@ -109,6 +109,7 @@ rule cnv_report:
         ensembl = config["annotation"]["general"]["ensembl"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
+        samples = config["run"]["samples"]
     conda:
         "../envs/str_sv.yaml"
     shell:
@@ -134,7 +135,8 @@ rule cnv_report:
                         -clingen_HI {params.clingen_path}/ClinGen_haploinsufficiency_gene_GRCh38.bed \
                         -clingen_TS {params.clingen_path}/ClinGen_triplosensitivity_gene_GRCh38.bed \
                         -clingen_disease {params.clingen_path}/ClinGen_tableExport_202310.csv \
-                        -clingen_regions {params.clingen_path}/ClinGen_region_curation_list_GRCh38.tsv) > {log} 2>&1
+                        -clingen_regions {params.clingen_path}/ClinGen_region_curation_list_GRCh38.tsv \
+                        -samples {params.samples}) > {log} 2>&1
             else
                 (python3 {params.crg2_pacbio}/scripts/annotate_SVs.py \
                     -annotsv {input.annotsv} \
@@ -156,6 +158,7 @@ rule cnv_report:
                     -clingen_HI {params.clingen_path}/ClinGen_haploinsufficiency_gene_GRCh38.bed \
                     -clingen_TS {params.clingen_path}/ClinGen_triplosensitivity_gene_GRCh38.bed \
                     -clingen_disease {params.clingen_path}/ClinGen_tableExport_202310.csv \
-                    -clingen_regions {params.clingen_path}/ClinGen_region_curation_list_GRCh38.tsv) > {log} 2>&1
+                    -clingen_regions {params.clingen_path}/ClinGen_region_curation_list_GRCh38.tsv \
+                    -samples {params.samples}) > {log} 2>&1
             fi
         """
