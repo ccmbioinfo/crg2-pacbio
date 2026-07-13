@@ -2,7 +2,7 @@ rule genotype_adotto_loci:
     input: get_bam
     output: 
         vcf = temp("repeat_outliers/{family}_{sample}.trgt.unsorted.vcf.gz"),
-        spanning_bam = "repeat_outliers/{family}_{sample}.trgt.unsorted.spanning.bam"
+        spanning_bam = temp("repeat_outliers/{family}_{sample}.trgt.unsorted.spanning.bam")
     params: 
         trgt = config["tools"]["trgt"],
         ref = config["ref"]["genome"],
@@ -42,7 +42,7 @@ rule genotype_adotto_loci:
 
 rule sort_trgt_adotto_vcf:
     input: "repeat_outliers/{family}_{sample}.trgt.unsorted.vcf.gz"
-    output: "repeat_outliers/{family}_{sample}.trgt.sorted.vcf.gz"
+    output: temp("repeat_outliers/{family}_{sample}.trgt.sorted.vcf.gz")
     log: "logs/bcftools/{family}_{sample}.sort.trgt.log"
     conda:
         "../envs/common.yaml"

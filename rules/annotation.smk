@@ -15,7 +15,7 @@ rule input_prep:
     params:
         outdir= "filtered"
     output:
-        "filtered/{family}.vcf.gz"
+        temp("filtered/{family}.vcf.gz")
     wildcard_constraints:
         family = "(?!.*panel|.*coding).*"
     log:
@@ -123,7 +123,7 @@ rule vcf2db:
     input:
         "annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.vcf",
     output:
-         db="annotated/{p}/{family}-gemini.db",
+         db=temp("annotated/{p}/{family}-gemini.db"),
     log:
         "logs/vcf2db/{family}.vcf2db.{p}.log"
     threads: 1

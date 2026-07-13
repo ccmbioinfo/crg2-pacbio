@@ -16,6 +16,7 @@ rule allsnvreport:
          ref=config["ref"]["genome"]
     shell:
          '''
+         set -eo pipefail
          mkdir -p {output}
          cd {output}
          ln -s ../../../{input.db} {project}-ensemble.db
