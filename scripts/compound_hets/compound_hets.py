@@ -573,6 +573,27 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
     hpo_df = hpo_df.rename(columns={'Gene symbol': 'Gene Symbol'})
     hpo_df = hpo_df.dropna(subset=["Gene Symbol"])
     hpo_df = hpo_df.set_index("Gene ID").drop(columns=["Gene Symbol"])
-    report = report.join(hpo_df, on="Ensembl_gene_id").rename(columns={"Number of occurrences": "HPO_count", "Features": "HPO_terms"})
-    
+
+    # Ensembl_gene_id_all lists every gene the variant overlaps and is only present in
+    # the slivar reports. Match on any of them, so an HPO gene is not missed just
+    # because another overlapping gene was chosen as the primary one. Reports without
+    # the column keep the original single-gene join.
+    if "Ensembl_gene_id_all" in report.columns:
+        gene_ids = (
+            report["Ensembl_gene_id_all"]
+            .fillna("")
+            .astype(str)
+            .str.split(",")
+            .explode()
+            .str.strip()
+        )
+        # first overlapping gene the HPO panel knows about, one per report row
+        matched = gene_ids[gene_ids.isin(hpo_df.index)].groupby(level=0).first()
+        report = report.assign(_hpo_gene_id=matched)
+        report = report.join(hpo_df, on="_hpo_gene_id").drop(columns=["_hpo_gene_id"])
+    else:
+        report = report.join(hpo_df, on="Ensembl_gene_id")
+
+    report = report.rename(columns={"Number of occurrences": "HPO_count", "Features": "HPO_terms"})
+
     return report
