@@ -2,8 +2,9 @@ rule mitorsaw_call:
     input:
         bam=get_bam
     output:
-        vcf="mitochondrial_variants/{family}/{sample}.mitorsaw.vcf.gz",
-        hap_stats="mitochondrial_variants/{family}/{sample}.hap_stats.json"
+        vcf=temp("mitochondrial_variants/{family}/{sample}.mitorsaw.vcf.gz"),
+        hap_stats=temp("mitochondrial_variants/{family}/{sample}.hap_stats.json"),
+        debug=temp(directory("mitochondrial_variants/{family}/{sample}.mitorsaw.debug"))
     params:
         ref=config["ref"]["genome"]
     log:
@@ -12,13 +13,13 @@ rule mitorsaw_call:
         "../envs/mitorsaw.yaml"
     shell:
         """
-        mkdir -p mitochondrial_variants/{wildcards.family}/{wildcards.sample}/debug
+        mkdir -p {output.debug}
         mitorsaw haplotype \
             --reference {params.ref} \
             --bam {input.bam} \
             --output-vcf {output.vcf} \
             --output-hap-stats {output.hap_stats} \
-            --output-debug mitochondrial_variants/{wildcards.family}/{wildcards.sample}/debug \
+            --output-debug {output.debug} \
             > {log} 2>&1
         """
 
@@ -28,7 +29,8 @@ rule merge_mitorsaw_vcfs:
         vcfs=expand("mitochondrial_variants/{{family}}/{sample}.mitorsaw.vcf.gz", sample=samples.index),
         indices=expand("mitochondrial_variants/{{family}}/{sample}.mitorsaw.vcf.gz.tbi", sample=samples.index)
     output:
-        "mitochondrial_variants/{family}/{family}.mitorsaw.vcf.gz"
+        vcf=temp("mitochondrial_variants/{family}/{family}.mitorsaw.vcf.gz"),
+        index=temp("mitochondrial_variants/{family}/{family}.mitorsaw.vcf.gz.tbi")
     log:
         "logs/mito/merge/{family}.log"
     conda:
@@ -38,12 +40,13 @@ rule merge_mitorsaw_vcfs:
         (
         n_vcfs=$(printf '%s\n' {input.vcfs} | wc -l)
         if [ "$n_vcfs" -eq 1 ]; then
-            cp {input.vcfs} {output}
-            tabix -f {output}
+            cp {input.vcfs} {output.vcf}
+            tabix -f {output.vcf}
         else
-            bcftools merge -m none {input.vcfs} -Oz -o {output}
-            tabix -f {output}
+            bcftools merge -m none {input.vcfs} -Oz -o {output.vcf}
+            tabix -f {output.vcf}
         fi
+        rm -f {input.indices}
         ) > {log} 2>&1
         """
 
@@ -52,7 +55,8 @@ rule mitorsaw_normalize:
     input:
         "mitochondrial_variants/{family}/{family}.mitorsaw.vcf.gz"
     output:
-        temp("mitochondrial_variants/{family}/{family}.mt.normalise.decompose.vcf.gz")
+        vcf=temp("mitochondrial_variants/{family}/{family}.mt.normalise.decompose.vcf.gz"),
+        index=temp("mitochondrial_variants/{family}/{family}.mt.normalise.decompose.vcf.gz.tbi")
     params:
         outdir="mitochondrial_variants/{family}",
         tool=config["tools"]["mity"],
