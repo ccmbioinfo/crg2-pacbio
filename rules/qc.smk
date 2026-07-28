@@ -199,6 +199,27 @@ rule verifybam:
     wrapper:
         get_wrapper_path("verifybamid")
 
+rule qc_pass_fail:
+    input:
+        selfsm=expand("qc/verifybam/{family}_{sample}.selfSM", family=project, sample=samples.index),
+        sex_check="qc/peddy/{family}.sex_check.csv",
+        ped_check="qc/peddy/{family}.ped_check.csv"
+    output:
+        tsv="qc/multiqc_custom/{family}/qc_pass_fail_mqc.tsv"
+    log:
+        "logs/qc/qc_pass_fail/{family}.log"
+    conda:
+        "../envs/str_sv.yaml"
+    params:
+        samples=list(samples.index),
+        min_mean_coverage=config["qc"]["pass_fail_thresholds"]["min_mean_coverage"],
+        max_freemix=config["qc"]["pass_fail_thresholds"]["max_freemix"],
+        unrelated_max_rel=config["qc"]["pass_fail_thresholds"]["unrelated_max_rel"],
+        firstdeg_min_rel=config["qc"]["pass_fail_thresholds"]["firstdeg_min_rel"],
+        firstdeg_max_rel=config["qc"]["pass_fail_thresholds"]["firstdeg_max_rel"]
+    script:
+        "../scripts/qc_pass_fail_to_mqc.py"
+
 rule multiqc:
     input:
         peddy_html=f"qc/peddy/{project}.html",
@@ -207,7 +228,8 @@ rule multiqc:
         bcftools_stats=expand("qc/bcftools/{family}_{sample}.stats", family=project, sample=samples.index),
         selfsm=expand("qc/verifybam/{family}_{sample}.selfSM", family=project, sample=samples.index),
         samtools_stats=expand("qc/samtools/{family}_{sample}.stats", family=project, sample=samples.index),
-        nanoplot_readlen=expand("qc/nanoplot/{family}_{sample}/NanoPlot_Readlength_{family}_{sample}_mqc.png", family=project, sample=samples.index)
+        nanoplot_readlen=expand("qc/nanoplot/{family}_{sample}/NanoPlot_Readlength_{family}_{sample}_mqc.png", family=project, sample=samples.index),
+        qc_pass_fail="qc/multiqc_custom/{family}/qc_pass_fail_mqc.tsv"
     output:
         report="qc/multiqc/{family}.multiqc_report.html"
     log:
