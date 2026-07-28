@@ -8,6 +8,7 @@ run:
   ped: ""
   flank: 100000
   acmg_sf: false
+  slivar_preview: true
 
 genes:
   ensembl: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/for_gene_panels/Homo_sapiens.GRCh38.112.gtf_subset.csv"
@@ -18,6 +19,7 @@ tools:
   cre: "~/crg2-pacbio/scripts/cre"
   crg: "~/crg"
   crg2_pacbio: "~/crg2-pacbio"
+  cphi_dragen_anno: "~/CPHI-DRAGEN-anno"
   annotSV: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/AnnotSV-3.1.1"
   trgt: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/TRGTv2.1.0/trgt-v2.1.0-x86_64-unknown-linux-gnu/trgt"
   trgt-denovo: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/trgt-denovo-v0.2.0/trgt-denovo"

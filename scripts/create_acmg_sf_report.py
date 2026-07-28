@@ -143,12 +143,11 @@ def update_acmg_sf_report_flags(acmg_sf_report, df, input_report_type, acmg_col)
     return acmg_sf_report
 
 def infer_input_report_type(report_csv, family):
-    report_csv = str(report_csv)
-
-    prefix = f"reports/{family}."
+    basename = os.path.basename(str(report_csv))
+    prefix = f"{family}."
     suffix = ".SF.csv"
 
-    input_report_type = report_csv
+    input_report_type = basename
 
     if input_report_type.startswith(prefix):
         input_report_type = input_report_type.replace(prefix, "", 1)
@@ -179,8 +178,8 @@ def get_empty_acmg_sf_report():
         "VARIANT_KEY",
     ])
 
-def main(family, input_reports, output_csv, acmg_sf_version):
-    logfile = f"logs/report/acmg_sf/{family}.acmg_sf_report.log"
+def main(family, input_reports, output_csv, acmg_sf_version, log_path=None):
+    logfile = log_path or f"logs/report/acmg_sf/{family}.acmg_sf_report.log"
 
     os.makedirs(os.path.dirname(logfile), exist_ok=True)
 
@@ -269,6 +268,7 @@ def main(family, input_reports, output_csv, acmg_sf_version):
     if "VARIANT_KEY" in acmg_sf_report.columns:
         acmg_sf_report = acmg_sf_report.drop(columns=["VARIANT_KEY"])
     
+    os.makedirs(os.path.dirname(output_csv) or ".", exist_ok=True)
     acmg_sf_report.to_csv(output_csv, index=False)
     log_message(f"{output_csv} created with {len(acmg_sf_report)} rows")
 
@@ -277,5 +277,6 @@ if __name__ == "__main__":
     input_reports = snakemake.input.reports
     output_csv = snakemake.output.report
     acmg_sf_version = snakemake.params.acmg_sf_version
+    log_path = str(snakemake.log[0]) if len(snakemake.log) > 0 else None
 
-    main(family, input_reports, output_csv, acmg_sf_version)
+    main(family, input_reports, output_csv, acmg_sf_version, log_path)
