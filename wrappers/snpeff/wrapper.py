@@ -6,6 +6,7 @@ shell(
     "(snpEff {snakemake.params.java_opts} "
     "-i VCF "
     "-o VCF "
+    "-noStats "
     "-dataDir {snakemake.params.data_dir} "
     "{snakemake.params.reference} "
     "{snakemake.input} > {snakemake.output.vcf}) {log}"

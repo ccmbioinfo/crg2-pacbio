@@ -2,6 +2,7 @@ include: "rules/common.smk"
 include: "rules/annotation.smk"
 include: "rules/snvreport.smk"
 include: "rules/svreport.smk"
+include: "rules/annotate_mt_var.smk"
 include: "rules/outlier_expansions.smk"
 include: "rules/pathogenic_expansion_loci.smk"
 include: "rules/denovo_TR.smk"
@@ -56,6 +57,7 @@ rule all:
         "reports/{family}.known.path.str.loci.csv".format(family=project),
         "reports/{family}.multiqc_report.html".format(family=project),
         *hpo_reports,
+        "reports/{family}.mito.csv".format(family=project),
         *acmg_sf_report_output,
         expand("reports/{child}.TRGT.denovo.annotated.csv",
                child=children) if len(children) > 0 else []

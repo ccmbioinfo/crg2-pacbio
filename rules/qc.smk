@@ -19,7 +19,7 @@ rule peddy_unphase_vcf:
 
 rule peddy:
     input:
-        vcf="qc/peddy/{family}.unphased.vcf.gz",
+        vcf=temp("qc/peddy/{family}.unphased.vcf.gz"),
         ped=format_pedigree_qc
     output:
         pca="qc/peddy/{family}.background_pca.json",
@@ -44,6 +44,7 @@ rule peddy:
         peddy \
           --prefix ./qc/peddy/{wildcards.family} \
           --plot \
+          --sites hg38 \
           {input.vcf} \
           {input.ped} \
           2>&1 | tee {log}
@@ -120,7 +121,7 @@ rule add_dp_qc:
     input:
         vcf=get_smallvariants_vcf
     output:
-        "qc/bcftools/{family}.smallvariants_withdp.vcf"
+        temp("qc/bcftools/{family}.smallvariants_withdp.vcf")
     log:
         "logs/qc/bcftools/{family}.add_dp.log"
     wrapper:

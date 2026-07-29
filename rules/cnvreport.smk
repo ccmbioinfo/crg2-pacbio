@@ -1,7 +1,7 @@
 rule bcftools_merge:
     input: get_cnv_dir
     output:
-        vcf = "cnv/{family}.cnv.vcf.gz"
+        vcf = temp("cnv/{family}.cnv.vcf.gz")
     log:
         "logs/cnv/{family}.cnv.bcftools.merge.log"
     conda:
@@ -23,7 +23,7 @@ rule bcftools_merge:
 rule truvari_collapse:
     input: "cnv/{family}.cnv.vcf.gz"
     output:
-        merged_variants = "cnv/{family}.cnv.truvari.merge.vcf",
+        merged_variants = temp("cnv/{family}.cnv.truvari.merge.vcf"),
         collapsed_variants = temp("cnv/{family}.cnv.truvari.collapse.vcf")
     params:
         ref = config["ref"]["genome"]
@@ -56,7 +56,7 @@ rule fix_hifi_cnv_CI:
 rule cnv_snpeff:
     input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
     output:
-        vcf = "cnv/{family}.cnv.snpeff.vcf",
+        vcf = temp("cnv/{family}.cnv.snpeff.vcf"),
     log:
         "logs/cnv/{family}.snpeff.log"
     params:
@@ -69,7 +69,7 @@ rule cnv_snpeff:
 rule cnv_annotsv:
     input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
     output:
-        annotsv_annotated =  "cnv/{family}.AnnotSV.tsv",
+        annotsv_annotated =  temp("cnv/{family}.AnnotSV.tsv"),
         annotsv_unannotated =  temp("cnv/{family}.AnnotSV.unannotated.tsv")
     log: "logs/cnv/{family}.annotsv.log"
     params:

@@ -993,7 +993,6 @@ def main(
     print("Preparing OMIM data")
     omim_df = prepare_OMIM(f"{omim}/genemap2.txt")
 
-    df_merge.to_csv("df_merge.csv", index=False)
     df_merge["omim_phenotype"] = [
         add_omim(omim_df, gene)[0] for gene in df_merge["ENSEMBL_GENE"].values
     ]

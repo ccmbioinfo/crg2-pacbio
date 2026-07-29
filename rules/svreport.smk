@@ -1,7 +1,7 @@
 rule snpeff:
     input: get_pbsv_vcf
     output:
-        vcf = "sv/{family}.pbsv.snpeff.vcf",
+        vcf = temp("sv/{family}.pbsv.snpeff.vcf"),
     log:
         "logs/sv/{family}.snpeff.log"
     params:
@@ -14,7 +14,7 @@ rule snpeff:
 rule annotsv:
     input: get_pbsv_vcf
     output:
-        annotsv_annotated =  "sv/{family}.AnnotSV.tsv",
+        annotsv_annotated =  temp("sv/{family}.AnnotSV.tsv"),
         annotsv_unannotated =  temp("sv/{family}.AnnotSV.unannotated.tsv")
     log: "logs/sv/{family}.annotsv.log"
     params:
