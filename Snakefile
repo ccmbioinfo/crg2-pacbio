@@ -47,11 +47,22 @@ slivar_preview_outputs = [
     "reports_slivar/{family}.compound.het.status.CH.csv".format(family=project),
     "reports_slivar_compare/{family}.coding.summary.tsv".format(family=project),
     "reports_slivar_compare/{family}.wgs-high-impact.summary.tsv".format(family=project),
+    "reports_slivar/{family}.repeat.outliers.annotated.csv".format(family=project),
+    "reports_slivar/{family}.known.path.str.loci.csv".format(family=project),
+    "reports_slivar/{family}.multiqc_report.html".format(family=project),
+    "reports_slivar/{family}.mito.csv".format(family=project),
 ] if slivar_preview_enabled else []
 
 if slivar_preview_enabled and acmg_sf_enabled:
     slivar_preview_outputs.append(
         "reports_slivar/{family}.ACMG.SF.csv".format(family=project)
+    )
+
+if slivar_preview_enabled and len(children) > 0:
+    slivar_preview_outputs.extend(
+        expand("reports_slivar/{family}_{child}.TRGT.denovo.annotated.csv",
+               family=project,
+               child=children)
     )
 
 hpo_reports = []
@@ -67,9 +78,6 @@ if config["run"].get("hpo", ""):
             "reports_slivar_compare/{family}.panel.summary.tsv".format(family=project),
             "reports_slivar_compare/{family}.panel-flank.summary.tsv".format(family=project),
         ])
-
-if slivar_preview_enabled:
-    include: "rules/slivar_preview.smk"
     
 rule all:
     input:
@@ -88,4 +96,3 @@ rule all:
         expand("reports/{family}_{child}.TRGT.denovo.annotated.csv",
                family=project,
                child=children) if len(children) > 0 else []
-

@@ -133,3 +133,29 @@ def get_TR_outliers (wildcards):
 def get_cnv_dir(wildcards):
     family = project
     return units.loc[family, "cnv_dir"]
+
+
+rule link_slivar_report:
+    input:
+        report="reports/{family}.{report_type}"
+    output:
+        report="reports_slivar/{family}.{report_type}"
+    wildcard_constraints:
+        report_type="mito\\.csv|known\\.path\\.str\\.loci\\.csv|repeat\\.outliers\\.annotated\\.csv|multiqc_report\\.html",
+    shell:
+        """
+        mkdir -p $(dirname {output.report})
+        ln -sfn ../{input.report} {output.report}
+        """
+
+
+rule link_slivar_trgt_denovo_report:
+    input:
+        report="reports/{family}_{child}.TRGT.denovo.annotated.csv"
+    output:
+        report="reports_slivar/{family}_{child}.TRGT.denovo.annotated.csv"
+    shell:
+        """
+        mkdir -p $(dirname {output.report})
+        ln -sfn ../{input.report} {output.report}
+        """
