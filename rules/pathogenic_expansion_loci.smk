@@ -1,8 +1,8 @@
 rule genotype_pathogenic_loci:
     input: get_bam
     output: 
-        vcf = temp("pathogenic_repeats/{family}_{sample}.trgt.unsorted.vcf.gz"),
-        spanning_bam = temp("pathogenic_repeats/{family}_{sample}.trgt.unsorted.spanning.bam")
+        vcf = temp("pathogenic_repeats/{sample}.trgt.unsorted.vcf.gz"),
+        spanning_bam = temp("pathogenic_repeats/{sample}.trgt.unsorted.spanning.bam")
     params: 
         trgt = config["tools"]["trgt"],
         ref = config["ref"]["genome"],
@@ -36,15 +36,9 @@ rule genotype_pathogenic_loci:
         """
 
 rule sort_trgt_vcf:
-<<<<<<< HEAD
     input: "pathogenic_repeats/{sample}.trgt.unsorted.vcf.gz"
-    output: "pathogenic_repeats/{sample}.trgt.vcf.gz"
+    output: temp("pathogenic_repeats/{sample}.trgt.vcf.gz")
     log: "logs/bcftools/{sample}.sort.trgt.log"
-=======
-    input: "pathogenic_repeats/{family}_{sample}.trgt.unsorted.vcf.gz"
-    output: temp("pathogenic_repeats/{family}_{sample}.trgt.vcf.gz")
-    log: "logs/bcftools/{family}_{sample}.sort.trgt.log"
->>>>>>> origin
     conda:
         "../envs/common.yaml"
     shell:

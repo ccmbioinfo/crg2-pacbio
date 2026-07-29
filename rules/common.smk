@@ -31,7 +31,7 @@ project = config["run"]["project"]
 # `.+` wildcard regex makes paths like "{family}_{sample}" ambiguous whenever a
 # sample name contains "_" or ".". 
 _sample_name_pattern = "|".join(
-    sorted((re.escape(s) for s in samples["sample"]), key=len, reverse=True)
+    sorted((re.escape(sample) for sample in samples.index), key=len, reverse=True)
 )
 
 wildcard_constraints:

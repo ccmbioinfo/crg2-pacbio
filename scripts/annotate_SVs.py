@@ -927,11 +927,7 @@ def main(
     df_len = df_len.astype(str)
     # merge full and split AnnotSV annos
     df_merge = merge_full_split_annos(df_len)
-    _sample_name_pattern = "|".join(
-    sorted((re.escape(s) for s in samples))
-)
-    sample_cols = [col for col in df.columns if re.match(_sample_name_pattern, col)]
-
+    sample_cols = [col for col in df.columns if col in samples]
                      
     # extract genotype and alt allele depth
     for sample in sample_cols:
@@ -1389,9 +1385,8 @@ if __name__ == "__main__":
     clingen_disease = pd.read_csv(args.clingen_disease, comment="#")
     clingen_region_cols = ["ISCA ID", "ISCA Region Name", "cytoBand", "Genomic Location", "Haploinsufficiency Score", "Haploinsufficiency Description", "Haploinsufficiency PMID1", "Haploinsufficiency PMID2", "Haploinsufficiency PMID3", "Haploinsufficiency PMID4", "Haploinsufficiency PMID5", "Haploinsufficiency PMID6", "Triplosensitivity Score", "Triplosensitivity Description", "Triplosensitivity PMID1", "Triplosensitivity PMID2", "Triplosensitivity PMID3", "Triplosensitivity PMID4", "Triplosensitivity PMID5", "Triplosensitivity PMID6", "Date Last Evaluated", "Haploinsufficiency Disease ID", "Triplosensitivity Disease ID"]
     clingen_regions = pd.read_csv(args.clingen_regions, comment="#", sep="\t", names=clingen_region_cols)
-
     # read samples TSV
-    samples = pd.read_csv(args.samples, sep="\t")["sample"].values
+    samples = pd.read_csv(args.samples, sep="\t", dtype=str)["sample"].tolist()
 
     main(
         df,

@@ -14,9 +14,9 @@ include: "rules/qc.smk"
 def get_children_ids(ped_file):
     import pandas as pd
     pedigree = pd.read_csv(ped_file, sep=None, header=None, 
-                          names=["family_ID", "individual_ID", "paternal_ID", "maternal_ID", "sex", "phenotype"])
+                          names=["family_ID", "individual_ID", "paternal_ID", "maternal_ID", "sex", "phenotype"], engine="python")
     pedigree = pedigree.astype(str)
-    children = pedigree[(pedigree["paternal_ID"] != "0") & (pedigree["paternal_ID"] != ".")][(pedigree["maternal_ID"] != "0") & (pedigree["maternal_ID"] != ".")]["individual_ID"].values
+    children = pedigree[(pedigree["paternal_ID"] != "0") & (pedigree["paternal_ID"] != ".") & (pedigree["maternal_ID"] != "0") & (pedigree["maternal_ID"] != ".")]["individual_ID"].values
     family = pedigree["family_ID"].iloc[0]
 
     return children
