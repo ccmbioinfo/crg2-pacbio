@@ -575,25 +575,26 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
     hpo_df = hpo_df.set_index("Gene ID").drop(columns=["Gene Symbol"])
 
     # Ensembl_gene_id_all lists every gene the variant overlaps and is only present in
-    # the slivar reports. Match on any of them, so an HPO gene is not missed just
-    # because another overlapping gene was chosen as the primary one. Reports without
-    # the column keep the original single-gene join.
+    # the slivar reports. Match on all of them so the primary gene's terms are never
+    # dropped when another overlapping gene sorts earlier. Reports without the column
+    # keep the original single-gene join.
     if "Ensembl_gene_id_all" in report.columns:
-        gene_ids = (
-            report["Ensembl_gene_id_all"]
-            .fillna("")
-            .astype(str)
-            .str.split(",")
-            .explode()
-            .str.strip()
-        )
-        # first overlapping gene the HPO panel knows about, one per report row
-        matched = gene_ids[gene_ids.isin(hpo_df.index)].groupby(level=0).first()
-        report = report.assign(_hpo_gene_id=matched)
-        report = report.join(hpo_df, on="_hpo_gene_id").drop(columns=["_hpo_gene_id"])
+        hpo_features = hpo_df["Features"].to_dict()
+        hpo_counts = hpo_df["Number of occurrences"].to_dict()
+
+        # Concatenate the HPO terms and sum the counts over every panel gene the
+        # variant overlaps, so the primary gene's terms are never dropped.
+        def collect_hpo(gene_ids_text):
+            genes = [g.strip() for g in str(gene_ids_text).split(",") if g.strip() in hpo_features]
+            terms = ", ".join(hpo_features[g] for g in genes)
+            count = sum(hpo_counts[g] for g in genes)
+            return terms, count
+
+        collected = report["Ensembl_gene_id_all"].fillna("").apply(collect_hpo)
+        report["HPO_terms"] = collected.apply(lambda x: x[0])
+        report["HPO_count"] = collected.apply(lambda x: x[1])
     else:
         report = report.join(hpo_df, on="Ensembl_gene_id")
-
-    report = report.rename(columns={"Number of occurrences": "HPO_count", "Features": "HPO_terms"})
+        report = report.rename(columns={"Number of occurrences": "HPO_count", "Features": "HPO_terms"})
 
     return report
