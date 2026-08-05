@@ -586,6 +586,8 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
         # variant overlaps, so the primary gene's terms are never dropped.
         def collect_hpo(gene_ids_text):
             genes = [g.strip() for g in str(gene_ids_text).split(",") if g.strip() in hpo_features]
+            if not genes:
+                return ".", "."
             terms = ", ".join(hpo_features[g] for g in genes)
             count = sum(hpo_counts[g] for g in genes)
             return terms, count
