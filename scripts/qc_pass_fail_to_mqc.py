@@ -21,7 +21,6 @@ def to_bool_str(val):
         return "NA"
     return "True" if val else "False"
 
-samples = [f"{family}_{sample}" for sample in samples]
 # 1. Mean coverage >= min_cov (VerifyBAMID AVG_DP) and contamination (VerifyBamID FREEMIX) < max_freemix (FREEMIX is a fraction 0-1)
 coverage_pass = {sample: np.nan for sample in samples}
 freemix_pass = {sample: np.nan for sample in samples}
