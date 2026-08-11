@@ -9,7 +9,7 @@ from pybedtools import BedTool
 from sigfig import round
 from datetime import date
 import io
-import sys
+from ont_formatting import convert_ont_sample_value
 
 def rename_SV_cols(annotsv_df):
     annotsv_df.rename(
@@ -403,6 +403,7 @@ def annotate_pb_regions(annotsv_df, regions, region_name):
     """
     Annotate SVs against PacBio odd regions or PacBio dark regions (bed files where fourth column indicates region affected)
     """
+    region_details_name = ("_").join(region_name.split("_")[:-1])
     annotsv_bed = annotsv_df_to_bed(annotsv_df)
     regions = pd.read_csv(regions, sep="\t")
     regions_bed = BedTool.from_dataframe(regions)
@@ -411,6 +412,15 @@ def annotate_pb_regions(annotsv_df, regions, region_name):
         wa=True,
         wb=True,
     ).to_dataframe()
+    if intersect.empty:
+        # Small CNV callsets may have no overlaps with a reference BED, so
+        # BedTool returns no annotation columns. Keep the expected columns as
+        # empty values because later report-column selection requires them.
+        print(f"No overlaps found for {region_name}")
+        annotsv_df[region_name] = "."
+        annotsv_df[region_details_name] = "."
+        annotsv_df[f"{region_details_name}_perc_overlap"] = "."
+        return annotsv_df
     intersect.columns = [
         "CHROM",
         "POS",
@@ -424,7 +434,6 @@ def annotate_pb_regions(annotsv_df, regions, region_name):
         region_name,
     ]
     # make a column with region details, e.g 1:25266309-25324509
-    region_details_name = ("_").join(region_name.split("_")[:-1])
     intersect[region_details_name] = intersect[
         ["CHROM_region", "POS_region", "END_region"]
     ].apply(lambda x: f"{x[0]}:{x[1]}-{x[2]}", axis=1)
@@ -570,7 +579,7 @@ def vcf_to_df(vcf_path):
     ).rename(columns={"#CHROM": "CHROM"})
 
 
-def parse_snpeff(snpeff_df, variant_type):
+def parse_snpeff(snpeff_df, variant_type, platform="PACBIO"):
     svtype_list = []
     end_list = []
     ann_list = []
@@ -585,7 +594,8 @@ def parse_snpeff(snpeff_df, variant_type):
             end = [i for i in info if "END=" in i][0].split("=")[1]
             if svtype == "BND" or svtype == "INS":
                 end = int(end) + 1
-            elif variant_type == "CNV":
+            elif variant_type == "CNV" and platform == "PACBIO":
+                # AnnotSV expands HiFiCNV calls to their confidence-interval bounds. 
                 CIEND = [i for i in info if "CIEND=" in i][0].split("=")[1].split(",")[1]
                 end = int(end) + int(CIEND)
         except IndexError:
@@ -597,9 +607,17 @@ def parse_snpeff(snpeff_df, variant_type):
         except IndexError:
             ann_list.append("NA")
         if svtype == "BND":
-            CIPOS = [i for i in info if "CIPOS=" in i][0].split("=")[1].split(",")[0]
-            pos = int(pos) + int(CIPOS)
-        elif variant_type == "CNV":
+            if platform == "PACBIO":
+                # pbsv BND records include CIPOS; Sniffles2 do not.
+                CIPOS = [i for i in info if "CIPOS=" in i][0].split("=")[1].split(",")[0]
+                pos = int(pos) + int(CIPOS)
+            else:
+                cipos = [i for i in info if "CIPOS=" in i]
+                if cipos:
+                    CIPOS = cipos[0].split("=")[1].split(",")[0]
+                    pos = int(pos) + int(CIPOS)
+        elif variant_type == "CNV" and platform == "PACBIO":
+            # match AnnotSV's confidence-interval start for HiFiCNV.
             CIPOS = [i for i in info if "CIPOS=" in i][0].split("=")[1].split(",")[0]
             pos = int(pos) + int(CIPOS)
         pos_list.append(pos)
@@ -919,7 +937,8 @@ def main(
     clingen_TS,
     clingen_disease,
     clingen_regions,
-    samples
+    samples,
+    platform="PACBIO",
 ):
     print(c4r)
     # filter out SVs < 50bp
@@ -928,6 +947,17 @@ def main(
     # merge full and split AnnotSV annos
     df_merge = merge_full_split_annos(df_len)
     sample_cols = [col for col in df.columns if col in samples]
+
+    if platform == "ONT":
+        # The extraction helpers below expect the positional PacBio sample
+        # layouts. Normalize Sniffles2/Spectre fields before using them.
+        if "FORMAT" not in df_merge.columns:
+            raise ValueError("AnnotSV output must include the VCF FORMAT column for ONT inputs")
+        for sample in sample_cols:
+            df_merge[sample] = [
+                convert_ont_sample_value(row["FORMAT"], row[sample], variant_type)
+                for index, row in df_merge.iterrows()
+            ]
                      
     # extract genotype and alt allele depth
     for sample in sample_cols:
@@ -938,10 +968,12 @@ def main(
             df_merge[f"{sample}_CN"] = [
                 get_CN(row[sample]) for index, row in df_merge.iterrows()
             ]
-            # map genotype to copy number
-            df_merge[f"{sample}_GT"] = [
-                map_CN_to_GT(row["SVTYPE"], row[f"{sample}_CN"], row[f"{sample}_GT"], row["CHROM"]) for index, row in df_merge.iterrows()
-            ]
+            if platform == "PACBIO":
+                # HiFiCNV GT is normalized from CN; Spectre already provides
+                # an explicit GT, so the ONT value should not be overwritten.
+                df_merge[f"{sample}_GT"] = [
+                    map_CN_to_GT(row["SVTYPE"], row[f"{sample}_CN"], row[f"{sample}_GT"], row["CHROM"]) for index, row in df_merge.iterrows()
+                ]
             df_merge[f"{sample}_zyg"] = [
                 get_genotype(row[f"{sample}_GT"])[0] for index, row in df_merge.iterrows()
             ]
@@ -969,7 +1001,7 @@ def main(
     # df_merge_notbenign = df_merge[apply_filter_benign(df_merge)]
 
     # add snpeff annos
-    snpeff_df = parse_snpeff(snpeff_df, variant_type)
+    snpeff_df = parse_snpeff(snpeff_df, variant_type, platform)
     for col in ["POS", "END"]:
         snpeff_df[col] = snpeff_df[col].astype(int)
         df_merge[col] = df_merge[col].astype(int)
@@ -1193,9 +1225,9 @@ def main(
     if variant_type == "CNV":
         # exclude splice site annotations for CNVs
         df_merge = df_merge.drop(columns=["Nearest_SS_type", "Dist_nearest_SS", "ID"])
-        # add back confidence intervals for CNV length now that annotation is done
-        df_merge["POS"] = df_merge["POS"] + 2000
-        df_merge["END"] = df_merge["END"] - 2000
+        if platform == "PACBIO":
+            df_merge["POS"] = df_merge["POS"] + 2000
+            df_merge["END"] = df_merge["END"] - 2000
     df_merge = df_merge.replace("nan", ".")
     df_merge = df_merge.fillna(".")
     df_merge = df_merge.drop_duplicates()
@@ -1212,6 +1244,7 @@ if __name__ == "__main__":
     parser.add_argument("-annotsv", type=str, help="AnnotSV tsv file", required=True)
     parser.add_argument("-snpeff", type=str, help="Snpeff vcf file", required=True)
     parser.add_argument("-variant_type", type=str, help="Variant type: SV or CNV", required=True)
+    parser.add_argument("-platform", choices=["PACBIO", "ONT"], default="PACBIO")
     parser.add_argument(
         "-hpo",
         help="Tab delimited file containing gene names and HPO terms",
@@ -1413,4 +1446,5 @@ if __name__ == "__main__":
         clingen_disease,
         clingen_regions,
         samples,
+        args.platform,
     )

@@ -54,6 +54,7 @@ rule sv_report:
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
         samples = config["run"]["samples"],
+        platform = get_platform,
     conda:
         "../envs/str_sv.yaml"
     shell:
@@ -65,6 +66,7 @@ rule sv_report:
                         -snpeff {input.snpeff} \
                         -variant_type SV \
                         -samples {params.samples} \
+                        -platform {params.platform} \
                         -omim {params.omim} \
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
@@ -87,6 +89,7 @@ rule sv_report:
                     -snpeff {input.snpeff} \
                     -variant_type SV \
                     -samples {params.samples} \
+                    -platform {params.platform} \
                     -omim {params.omim} \
                     -hpo {params.HPO} \
                     -exon {params.exon} \

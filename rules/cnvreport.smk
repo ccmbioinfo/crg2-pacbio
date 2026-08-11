@@ -6,15 +6,17 @@ rule bcftools_merge:
         "logs/cnv/{family}.cnv.bcftools.merge.log"
     conda:
         "../envs/common.yaml"
+    params:
+        pattern=lambda wildcards: "*.wf_cnv.vcf.gz" if get_platform(wildcards) == "ONT" else "*hificnv*.vcf.gz"
     shell:
         """
         (
-        n_vcfs=$(ls {input}/*hificnv*.vcf.gz | wc -l)
+        n_vcfs=$(ls {input}/{params.pattern} | wc -l)
         if [ "$n_vcfs" -eq 1 ]; then
-            cp {input}/*hificnv*.vcf.gz {output}
+            cp {input}/{params.pattern} {output}
             tabix {output}
         else
-            bcftools merge -m none {input}/*hificnv*.vcf.gz | bgzip > {output}
+            bcftools merge -m none {input}/{params.pattern} | bgzip > {output}
             tabix {output}
         fi
         ) > {log} 2>&1
@@ -109,7 +111,8 @@ rule cnv_report:
         ensembl = config["annotation"]["general"]["ensembl"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
-        samples = config["run"]["samples"]
+        samples = config["run"]["samples"],
+        platform = get_platform,
     conda:
         "../envs/str_sv.yaml"
     shell:
@@ -121,6 +124,7 @@ rule cnv_report:
                         -snpeff {input.snpeff} \
                         -variant_type CNV \
                         -samples {params.samples} \
+                        -platform {params.platform} \
                         -omim {params.omim} \
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
@@ -143,6 +147,7 @@ rule cnv_report:
                     -snpeff {input.snpeff} \
                     -variant_type CNV \
                     -samples {params.samples} \
+                    -platform {params.platform} \
                     -omim {params.omim} \
                     -hpo {params.HPO} \
                     -exon {params.exon} \
