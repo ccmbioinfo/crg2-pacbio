@@ -45,6 +45,33 @@ def per_sample_zygosity_genotype_columns(row, sample_columns):
         columns[f"{sample}_GT"] = get_value(row, genotype_col) if genotype_col else "."
     return columns
 
+
+def get_acmg_sf_gene_annotations(acmg_gene_string, acmg_sf_list):
+    if pd.isna(acmg_gene_string) or str(acmg_gene_string).strip() in ("", "."):
+        return ".", "."
+
+    genes = []
+    for gene_value in str(acmg_gene_string).split(";"):
+        gene = gene_value.strip()
+        if gene:
+            genes.append(gene)
+
+    # Match the reported gene or genes directly to rows in the ACMG SF list.
+    matches = acmg_sf_list[acmg_sf_list["Gene"].isin(genes)]
+    phenotypes = matches["Phenotype"].dropna().astype(str).str.strip()
+    phenotypes = phenotypes[(phenotypes != "") & (phenotypes != ".")]
+    phenotypes = phenotypes.drop_duplicates()
+
+    inheritances = matches["Inheritance"].dropna().astype(str).str.strip()
+    inheritances = inheritances[(inheritances != "") & (inheritances != ".")]
+    inheritances = inheritances.drop_duplicates()
+
+    return (
+        ";".join(phenotypes) if len(phenotypes) > 0 else ".",
+        ";".join(inheritances) if len(inheritances) > 0 else ".",
+    )
+
+
 def make_variant_key(row, input_report_type):
     if input_report_type in ["wgs.coding.CH", "wgs.high.impact.CH"]:
         return f"{get_value(row, 'Position')}:{get_value(row, 'Ref')}:{get_value(row, 'Alt')}"
@@ -59,7 +86,7 @@ def make_variant_key(row, input_report_type):
 
     return "."
 
-def make_acmg_sf_report_rows(df, family, input_report_type, acmg_col):
+def make_acmg_sf_report_rows(df, family, input_report_type, acmg_col, acmg_sf_list,):
     acmg_matches = df[df[acmg_col] != "."].copy()
     sample_columns = discover_samples(acmg_matches)
     report_rows = []
@@ -77,6 +104,8 @@ def make_acmg_sf_report_rows(df, family, input_report_type, acmg_col):
             clinvar = get_value(row, "Clinvar")
             gnomad_af = get_value(row, "Gnomad_af")
             ucsc_link = get_value(row, "UCSC_Link")
+            # Copy the RefSeq change already present in the coding report.
+            refseq_change = get_value(row, "Refseq_change")
 
         elif input_report_type in ["sv.CH", "cnv.CH"]:
             chrom = str(get_value(row, "CHROM"))
@@ -94,18 +123,31 @@ def make_acmg_sf_report_rows(df, family, input_report_type, acmg_col):
             clinvar = "."
             gnomad_af = get_value(row, "gnomad_GRPMAX_AF")
             ucsc_link = get_value(row, "UCSC_link")
+            # RefSeq changes are not currently reported for SVs and CNVs.
+            refseq_change = "."
 
         else:
             continue
 
+        acmg_sf_gene = get_value(row, acmg_col)
+        acmg_sf_gene_phenotype, acmg_sf_gene_inheritance = (
+            get_acmg_sf_gene_annotations(acmg_sf_gene, acmg_sf_list)
+        )
+
+        # OMIM comes from the annotated input; the ACMG values come from the
+        # secondary-findings gene list.
         report_row = {
             "POSITION": position,
             "END": end,
             "REF": ref,
             "ALT": alt,
             "SVTYPE": svtype,
+            "REFSEQ_CHANGE": refseq_change,
             "GENE": gene,
-            "ACMG_SF_GENE": get_value(row, acmg_col),
+            "ACMG_SF_GENE": acmg_sf_gene,
+            "OMIM_PHENOTYPE": get_value(row, "omim_phenotype"),
+            "ACMG_SF_GENE_PHENOTYPE": acmg_sf_gene_phenotype,
+            "ACMG_SF_GENE_INHERITANCE": acmg_sf_gene_inheritance,
             "CONSEQUENCE": consequence,
             "FAMILY": family,
             "CLINVAR": clinvar,
@@ -165,8 +207,12 @@ def get_empty_acmg_sf_report():
         "REF",
         "ALT",
         "SVTYPE",
+        "REFSEQ_CHANGE",
         "GENE",
         "ACMG_SF_GENE",
+        "OMIM_PHENOTYPE",
+        "ACMG_SF_GENE_PHENOTYPE",
+        "ACMG_SF_GENE_INHERITANCE",
         "CONSEQUENCE",
         "FAMILY",
         "SAMPLE_ZYGOSITY",
@@ -179,7 +225,7 @@ def get_empty_acmg_sf_report():
         "VARIANT_KEY",
     ])
 
-def main(family, input_reports, output_csv, acmg_sf_version):
+def main(family, input_reports, output_csv, acmg_sf_version, acmg_sf_tsv):
     logfile = f"logs/report/acmg_sf/{family}.acmg_sf_report.log"
 
     os.makedirs(os.path.dirname(logfile), exist_ok=True)
@@ -193,6 +239,8 @@ def main(family, input_reports, output_csv, acmg_sf_version):
     )
 
     acmg_col = f"ACMG_SF_v{acmg_sf_version}"
+    acmg_sf_list = pd.read_csv(acmg_sf_tsv, sep="\t", usecols=["Gene", "Phenotype", "Inheritance"],)
+    acmg_sf_list["Gene"] = acmg_sf_list["Gene"].astype("string").str.strip()
 
     main_acmg_report_types = [
         "wgs.coding.CH",
@@ -226,6 +274,7 @@ def main(family, input_reports, output_csv, acmg_sf_version):
                 family=family,
                 input_report_type=input_report_type,
                 acmg_col=acmg_col,
+                acmg_sf_list=acmg_sf_list,
             )
 
             if len(acmg_sf_report_df) > 0:
@@ -277,5 +326,6 @@ if __name__ == "__main__":
     input_reports = snakemake.input.reports
     output_csv = snakemake.output.report
     acmg_sf_version = snakemake.params.acmg_sf_version
+    acmg_sf_tsv = snakemake.input.acmg_sf_list
 
-    main(family, input_reports, output_csv, acmg_sf_version)
+    main(family, input_reports, output_csv, acmg_sf_version, acmg_sf_tsv)
