@@ -71,8 +71,7 @@ rule cnv_snpeff:
 rule cnv_annotsv:
     input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
     output:
-        annotsv_annotated =  temp("cnv/{family}.AnnotSV.tsv"),
-        annotsv_unannotated =  temp("cnv/{family}.AnnotSV.unannotated.tsv")
+        annotsv_annotated =  temp("cnv/{family}.AnnotSV.tsv")
     log: "logs/cnv/{family}.annotsv.log"
     params:
         annotsv_path = config["tools"]["annotSV"]

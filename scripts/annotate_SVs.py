@@ -326,6 +326,15 @@ def annotate_pop_svs(annotsv_df, pop_svs, cols, variant_type):
     else:
         intersect = intersect_DEL_DUP_INV
     
+    # BedTools can return an empty dataframe without the requested column names, might want to change how this is handled
+    if intersect.empty:
+        pop_name = cols[0].split("_")[0]
+        for col in cols:
+            annotsv_df[col] = "."
+        annotsv_df[f"{pop_name}_SV"] = "."
+        annotsv_df[f"{pop_name}_maxAF"] = "."
+        return annotsv_df
+
     # popSV and sample SV must be same type
     intersect = intersect[intersect["SVTYPE"] == intersect["SVTYPE_pop"]]
 
