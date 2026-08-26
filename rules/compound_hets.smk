@@ -58,14 +58,13 @@ rule slivar_select_compound_het_candidates:
     log:
         "logs/compound_hets/{family}.slivar.select.compound.het.candidates.log"
     conda:
-        os.path.join(os.path.expanduser(config["tools"]["cphi_dragen_anno"]), "workflow", "envs", "slivar.yaml")
+        "../envs/slivar.yaml"
     params:
-        js=config["tools"]["cphi_dragen_anno"] + "/workflow/scripts/slivar/slivar_functions.js",
-        consequence_order_file=config["tools"]["cphi_dragen_anno"] + "/workflow/scripts/slivar/default-order.txt",
+        js=f"{workflow.basedir}/scripts/slivar/slivar_functions.js",
+        consequence_order_file=f"{workflow.basedir}/scripts/slivar/default-order.txt",
         mode="compound-hets",
-        profile="pacbio",
     wrapper:
-        "file:" + os.path.join(os.path.expanduser(config["tools"]["cphi_dragen_anno"]), "workflow", "wrappers", "slivar")
+        get_wrapper_path("slivar")
 
 
 rule get_slivar_small_variants_for_CH:
@@ -77,17 +76,14 @@ rule get_slivar_small_variants_for_CH:
     log:
         "logs/compound_hets/{family}.slivar.get.sequence.variants.for.CH.log"
     conda:
-        os.path.join(os.path.expanduser(config["tools"]["cphi_dragen_anno"]), "workflow", "envs", "slivar.yaml")
-    params:
-        cphi_dragen_anno=config["tools"]["cphi_dragen_anno"]
+        "../envs/slivar.yaml"
     shell:
         """
         (set -e
         mkdir -p $(dirname {output.high_med})
-        python3 {params.cphi_dragen_anno}/workflow/scripts/slivar/build_ch_tsv.py \
-        --profile pacbio \
+        python3 {workflow.basedir}/scripts/slivar/build_ch_tsv.py \
         --vcf {input.vcf} \
-        --impact-order-file {params.cphi_dragen_anno}/workflow/scripts/slivar/default-order.txt \
+        --impact-order-file {workflow.basedir}/scripts/slivar/default-order.txt \
         --high-med-out {output.high_med} \
         --low-out {output.low}) > {log} 2>&1
         """

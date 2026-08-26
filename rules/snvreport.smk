@@ -112,14 +112,13 @@ rule slivar_select:
     log:
         "logs/slivar/{family}.{p}.select.log"
     conda:
-        os.path.join(os.path.expanduser(config["tools"]["cphi_dragen_anno"]), "workflow", "envs", "slivar.yaml")
+        "../envs/slivar.yaml"
     params:
-        js=config["tools"]["cphi_dragen_anno"] + "/workflow/scripts/slivar/slivar_functions.js",
-        consequence_order_file=config["tools"]["cphi_dragen_anno"] + "/workflow/scripts/slivar/default-order.txt",
+        js=f"{workflow.basedir}/scripts/slivar/slivar_functions.js",
+        consequence_order_file=f"{workflow.basedir}/scripts/slivar/default-order.txt",
         mode="{p}",
-        profile="pacbio",
     wrapper:
-        "file:" + os.path.join(os.path.expanduser(config["tools"]["cphi_dragen_anno"]), "workflow", "wrappers", "slivar")
+        get_wrapper_path("slivar")
 
 
 rule slivar_postfilter:
@@ -134,17 +133,15 @@ rule slivar_postfilter:
     log:
         "logs/slivar/{family}.{p}.postfilter.log"
     conda:
-        os.path.join(os.path.expanduser(config["tools"]["cphi_dragen_anno"]), "workflow", "envs", "slivar.yaml")
-    params:
-        cphi_dragen_anno=config["tools"]["cphi_dragen_anno"]
+        "../envs/slivar.yaml"
     shell:
         """
-        (python3 {params.cphi_dragen_anno}/workflow/scripts/slivar/postfilter.py \
+        (python3 {workflow.basedir}/scripts/slivar/postfilter.py \
         --mode {wildcards.p} \
         --rare-main-vcf {input.rare_main} \
         --rare-clinvar-vcf {input.rare_clinvar} \
         --common-pathogenic-clinvar-vcf {input.common_pathogenic_clinvar} \
-        --impact-order-file {params.cphi_dragen_anno}/workflow/scripts/slivar/default-order.txt \
+        --impact-order-file {workflow.basedir}/scripts/slivar/default-order.txt \
         --out-vcf {output.vcf} &&
         bcftools sort -O v -o {output.vcf}.sorted {output.vcf} &&
         mv {output.vcf}.sorted {output.vcf}) > {log} 2>&1
@@ -161,19 +158,17 @@ rule slivar_report:
     log:
         "logs/slivar/{family}.{p}.report.log"
     conda:
-        os.path.join(os.path.expanduser(config["tools"]["cphi_dragen_anno"]), "workflow", "envs", "slivar.yaml")
+        "../envs/slivar.yaml"
     params:
-        cphi_dragen_anno=config["tools"]["cphi_dragen_anno"],
         crg2_pacbio=config["tools"]["crg2_pacbio"],
         hgmd=os.path.join(config["annotation"]["slivar"]["database_path"], "hgmd_hg38.csv"),
     shell:
         """
-        (python3 {params.cphi_dragen_anno}/workflow/scripts/slivar/build_report.py \
-        --profile pacbio \
+        (python3 {workflow.basedir}/scripts/slivar/build_report.py \
         --mode {wildcards.p} \
         --vcf {input.vcf} \
         --out-csv {output.report} \
-        --impact-order-file {params.cphi_dragen_anno}/workflow/scripts/slivar/default-order.txt \
+        --impact-order-file {workflow.basedir}/scripts/slivar/default-order.txt \
         --slivar-data-dir {params.crg2_pacbio}/scripts/slivar/data \
         --hgmd {params.hgmd}) > {log} 2>&1
         """
