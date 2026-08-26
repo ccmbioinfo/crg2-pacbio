@@ -53,6 +53,7 @@ rule sv_report:
         clingen_path = config["annotation"]["general"]["clingen_path"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
+        samples = config["run"]["samples"],
     conda:
         "../envs/str_sv.yaml"
     shell:
@@ -63,6 +64,7 @@ rule sv_report:
                         -annotsv {input.annotsv} \
                         -snpeff {input.snpeff} \
                         -variant_type SV \
+                        -samples {params.samples} \
                         -omim {params.omim} \
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
@@ -84,6 +86,7 @@ rule sv_report:
                     -annotsv {input.annotsv} \
                     -snpeff {input.snpeff} \
                     -variant_type SV \
+                    -samples {params.samples} \
                     -omim {params.omim} \
                     -hpo {params.HPO} \
                     -exon {params.exon} \

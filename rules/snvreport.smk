@@ -1,43 +1,3 @@
-rule allsnvreport:
-    input:
-        db="annotated/{p}/{family}-gemini.db",
-        vcf="annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.vcf.gz"
-    output:
-        directory("small_variants/{p}/{family}")
-    conda:
-        "../envs/cre.yaml"
-    log:
-        "logs/report/{p}/{family}.cre.log"
-    resources:
-         mem_mb=40000
-    params:
-         cre=config["tools"]["cre"],
-         database_path=config["annotation"]["cre"]["database_path"],
-         ref=config["ref"]["genome"]
-    shell:
-         '''
-         set -eo pipefail
-         mkdir -p {output}
-         cd {output}
-         ln -s ../../../{input.db} {project}-ensemble.db
-         #bgzip ../../../{input.vcf} -c > {project}-gatk-haplotype-annotated-decomposed.vcf.gz
-         ln -s ../../../{input.vcf} {project}-gatk-haplotype-annotated-decomposed.vcf.gz
-         tabix {project}-gatk-haplotype-annotated-decomposed.vcf.gz
-         ln -s {project}-gatk-haplotype-annotated-decomposed.vcf.gz {project}-ensemble-annotated-decomposed.vcf.gz
-         ln -s {project}-gatk-haplotype-annotated-decomposed.vcf.gz.tbi {project}-ensemble-annotated-decomposed.vcf.gz.tbi
-         cd ../
-         if [ {wildcards.p} == "coding" ]; then  
-         cre={params.cre} reference={params.ref} database={params.database_path} {params.cre}/cre.sh {project} 
-         elif [ {wildcards.p} == "denovo" ]; then  
-         cre={params.cre} reference={params.ref} database={params.database_path} type=denovo {params.cre}/cre.sh {project} 
-         elif [ {wildcards.p} == "wgs-high-impact" ]; then  
-         cre={params.cre} reference={params.ref} database={params.database_path} type=wgs.high.impact {params.cre}/cre.sh {project}
-         else
-         cre={params.cre} reference={params.ref} database={params.database_path} type=wgs {params.cre}/cre.sh {project}
-         unset type
-         fi;
-         '''
-
 if config["run"]["hpo"]:
 
     def get_panel(wildcards):
@@ -60,8 +20,7 @@ if config["run"]["hpo"]:
             refseq=config["genes"]["refseq"],
             hgnc=config["genes"]["hgnc"]
         params: 
-            crg2_pacbio=config["tools"]["crg2_pacbio"],
-            cre=config["tools"]["cre"]
+            crg2_pacbio=config["tools"]["crg2_pacbio"]
         output: 
             genes="genes/{family}.bed"
         wildcard_constraints:
@@ -206,7 +165,7 @@ rule slivar_report:
     params:
         cphi_dragen_anno=config["tools"]["cphi_dragen_anno"],
         crg2_pacbio=config["tools"]["crg2_pacbio"],
-        hgmd=os.path.join(config["annotation"]["cre"]["database_path"], "hgmd_hg38.csv"),
+        hgmd=os.path.join(config["annotation"]["slivar"]["database_path"], "hgmd_hg38.csv"),
     shell:
         """
         (python3 {params.cphi_dragen_anno}/workflow/scripts/slivar/build_report.py \
@@ -215,59 +174,6 @@ rule slivar_report:
         --vcf {input.vcf} \
         --out-csv {output.report} \
         --impact-order-file {params.cphi_dragen_anno}/workflow/scripts/slivar/default-order.txt \
-        --cre-data-dir {params.crg2_pacbio}/scripts/cre/data \
+        --slivar-data-dir {params.crg2_pacbio}/scripts/slivar/data \
         --hgmd {params.hgmd}) > {log} 2>&1
-        """
-
-
-def get_cre_report_for_slivar_comparison(wildcards):
-    report_type = {
-        "coding": "wgs.coding",
-        "wgs-high-impact": "wgs.high.impact",
-        "panel": "panel",
-        "panel-flank": "panel-flank",
-    }[wildcards.p]
-    suffix = ".SF" if acmg_sf_enabled and wildcards.p in {
-        "coding", "wgs-high-impact"
-    } else ""
-    return f"reports/{wildcards.family}.{report_type}.CH{suffix}.csv"
-
-
-def get_slivar_report_for_comparison(wildcards):
-    report_type = {
-        "coding": "wgs.coding",
-        "wgs-high-impact": "wgs.high.impact",
-        "panel": "panel",
-        "panel-flank": "panel-flank",
-    }[wildcards.p]
-    suffix = ".SF" if acmg_sf_enabled and wildcards.p in {
-        "coding", "wgs-high-impact"
-    } else ""
-    return f"reports_slivar/{wildcards.family}.{report_type}.CH{suffix}.csv"
-
-
-rule compare_slivar_report_keys:
-    input:
-        gemini=get_cre_report_for_slivar_comparison,
-        slivar=get_slivar_report_for_comparison,
-    output:
-        summary="reports_slivar_compare/{family}.{p}.summary.tsv",
-        shared="reports_slivar_compare/{family}.{p}.shared.csv",
-        gemini_only="reports_slivar_compare/{family}.{p}.gemini_only.csv",
-        slivar_only="reports_slivar_compare/{family}.{p}.slivar_only.csv",
-    wildcard_constraints:
-        p="coding|wgs-high-impact|panel|panel-flank",
-    log:
-        "logs/slivar/{family}.{p}.compare.log"
-    conda:
-        os.path.join(os.path.expanduser(config["tools"]["cphi_dragen_anno"]), "workflow", "envs", "slivar.yaml")
-    params:
-        cphi_dragen_anno=config["tools"]["cphi_dragen_anno"],
-        out_prefix="reports_slivar_compare/{family}.{p}",
-    shell:
-        """
-        (python3 {params.cphi_dragen_anno}/workflow/scripts/slivar/compare_report_variant_keys.py \
-        --gemini-report {input.gemini} \
-        --slivar-report {input.slivar} \
-        --out-prefix {params.out_prefix}) > {log} 2>&1
         """

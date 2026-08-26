@@ -119,20 +119,6 @@ rule add_ps_field:
             rm annotated/{wildcards.p}/vcfanno/PS_annot.txt.gz annotated/{wildcards.p}/vcfanno/PS_annot.txt.gz.tbi annotated/{wildcards.p}/vcfanno/hdr.txt
         '''
 
-rule vcf2db:
-    input:
-        "annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.vcf",
-    output:
-         db=temp("annotated/{p}/{family}-gemini.db"),
-    log:
-        "logs/vcf2db/{family}.vcf2db.{p}.log"
-    threads: 1
-    resources:
-        mem_mb = 20000
-    wrapper:
-        get_wrapper_path("vcf2db")
-
-
 rule bgzip:
     input:
         "{prefix}.vcf"

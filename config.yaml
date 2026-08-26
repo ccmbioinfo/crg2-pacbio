@@ -8,7 +8,6 @@ run:
   ped: ""
   flank: 100000
   acmg_sf: false
-  slivar_preview: true
 
 genes:
   ensembl: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/for_gene_panels/Homo_sapiens.GRCh38.112.gtf_subset.csv"
@@ -16,7 +15,6 @@ genes:
   hgnc: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/HGNC/HGNC_20240717.txt"
 
 tools:
-  cre: "~/crg2-pacbio/scripts/cre"
   crg: "~/crg"
   crg2_pacbio: "~/crg2-pacbio"
   cphi_dragen_anno: "~/CPHI-DRAGEN-anno"
@@ -36,7 +34,7 @@ ref:
   
 annotation:
   c4r: False # if samples belong to C4R, leave C4R sample IDs in
-  omim_path: "~/crg2-pacbio/scripts/cre/data/"
+  omim_path: "~/crg2-pacbio/scripts/slivar/data/"
   ensembl_to_NCBI_df: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/ensembl_to_NCBI_ID.csv"
   pacbio.vcfanno:
     conf: "~/crg2-pacbio/vcfanno/pacbio.vcfanno.conf"
@@ -50,7 +48,7 @@ annotation:
     dir: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/snakemake/499f2ad2/share/ensembl-vep-115.2-0/"
     dir_cache: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/vep"
     phyloP100way: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/PhyloP100way/hg38.phyloP100way.bw"
-  cre:
+  slivar:
      database_path: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/"
   snpeff:
     data_dir: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/snpeff/data"

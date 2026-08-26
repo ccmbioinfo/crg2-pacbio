@@ -10,12 +10,13 @@ include: "rules/compound_hets.smk"
 include: "rules/cnvreport.smk"
 include: "rules/qc.smk"
 
+
 def get_children_ids(ped_file):
     import pandas as pd
-    pedigree = pd.read_csv(ped_file, sep=" ", header=None, 
-                          names=["family_ID", "individual_ID", "paternal_ID", "maternal_ID", "sex", "phenotype"])
+    pedigree = pd.read_csv(ped_file, sep=None, header=None, 
+                          names=["family_ID", "individual_ID", "paternal_ID", "maternal_ID", "sex", "phenotype"], engine="python")
     pedigree = pedigree.astype(str)
-    children = pedigree[pedigree["paternal_ID"] != "0"][pedigree["maternal_ID"] != "0"]["individual_ID"].apply(lambda x: x.split("_")[1]).values
+    children = pedigree[(pedigree["paternal_ID"] != "0") & (pedigree["paternal_ID"] != ".") & (pedigree["maternal_ID"] != "0") & (pedigree["maternal_ID"] != ".")]["individual_ID"].values
     family = pedigree["family_ID"].iloc[0]
 
     return children
@@ -35,35 +36,8 @@ if str(config["run"].get("acmg_sf", "")).lower() == "true":
     
 acmg_sf_enabled = str(config["run"].get("acmg_sf", "")).lower() == "true"
 sf_suffix = ".SF" if acmg_sf_enabled else ""
-slivar_preview_enabled = str(config["run"].get("slivar_preview", "")).lower() == "true"
 
 acmg_sf_report_output = ["reports/{family}.ACMG.SF.csv".format(family=project)] if acmg_sf_enabled else []
-
-slivar_preview_outputs = [
-    "reports_slivar/{family}.wgs.coding.CH{sf}.csv".format(family=project, sf=sf_suffix),
-    "reports_slivar/{family}.wgs.high.impact.CH{sf}.csv".format(family=project, sf=sf_suffix),
-    "reports_slivar/{family}.sv.CH{sf}.csv".format(family=project, sf=sf_suffix),
-    "reports_slivar/{family}.cnv.CH{sf}.csv".format(family=project, sf=sf_suffix),
-    "reports_slivar/{family}.compound.het.status.CH.csv".format(family=project),
-    "reports_slivar_compare/{family}.coding.summary.tsv".format(family=project),
-    "reports_slivar_compare/{family}.wgs-high-impact.summary.tsv".format(family=project),
-    "reports_slivar/{family}.repeat.outliers.annotated.csv".format(family=project),
-    "reports_slivar/{family}.known.path.str.loci.csv".format(family=project),
-    "reports_slivar/{family}.multiqc_report.html".format(family=project),
-    "reports_slivar/{family}.mito.csv".format(family=project),
-] if slivar_preview_enabled else []
-
-if slivar_preview_enabled and acmg_sf_enabled:
-    slivar_preview_outputs.append(
-        "reports_slivar/{family}.ACMG.SF.csv".format(family=project)
-    )
-
-if slivar_preview_enabled and len(children) > 0:
-    slivar_preview_outputs.extend(
-        expand("reports_slivar/{family}_{child}.TRGT.denovo.annotated.csv",
-               family=project,
-               child=children)
-    )
 
 hpo_reports = []
 if config["run"].get("hpo", ""):
@@ -71,13 +45,6 @@ if config["run"].get("hpo", ""):
         "reports/{family}.panel.CH.csv".format(family=project),
         "reports/{family}.panel-flank.CH.csv".format(family=project),
     ]
-    if slivar_preview_enabled:
-        hpo_reports.extend([
-            "reports_slivar/{family}.panel.CH.csv".format(family=project),
-            "reports_slivar/{family}.panel-flank.CH.csv".format(family=project),
-            "reports_slivar_compare/{family}.panel.summary.tsv".format(family=project),
-            "reports_slivar_compare/{family}.panel-flank.summary.tsv".format(family=project),
-        ])
     
 rule all:
     input:
@@ -92,7 +59,6 @@ rule all:
         *hpo_reports,
         "reports/{family}.mito.csv".format(family=project),
         *acmg_sf_report_output,
-        *slivar_preview_outputs,
-        expand("reports/{family}_{child}.TRGT.denovo.annotated.csv",
-               family=project,
+        expand("reports/{child}.TRGT.denovo.annotated.csv",
                child=children) if len(children) > 0 else []
+

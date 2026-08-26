@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import re
 from snakemake.utils import validate
 from snakemake.utils import min_version
 from datetime import date
@@ -24,6 +25,19 @@ if config["run"]["variants_for_methbat"] != "":
     variants_for_methbat = pd.read_table(config["run"]["variants_for_methbat"], dtype=str).set_index(["variant_type"], drop=False)
 
 project = config["run"]["project"]
+
+# Restrict the `sample` wildcard to the exact set of names declared in samples.tsv
+# and the `family` wildcard to the project name. Without this, Snakemake's default
+# `.+` wildcard regex makes paths like "{family}_{sample}" ambiguous whenever a
+# sample name contains "_" or ".". 
+_sample_name_pattern = "|".join(
+    sorted((re.escape(sample) for sample in samples.index), key=len, reverse=True)
+)
+
+wildcard_constraints:
+    family=re.escape(project),
+    sample=_sample_name_pattern,
+    child=_sample_name_pattern
 
 def get_wrapper_path(*dirs):
     return "file:%s" % os.path.join(workflow.basedir, "wrappers", *dirs)
@@ -133,29 +147,3 @@ def get_TR_outliers (wildcards):
 def get_cnv_dir(wildcards):
     family = project
     return units.loc[family, "cnv_dir"]
-
-
-rule link_slivar_report:
-    input:
-        report="reports/{family}.{report_type}"
-    output:
-        report="reports_slivar/{family}.{report_type}"
-    wildcard_constraints:
-        report_type="mito\\.csv|known\\.path\\.str\\.loci\\.csv|repeat\\.outliers\\.annotated\\.csv|multiqc_report\\.html",
-    shell:
-        """
-        mkdir -p $(dirname {output.report})
-        ln -sfn ../{input.report} {output.report}
-        """
-
-
-rule link_slivar_trgt_denovo_report:
-    input:
-        report="reports/{family}_{child}.TRGT.denovo.annotated.csv"
-    output:
-        report="reports_slivar/{family}_{child}.TRGT.denovo.annotated.csv"
-    shell:
-        """
-        mkdir -p $(dirname {output.report})
-        ln -sfn ../{input.report} {output.report}
-        """
