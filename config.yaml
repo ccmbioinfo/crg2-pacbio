@@ -81,6 +81,12 @@ methbat:
 
 qc:
   svdp: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/QC/1000g.phase3.100k.b38.vcf.gz.dat"
+  pass_fail_thresholds:
+    min_mean_coverage: 20
+    max_freemix: 0.02
+    unrelated_max_rel: 0.02
+    firstdeg_min_rel: 0.4
+    firstdeg_max_rel: 0.6
 
 pbcpgtools:
   binary: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/pb-CpG-tools-v2.3.2-x86_64-unknown-linux-gnu/bin/aligned_bam_to_cpg_scores"
