@@ -1,13 +1,13 @@
 rule genotype_adotto_loci:
     input: get_bam
     output: 
-        vcf = temp("repeat_outliers/{family}_{sample}.trgt.unsorted.vcf.gz"),
-        spanning_bam = temp("repeat_outliers/{family}_{sample}.trgt.unsorted.spanning.bam")
+        vcf = temp("repeat_outliers/{sample}.trgt.unsorted.vcf.gz"),
+        spanning_bam = temp("repeat_outliers/{sample}.trgt.unsorted.spanning.bam")
     params: 
         trgt = config["tools"]["trgt"],
         ref = config["ref"]["genome"],
         repeats = config["annotation"]["general"]["adotto_repeats"]
-    log: "logs/repeat_outliers/{family}_{sample}.trgt.log"
+    log: "logs/repeat_outliers/{sample}.trgt.log"
     conda:
         "../envs/common.yaml"
     threads: 10
@@ -34,16 +34,16 @@ rule genotype_adotto_loci:
         {params.trgt} genotype --genome {params.ref} \
             --reads {input} \
             --repeats {params.repeats} \
-            --output-prefix repeat_outliers/{wildcards.family}_{wildcards.sample}.trgt.unsorted \
+            --output-prefix repeat_outliers/{wildcards.sample}.trgt.unsorted \
             --karyotype $sex \
-            --sample-name {wildcards.family}_{wildcards.sample} \
+            --sample-name {wildcards.sample} \
             --threads {threads}
         """       
 
 rule sort_trgt_adotto_vcf:
-    input: "repeat_outliers/{family}_{sample}.trgt.unsorted.vcf.gz"
-    output: temp("repeat_outliers/{family}_{sample}.trgt.sorted.vcf.gz")
-    log: "logs/bcftools/{family}_{sample}.sort.trgt.log"
+    input: "repeat_outliers/{sample}.trgt.unsorted.vcf.gz"
+    output: temp("repeat_outliers/{sample}.trgt.sorted.vcf.gz")
+    log: "logs/bcftools/{sample}.sort.trgt.log"
     conda:
         "../envs/common.yaml"
     shell:
@@ -54,8 +54,8 @@ rule sort_trgt_adotto_vcf:
 
 rule merge_trgt_vcf:
     input: 
-        vcf = expand("repeat_outliers/{{family}}_{sample}.trgt.sorted.vcf.gz", sample=samples.index),
-        indices = expand("repeat_outliers/{{family}}_{sample}.trgt.sorted.vcf.gz.tbi", sample=samples.index) 
+        vcf = expand("repeat_outliers/{sample}.trgt.sorted.vcf.gz", sample=samples.index),
+        indices = expand("repeat_outliers/{sample}.trgt.sorted.vcf.gz.tbi", sample=samples.index)
     params:
         trgt = config["tools"]["trgt"],
         genome = config["ref"]["genome"]
@@ -72,11 +72,11 @@ rule merge_trgt_vcf:
         """
 
 rule calculate_lps: 
-    input: "repeat_outliers/{family}_{sample}.trgt.sorted.vcf.gz"
-    output: temp("repeat_outliers/{family}_{sample}.trgt.lps.tsv")
+    input: "repeat_outliers/{sample}.trgt.sorted.vcf.gz"
+    output: temp("repeat_outliers/{sample}.trgt.lps.tsv")
     params:
         trgt_lps = config["tools"]["trgt-lps"]
-    log: "logs/repeat_outliers/{family}_{sample}.trgt.lps.log"
+    log: "logs/repeat_outliers/{sample}.trgt.lps.log"
     shell:
         """
         {params.trgt_lps} --vcf {input} > {output}
@@ -84,17 +84,14 @@ rule calculate_lps:
 
 rule combine_lps: 
     input: 
-        lps = expand("repeat_outliers/{{family}}_{sample}.trgt.lps.tsv", sample=samples.index)
+        lps = expand("repeat_outliers/{sample}.trgt.lps.tsv", sample=samples.index)
     output: "repeat_outliers/{family}.trgt.lps.combined.tsv.gz"
     log: "logs/repeat_outliers/{family}.trgt.lps.combined.log"
     run:
         import pandas as pd
-        files = input.lps
         lps_list = []
-        for file in files: 
-            print(files)
+        for file, sample in zip(input.lps, samples.index):
             df = pd.read_csv(file, sep="\t")
-            sample = file.split("/")[-1].split(".")[0]
             df["sample"] = sample
             lps_list.append(df)
         lps_df = pd.concat(lps_list)

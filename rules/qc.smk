@@ -77,31 +77,31 @@ rule nanoplot:
     input:
         bam=get_bam
     output:
-        stats="qc/nanoplot/{family}_{sample}/NanoStats.txt",
-        html="qc/nanoplot/{family}_{sample}/NanoPlot-report.html",
-        readlen_plot="qc/nanoplot/{family}_{sample}/WeightedHistogramReadlength.png"
+        stats="qc/nanoplot/{sample}/NanoStats.txt",
+        html="qc/nanoplot/{sample}/NanoPlot-report.html",
+        readlen_plot="qc/nanoplot/{sample}/WeightedHistogramReadlength.png"
     log:
-        "logs/qc/nanoplot/{family}_{sample}.log"
+        "logs/qc/nanoplot/{sample}.log"
     conda:
         "../envs/nanoplot.yaml"
     threads: 4
     shell:
         '''
-        mkdir -p qc/nanoplot/{wildcards.family}_{wildcards.sample}
+        mkdir -p qc/nanoplot/{wildcards.sample}
         NanoPlot \
           --bam {input.bam} \
           -t {threads} \
           --N50 \
-          --title {wildcards.family}_{wildcards.sample} \
-          --outdir qc/nanoplot/{wildcards.family}_{wildcards.sample} \
+          --title {wildcards.sample} \
+          --outdir qc/nanoplot/{wildcards.sample} \
           &> {log}
         '''
 
 rule nanoplot_rename:
     input:
-        stats="qc/nanoplot/{family}_{sample}/NanoStats.txt"
+        stats="qc/nanoplot/{sample}/NanoStats.txt"
     output:
-        renamed_stats="qc/nanoplot/{family}_{sample}/{family}_{sample}.txt"
+        renamed_stats="qc/nanoplot/{sample}/{sample}.txt"
     shell:
         '''
             mv {input.stats} {output.renamed_stats}
@@ -109,9 +109,9 @@ rule nanoplot_rename:
 
 rule nanoplot_readlen:
     input:
-        plot="qc/nanoplot/{family}_{sample}/WeightedHistogramReadlength.png"
+        plot="qc/nanoplot/{sample}/WeightedHistogramReadlength.png"
     output:
-        renamed_plot="qc/nanoplot/{family}_{sample}/NanoPlot_Readlength_{family}_{sample}_mqc.png"
+        renamed_plot="qc/nanoplot/{sample}/NanoPlot_Readlength_{sample}_mqc.png"
     shell:
         '''
             mv {input.plot} {output.renamed_plot}
@@ -129,19 +129,19 @@ rule add_dp_qc:
 
 rule bcftools_stats:
     input:
-        vcf="qc/bcftools/{family}.smallvariants_withdp.vcf"
+        vcf=f"qc/bcftools/{project}.smallvariants_withdp.vcf"
     output:
-        stats="qc/bcftools/{family}_{sample}.stats"
+        stats="qc/bcftools/{sample}.stats"
     log: 
-        "logs/qc/bcftools/{family}_{sample}.stats.log"
+        "logs/qc/bcftools/{sample}.stats.log"
     conda:
         "../envs/common.yaml"
     shell:
         '''
         bcftools stats \
-            -s {wildcards.family}_{wildcards.sample} \
+            -s {wildcards.sample} \
             {input.vcf} \
-        | awk -v sample="{wildcards.family}_{wildcards.sample}" ' 
+        | awk -v sample="{wildcards.sample}" ' 
             BEGIN {{ OFS="\t" }} 
             $1=="ID" && $2=="0" {{ $3=sample }}
             {{ print }} 
@@ -153,9 +153,9 @@ rule samtools_stats:
     input:
         bam=get_bam
     output:
-        stats="qc/samtools/{family}_{sample}.stats"
+        stats="qc/samtools/{sample}.stats"
     log:
-        "logs/qc/samtools/{family}_{sample}.log"
+        "logs/qc/samtools/{sample}.log"
     conda:
         "../envs/samtools.yaml"
     params:
@@ -170,9 +170,9 @@ rule mpile_qc:
     input:
         bam=get_bam
     output:
-        pileup="qc/verifybam/{family}_{sample}.pileup"
+        pileup="qc/verifybam/{sample}.pileup"
     log:
-        "logs/qc/verifybam/{family}_{sample}.mpile.log"
+        "logs/qc/verifybam/{sample}.mpile.log"
     conda:
         "../envs/samtools.yaml"
     params:
@@ -186,14 +186,14 @@ rule mpile_qc:
 
 rule verifybam:
     input:
-        pileup="qc/verifybam/{family}_{sample}.pileup"
+        pileup="qc/verifybam/{sample}.pileup"
     output:
-        selfsm="qc/verifybam/{family}_{sample}.selfSM"
+        selfsm="qc/verifybam/{sample}.selfSM"
     log:
-        "logs/qc/verifybam/{family}_{sample}.verifybam.log"
+        "logs/qc/verifybam/{sample}.verifybam.log"
     params:
-        out_prefix="qc/verifybam/{family}_{sample}",
-        sample="{family}_{sample}",
+        out_prefix="qc/verifybam/{sample}",
+        sample="{sample}",
         ref=config["ref"]["genome"],
         svdp=config["qc"]["svdp"]
     wrapper:
@@ -201,7 +201,7 @@ rule verifybam:
 
 rule qc_pass_fail:
     input:
-        selfsm=expand("qc/verifybam/{family}_{sample}.selfSM", family=project, sample=samples.index),
+        selfsm=expand("qc/verifybam/{sample}.selfSM", sample=samples.index),
         sex_check="qc/peddy/{family}.sex_check.csv",
         ped_check="qc/peddy/{family}.ped_check.csv"
     output:
@@ -224,11 +224,11 @@ rule multiqc:
     input:
         peddy_html=f"qc/peddy/{project}.html",
         peddy_relatedness="qc/multiqc_custom/{family}/peddy_relatedness_mqc.tsv",
-        nanoplot_stats=expand("qc/nanoplot/{family}_{sample}/{family}_{sample}.txt", family=project, sample=samples.index),
-        bcftools_stats=expand("qc/bcftools/{family}_{sample}.stats", family=project, sample=samples.index),
-        selfsm=expand("qc/verifybam/{family}_{sample}.selfSM", family=project, sample=samples.index),
-        samtools_stats=expand("qc/samtools/{family}_{sample}.stats", family=project, sample=samples.index),
-        nanoplot_readlen=expand("qc/nanoplot/{family}_{sample}/NanoPlot_Readlength_{family}_{sample}_mqc.png", family=project, sample=samples.index),
+        nanoplot_stats=expand("qc/nanoplot/{sample}/{sample}.txt", sample=samples.index),
+        bcftools_stats=expand("qc/bcftools/{sample}.stats", sample=samples.index),
+        selfsm=expand("qc/verifybam/{sample}.selfSM", sample=samples.index),
+        samtools_stats=expand("qc/samtools/{sample}.stats", sample=samples.index),
+        nanoplot_readlen=expand("qc/nanoplot/{sample}/NanoPlot_Readlength_{sample}_mqc.png", sample=samples.index),
         qc_pass_fail="qc/multiqc_custom/{family}/qc_pass_fail_mqc.tsv"
     output:
         report="qc/multiqc/{family}.multiqc_report.html"

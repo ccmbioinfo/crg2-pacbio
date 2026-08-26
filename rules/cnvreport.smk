@@ -109,6 +109,7 @@ rule cnv_report:
         ensembl = config["annotation"]["general"]["ensembl"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
+        samples = config["run"]["samples"]
     conda:
         "../envs/str_sv.yaml"
     shell:
@@ -119,6 +120,7 @@ rule cnv_report:
                         -annotsv {input.annotsv} \
                         -snpeff {input.snpeff} \
                         -variant_type CNV \
+                        -samples {params.samples} \
                         -omim {params.omim} \
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
@@ -140,6 +142,7 @@ rule cnv_report:
                     -annotsv {input.annotsv} \
                     -snpeff {input.snpeff} \
                     -variant_type CNV \
+                    -samples {params.samples} \
                     -omim {params.omim} \
                     -hpo {params.HPO} \
                     -exon {params.exon} \

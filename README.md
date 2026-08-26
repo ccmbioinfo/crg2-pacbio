@@ -25,18 +25,25 @@ $ cp crg2-pacbio/samples.tsv crg2-pacbio/units.tsv crg2-pacbio/config.yaml crg2-
 $ cd NA12878
 ```
 2. Set up pipeline run: 
-- reconfigure `samples.tsv` and `units.tsv` to reflect sample names and input files. Note that because several of the inputs are joint-genotyped, one row in the units.tsv file corresponds to one family, not one sample. `units.tsv` must be configured with the path to the joint-genotyped (or singleton, if no family members were sequenced) deepvariant `small_variant_vcf`, the joint-genotyped (or singleton) pbsv `pbsv_vcf`, and the path to a directory `cnv_dir` containing HiFiCNV VCF(s) for family member(s). The `samples.tsv` file should contain one row per family member, with the `sample` column corresponding to the sample ID and the `BAM` column corresponding to the path to the BAM file for that sample. The `case_or_control` column in `samples.tsv` is only relevant for the methylation pipeline, and can be left empty if you're not running this module. 
+- reconfigure `samples.tsv` and `units.tsv` to reflect sample names and input files. Note that because several of the inputs are joint-genotyped, one row in the units.tsv file corresponds to one family, not one sample. `units.tsv` must be configured with the path to the joint-genotyped (or singleton, if no family members were sequenced) deepvariant `small_variant_vcf`, the joint-genotyped (or singleton) pbsv `pbsv_vcf`, and the path to a directory `cnv_dir` containing HiFiCNV VCF(s) for family member(s). The `samples.tsv` file should contain one row per family member, with the `sample` column matching the exact sample ID used in the VCFs and PED, and the `BAM` column corresponding to the path to the BAM file for that sample. The `case_or_control` column in `samples.tsv` is only relevant for the methylation pipeline, and can be left empty if you're not running this module.
 
-`units.tsv` example:
+`units.tsv` examples:
 ```
 family	platform	small_variant_vcf	pbsv_vcf    cnv_dir
-FAM01	PACBIO	/path/to/FAM01.joint.GRCh38.small_variants.phased.vcf.gz   /path/to/FAM01.joint.GRCh38.structural_variants.phased.vcf.gz /path/to/cnv/dir
+FAM01	PACBIO	/path/to/FAM01.joint.GRCh38.small_variants.phased.vcf.gz   /path/to/FAM01.joint.GRCh38.structural_variants.phased.vcf.gz	/path/to/cnv/dir
+
+family	platform	small_variant_vcf	pbsv_vcf    cnv_dir
+FAM-001477	PACBIO	/path/to/FAM-001477.joint.GRCh38.small_variants.phased.vcf.gz   /path/to/FAM-001477.joint.GRCh38.structural_variants.phased.vcf.gz	/path/to/cnv/dir
 ```
-`samples.tsv` example (note that the case_or_control field is ONLY required for the methylation outlier workflow, see below):
+`samples.tsv` examples (note that the case_or_control field is ONLY required for the methylation outlier workflow, see below):
 ```
 sample	BAM	case_or_control
-01	/path/to/FAM01_01.GRCh38.aligned.haplotagged.bam  
-02	/path/to/FAM01_02.GRCh38.aligned.haplotagged.bam 
+FAM01_01	/path/to/FAM01_01.GRCh38.aligned.haplotagged.bam
+FAM01_02	/path/to/FAM01_02.GRCh38.aligned.haplotagged.bam
+
+sample	BAM	case_or_control
+CS4C-070001_EXP_0000	/path/to/CS4C-070001_EXP_0000.GRCh38.aligned.haplotagged.bam
+CS4C-070002_EXP_0000	/path/to/CS4C-070002_EXP_0000.GRCh38.aligned.haplotagged.bam
 ```
 - Add paths to the HPO term file and pedigree file to config.yaml. 
 - Do a dry run: add a `-n` flag to the Snakemake command in crg2-pacbio.sh. This will print out the rules that will be run, but not actually run them.

@@ -4,18 +4,14 @@ rule define_trio_members:
     run:
         import pandas as pd
         # Load the pedigree file
-        pedigree = pd.read_csv(input[0], sep=" ", header=None, names=["family_ID", "individual_ID", "paternal_ID", "maternal_ID", "sex", "phenotype"])
+        pedigree = pd.read_csv(input[0], sep=None, header=None, names=["family_ID", "individual_ID", "paternal_ID", "maternal_ID", "sex", "phenotype"], engine="python")
         print(pedigree)
-        # Infer the roles of each sample
-        children = pedigree[pedigree["paternal_ID"] != "0"][pedigree["maternal_ID"] != "0"]["individual_ID"].values
+        children = pedigree[(pedigree["paternal_ID"] != "0") & (pedigree["paternal_ID"] != ".") & (pedigree["maternal_ID"] != "0") & (pedigree["maternal_ID"] != ".")]["individual_ID"].values
         with open(output[0], "w") as f:
             i = 0
             for child in children: # Could be multiple children. Phenotype field is not regularly populated, so just run pipeline on all children.
                 father = pedigree[pedigree["individual_ID"] == pedigree[pedigree["individual_ID"] == child]["paternal_ID"].values[0]]["individual_ID"].values[0]
                 mother = pedigree[pedigree["individual_ID"] == pedigree[pedigree["individual_ID"] == child]["maternal_ID"].values[0]]["individual_ID"].values[0]
-                child = child.split("_")[1]
-                mother = mother.split("_")[1]
-                father = father.split("_")[1]
                 if i == 0:
                     f.write(f"child\t{child}\n")
                     f.write(f"father\t{father}\n")
@@ -32,8 +28,8 @@ rule trgt_denovo:
         trgt_denovo = config["tools"]["trgt-denovo"],
         ref = config["ref"]["genome"],
         bed = config["annotation"]["general"]["adotto_repeats"]
-    output: "TRGT_denovo/{family}_{child}.TRGT.denovo.tsv"
-    log: "logs/denovo_TRs/{family}_{child}.TRGT-denovo.log"
+    output: "TRGT_denovo/{child}.TRGT.denovo.tsv"
+    log: "logs/denovo_TRs/{child}.TRGT-denovo.log"
     resources:
         threads = 8
     shell:
@@ -82,8 +78,8 @@ rule trgt_denovo:
         """   
 
 rule annotate_trgt_denovo:
-    input: "TRGT_denovo/{family}_{child}.TRGT.denovo.tsv"
-    output: "reports/{family}_{child}.TRGT.denovo.annotated.csv"
+    input: "TRGT_denovo/{child}.TRGT.denovo.tsv"
+    output: "reports/{child}.TRGT.denovo.annotated.csv"
     params:
       crg2_pacbio = config["tools"]["crg2_pacbio"],
       genes = config["annotation"]["general"]["ensembl"],
@@ -94,7 +90,7 @@ rule annotate_trgt_denovo:
       c4r = config["annotation"]["c4r"],
       HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
       c4r_outliers = config["trgt"]["C4R_outliers"]
-    log:  "logs/denovo_TRs/{family}_{child}.annotate.TRGT.denovo.log"
+    log:  "logs/denovo_TRs/{child}.annotate.TRGT.denovo.log"
     conda: 
         "../envs/str_sv.yaml"
     shell:
