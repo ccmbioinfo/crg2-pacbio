@@ -1,43 +1,3 @@
-rule allsnvreport:
-    input:
-        db="annotated/{p}/{family}-gemini.db",
-        vcf="annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.vcf.gz"
-    output:
-        directory("small_variants/{p}/{family}")
-    conda:
-        "../envs/cre.yaml"
-    log:
-        "logs/report/{p}/{family}.cre.log"
-    resources:
-         mem_mb=40000
-    params:
-         cre=config["tools"]["cre"],
-         database_path=config["annotation"]["cre"]["database_path"],
-         ref=config["ref"]["genome"]
-    shell:
-         '''
-         set -eo pipefail
-         mkdir -p {output}
-         cd {output}
-         ln -s ../../../{input.db} {project}-ensemble.db
-         #bgzip ../../../{input.vcf} -c > {project}-gatk-haplotype-annotated-decomposed.vcf.gz
-         ln -s ../../../{input.vcf} {project}-gatk-haplotype-annotated-decomposed.vcf.gz
-         tabix {project}-gatk-haplotype-annotated-decomposed.vcf.gz
-         ln -s {project}-gatk-haplotype-annotated-decomposed.vcf.gz {project}-ensemble-annotated-decomposed.vcf.gz
-         ln -s {project}-gatk-haplotype-annotated-decomposed.vcf.gz.tbi {project}-ensemble-annotated-decomposed.vcf.gz.tbi
-         cd ../
-         if [ {wildcards.p} == "coding" ]; then  
-         cre={params.cre} reference={params.ref} database={params.database_path} {params.cre}/cre.sh {project} 
-         elif [ {wildcards.p} == "denovo" ]; then  
-         cre={params.cre} reference={params.ref} database={params.database_path} type=denovo {params.cre}/cre.sh {project} 
-         elif [ {wildcards.p} == "wgs-high-impact" ]; then  
-         cre={params.cre} reference={params.ref} database={params.database_path} type=wgs.high.impact {params.cre}/cre.sh {project}
-         else
-         cre={params.cre} reference={params.ref} database={params.database_path} type=wgs {params.cre}/cre.sh {project}
-         unset type
-         fi;
-         '''
-
 if config["run"]["hpo"]:
 
     def get_panel(wildcards):
@@ -60,8 +20,7 @@ if config["run"]["hpo"]:
             refseq=config["genes"]["refseq"],
             hgnc=config["genes"]["hgnc"]
         params: 
-            crg2_pacbio=config["tools"]["crg2_pacbio"],
-            cre=config["tools"]["cre"]
+            crg2_pacbio=config["tools"]["crg2_pacbio"]
         output: 
             genes="genes/{family}.bed"
         wildcard_constraints:
@@ -136,3 +95,80 @@ if config["run"]["hpo"]:
                     python {params.crg2_pacbio}/scripts/add_hpo_terms_to_wes.py {input.hpo} ${{rename}} {output} >> {log} 2>&1
                 done;
             '''
+
+
+rule slivar_select:
+    input:
+        vcf="annotated/{p}/vcfanno/{family}.{p}.vep.vcfanno.vcf.gz"
+    output:
+        rare_main=temp("small_variants_slivar/{p}/{family}/branches/{family}.{p}.rare_main.vcf.gz"),
+        rare_main_tbi=temp("small_variants_slivar/{p}/{family}/branches/{family}.{p}.rare_main.vcf.gz.tbi"),
+        rare_clinvar=temp("small_variants_slivar/{p}/{family}/branches/{family}.{p}.rare_clinvar.vcf.gz"),
+        rare_clinvar_tbi=temp("small_variants_slivar/{p}/{family}/branches/{family}.{p}.rare_clinvar.vcf.gz.tbi"),
+        common_pathogenic_clinvar=temp("small_variants_slivar/{p}/{family}/branches/{family}.{p}.common_pathogenic_clinvar.vcf.gz"),
+        common_pathogenic_clinvar_tbi=temp("small_variants_slivar/{p}/{family}/branches/{family}.{p}.common_pathogenic_clinvar.vcf.gz.tbi"),
+    wildcard_constraints:
+        p="coding|wgs-high-impact|panel|panel-flank",
+    log:
+        "logs/slivar/{family}.{p}.select.log"
+    conda:
+        "../envs/slivar.yaml"
+    params:
+        js=f"{workflow.basedir}/scripts/slivar/slivar_functions.js",
+        consequence_order_file=f"{workflow.basedir}/scripts/slivar/default-order.txt",
+        mode="{p}",
+    wrapper:
+        get_wrapper_path("slivar")
+
+
+rule slivar_postfilter:
+    input:
+        rare_main="small_variants_slivar/{p}/{family}/branches/{family}.{p}.rare_main.vcf.gz",
+        rare_clinvar="small_variants_slivar/{p}/{family}/branches/{family}.{p}.rare_clinvar.vcf.gz",
+        common_pathogenic_clinvar="small_variants_slivar/{p}/{family}/branches/{family}.{p}.common_pathogenic_clinvar.vcf.gz",
+    output:
+        vcf=temp("small_variants_slivar/{p}/{family}/{family}.{p}.postfilter.vcf"),
+    wildcard_constraints:
+        p="coding|wgs-high-impact|panel|panel-flank",
+    log:
+        "logs/slivar/{family}.{p}.postfilter.log"
+    conda:
+        "../envs/slivar.yaml"
+    shell:
+        """
+        (python3 {workflow.basedir}/scripts/slivar/postfilter.py \
+        --mode {wildcards.p} \
+        --rare-main-vcf {input.rare_main} \
+        --rare-clinvar-vcf {input.rare_clinvar} \
+        --common-pathogenic-clinvar-vcf {input.common_pathogenic_clinvar} \
+        --impact-order-file {workflow.basedir}/scripts/slivar/default-order.txt \
+        --out-vcf {output.vcf} &&
+        bcftools sort -O v -o {output.vcf}.sorted {output.vcf} &&
+        mv {output.vcf}.sorted {output.vcf}) > {log} 2>&1
+        """
+
+
+rule slivar_report:
+    input:
+        vcf="small_variants_slivar/{p}/{family}/{family}.{p}.postfilter.vcf"
+    output:
+        report=temp("small_variants_slivar/{p}/{family}/{family}.{p}.slivar.csv")
+    wildcard_constraints:
+        p="coding|wgs-high-impact|panel|panel-flank",
+    log:
+        "logs/slivar/{family}.{p}.report.log"
+    conda:
+        "../envs/slivar.yaml"
+    params:
+        crg2_pacbio=config["tools"]["crg2_pacbio"],
+        hgmd=os.path.join(config["annotation"]["slivar"]["database_path"], "hgmd_hg38.csv"),
+    shell:
+        """
+        (python3 {workflow.basedir}/scripts/slivar/build_report.py \
+        --mode {wildcards.p} \
+        --vcf {input.vcf} \
+        --out-csv {output.report} \
+        --impact-order-file {workflow.basedir}/scripts/slivar/default-order.txt \
+        --slivar-data-dir {params.crg2_pacbio}/scripts/slivar/data \
+        --hgmd {params.hgmd}) > {log} 2>&1
+        """
