@@ -23,13 +23,6 @@ __default__:
   time: "20:00:00"
   output: "slurm/%x-%j.out"
 
-allsnvreport:
-  time: "50:00:00"
-  mem: "60G"
-
-vcf2db:
-  time: "50:00:00"
-
 methbat_build_cohort:
   mem: "600G"
 
