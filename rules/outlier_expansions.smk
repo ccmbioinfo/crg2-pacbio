@@ -133,14 +133,16 @@ rule find_repeat_outliers:
         """
 
 rule annotate_repeat_outliers:
-    input: "repeat_outliers/{family}.repeat.outliers.tsv"
+    input:
+      "repeat_outliers/{family}.repeat.outliers.tsv",
+      hpo = [hpo_matches] if config["run"]["hpo"] else [],
     output: "reports/{family}.repeat.outliers.annotated.csv"
     log:  "logs/repeat_outliers/{family}.annotate.repeat.outliers.log"
     params: 
       crg2_pacbio = config["tools"]["crg2_pacbio"],
       genes = config["annotation"]["general"]["ensembl"],
       OMIM = config["annotation"]["omim_path"],
-      HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
+      HPO = hpo_matches if config["run"]["hpo"] else "none",
       constraint = config["annotation"]["general"]["gnomad_constraint"],
       c4r_outliers = config["trgt"]["C4R_outliers"],
       c4r = config["annotation"]["c4r"],
@@ -155,7 +157,7 @@ rule annotate_repeat_outliers:
         """
         if [[ {params.HPO} == "none" ]]
         then
-            (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input} \
+            (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input[0]} \
                 --output_file  {output} \
                 --ensembl {params.genes} \
                 --gnomad_constraint {params.constraint} \
@@ -166,7 +168,7 @@ rule annotate_repeat_outliers:
                 --repeat_catalog {params.repeat_catalog} \
 		        --c4r_outliers {params.c4r_outliers}) > {log} 2>&1
         else
-            (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input} \
+            (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input[0]} \
                 --output_file  {output} \
                 --ensembl {params.genes} \
                 --gnomad_constraint {params.constraint} \

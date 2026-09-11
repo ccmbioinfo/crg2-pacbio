@@ -6,8 +6,6 @@ import pyranges as pr
 import numpy as np
 import re
 
-from annotation.annotate import aggregate_hpo_matches
-
 logger = logging.getLogger(__name__)
 
 def parse_promoterAI_score(score):
@@ -574,14 +572,14 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
     hpo_df.columns = hpo_df.columns.str.strip()
     hpo_df = hpo_df.rename(columns={'Gene symbol': 'Gene Symbol'})
     hpo_df = hpo_df.dropna(subset=["Gene Symbol"])
-    hpo_df = aggregate_hpo_matches(hpo_df).set_index("Gene ID")
+    hpo_df = hpo_df.set_index("Gene ID").drop(columns=["Gene Symbol"])
 
     # Ensembl_gene_id_all lists every gene the variant overlaps and is only present in
     # the slivar reports. Match on all of them so the primary gene's terms are never
     # dropped when another overlapping gene sorts earlier. Reports without the column
     # keep the original single-gene join.
     if "Ensembl_gene_id_all" in report.columns:
-        hpo_features = hpo_df["HPO"].to_dict()
+        hpo_features = hpo_df["Features"].to_dict()
         hpo_counts = hpo_df["Number of occurrences"].to_dict()
 
         # Concatenate the HPO terms and sum the counts over every panel gene the
@@ -599,6 +597,6 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
         report["HPO_count"] = collected.apply(lambda x: x[1])
     else:
         report = report.join(hpo_df, on="Ensembl_gene_id")
-        report = report.rename(columns={"Number of occurrences": "HPO_count", "HPO": "HPO_terms"})
+        report = report.rename(columns={"Number of occurrences": "HPO_count", "Features": "HPO_terms"})
 
     return report
