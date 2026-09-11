@@ -1,3 +1,24 @@
+hpo_matches = "hpo/{project}.matched.tsv".format(project=config["run"]["project"])
+
+
+if config["run"]["hpo"]:
+    rule prepare_hpo_matches:
+        input:
+            hpo=config["run"]["hpo"],
+        output:
+            hpo=hpo_matches,
+        params:
+            hpo_dir=config["hpo_matching"],
+        log:
+            "logs/hpo_matching/{project}.log".format(project=config["run"]["project"]),
+        resources:
+            mem_mb=8000,
+        conda:
+            "../envs/hpo_matcher.yaml"
+        script:
+            "../scripts/prepare_hpo_matches.py"
+
+
 rule get_VCF_sample_order:
     input:
         vcf="annotated/coding/vcfanno/{family}.coding.vep.vcfanno.vcf.gz",
@@ -20,7 +41,7 @@ def output_status(output_path):
 slivar_hpo_panel_inputs = {
     "panel_variant_report": "small_variants_slivar/panel/{family}/{family}.panel.slivar.csv",
     "panel_flank_variant_report": "small_variants_slivar/panel-flank/{family}/{family}.panel-flank.slivar.csv",
-    "HPO": config["run"]["hpo"],
+    "HPO": hpo_matches,
 } if hpo_available else {}
 
 slivar_hpo_panel_outputs = {

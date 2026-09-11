@@ -155,13 +155,14 @@ rule methbat_annotate_outliers:
         smvs ="methbat/{sample}.rare.smvs.bed",
         svs = get_pbsv_csv,
         cnvs = get_cnvs,
-        trs = get_TR_outliers
+        trs = get_TR_outliers,
+        hpo = [hpo_matches] if config["run"]["hpo"] else [],
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
         ensembl = config["annotation"]["general"]["ensembl"],
         gnomad_constraint = config["annotation"]["general"]["gnomad_constraint"],
         OMIM_path = config["annotation"]["omim_path"], 
-        hpo = config["run"]["hpo"]
+        hpo = hpo_matches if config["run"]["hpo"] else "",
     output: "methbat/outliers/{sample}.annotated.outliers.csv"
     log:
         "logs/methbat/annotation/{sample}.log"

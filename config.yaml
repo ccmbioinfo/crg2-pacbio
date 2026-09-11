@@ -9,6 +9,8 @@ run:
   flank: 100000
   acmg_sf: false
 
+hpo_matching: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/HPO/download"
+
 genes:
   ensembl: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/for_gene_panels/Homo_sapiens.GRCh38.112.gtf_subset.csv"
   refseq: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/refseq/GRCh38_latest_genomic.gff_subset.csv"
