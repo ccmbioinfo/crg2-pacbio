@@ -168,6 +168,9 @@ def add_hpo(hpo, gene):
         return "nan"
     else:
         terms = ",".join(terms)
+        terms = ", ".join(
+            dict.fromkeys(term.strip() for term in terms.split(",") if term.strip())
+        )
         return terms
 
 
