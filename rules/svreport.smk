@@ -1,5 +1,32 @@
+rule clean_sv_input_annotations:
+    input:
+        vcf=get_pbsv_vcf
+    output:
+        vcf=temp("sv/{family}.input.clean.vcf")
+    log:
+        "logs/sv/{family}.clean.input.annotations.log"
+    conda:
+        "../envs/common.yaml"
+    shell:
+        """
+        (
+        header="$(bcftools view -h {input.vcf})"
+        if printf '%s\n' "$header" | grep '^##INFO=<ID=ANN,' > /dev/null; then
+            remove_tags="INFO/ANN"
+            for tag in LOF NMD CONTIG RNAMES; do
+                if printf '%s\n' "$header" | grep "^##INFO=<ID=${{tag}}," > /dev/null; then
+                    remove_tags="${{remove_tags}},INFO/${{tag}}"
+                fi
+            done
+            bcftools annotate -x "$remove_tags" {input.vcf} -Ov -o {output.vcf}
+        else
+            bcftools view {input.vcf} -Ov -o {output.vcf}
+        fi
+        ) > {log} 2>&1
+        """
+
 rule snpeff:
-    input: get_pbsv_vcf
+    input: "sv/{family}.input.clean.vcf"
     output:
         vcf = temp("sv/{family}.pbsv.snpeff.vcf"),
     log:
@@ -12,7 +39,7 @@ rule snpeff:
         get_wrapper_path("snpeff")
 
 rule annotsv:
-    input: get_pbsv_vcf
+    input: "sv/{family}.input.clean.vcf"
     output:
         annotsv_annotated =  temp("sv/{family}.AnnotSV.tsv"),
         annotsv_unannotated =  temp("sv/{family}.AnnotSV.unannotated.tsv")
