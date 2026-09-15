@@ -567,7 +567,7 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
         report (pd.DataFrame): The sequence varinat report dataframe to add HPO terms to.
         hpo_terms (str): The path to the HPO terms file from Phenotips 'Suggested Genes'.
     """
-    hpo_df = pd.read_csv(hpo_terms, comment='#', skip_blank_lines=True, sep="\t",  encoding="ISO-8859-1", engine='python').drop(columns=["HPO IDs"])
+    hpo_df = pd.read_csv(hpo_terms, comment='#', skip_blank_lines=True, sep="\t",  encoding="ISO-8859-1", engine='python')
     # Phenotips TSV has a space in column name: " Gene symbol"
     hpo_df.columns = hpo_df.columns.str.strip()
     hpo_df = hpo_df.rename(columns={'Gene symbol': 'Gene Symbol'})
@@ -580,23 +580,29 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
     # keep the original single-gene join.
     if "Ensembl_gene_id_all" in report.columns:
         hpo_features = hpo_df["Features"].to_dict()
-        hpo_counts = hpo_df["Number of occurrences"].to_dict()
+        hpo_ids = hpo_df["HPO IDs"].to_dict()
 
-        # Concatenate the HPO terms and sum the counts over every panel gene the
-        # variant overlaps, so the primary gene's terms are never dropped.
+        # Concatenate the HPO terms over every panel gene the variant overlaps,
+        # then remove repeated terms and count unique HPO IDs.
         def collect_hpo(gene_ids_text):
             genes = [g.strip() for g in str(gene_ids_text).split(",") if g.strip() in hpo_features]
             if not genes:
                 return ".", "."
             terms = ", ".join(hpo_features[g] for g in genes)
-            count = sum(hpo_counts[g] for g in genes)
+            terms = ", ".join(
+                dict.fromkeys(term.strip() for term in terms.split(",") if term.strip())
+            )
+            ids = set(
+                re.findall(r"HP:\d+", ", ".join(str(hpo_ids[g]) for g in genes))
+            )
+            count = len(ids)
             return terms, count
 
         collected = report["Ensembl_gene_id_all"].fillna("").apply(collect_hpo)
         report["HPO_terms"] = collected.apply(lambda x: x[0])
         report["HPO_count"] = collected.apply(lambda x: x[1])
     else:
-        report = report.join(hpo_df, on="Ensembl_gene_id")
+        report = report.join(hpo_df.drop(columns=["HPO IDs"]), on="Ensembl_gene_id")
         report = report.rename(columns={"Number of occurrences": "HPO_count", "Features": "HPO_terms"})
 
     return report
