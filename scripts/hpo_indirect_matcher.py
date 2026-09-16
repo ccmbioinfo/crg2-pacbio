@@ -44,8 +44,11 @@ _SEED_MEASUREMENT_WORDS = frozenset(
 )
 
 # Remove opposing magnitude or direction wording.
-_AXIS_PREFIXES = ("hyper", "hypo", "macro", "micro", "megalo", "mega", "brady", "tachy")
-_AXIS_SUFFIXES = ("cytosis", "cytopenia", "penia", "philia")
+_AXIS_PREFIXES = (
+    "hyper", "hypo", "macro", "micro", "megalo", "mega", "brady", "tachy",
+    "oligo", "poly", "an", "a",
+)
+_AXIS_SUFFIXES = ("cytosis", "cytopenia", "penia", "philia", "plegia", "paresis")
 
 # Used to require distinctive wording from terms passing the wording-supported sibling gate.
 _FINDING_WORDS = frozenset(
@@ -214,10 +217,10 @@ def _axis_stem(token: str) -> str:
         if token.startswith(prefix) and len(token) - len(prefix) >= 5:
             return token[len(prefix):]
 
-    # Blood-count suffixes are treated similarly when the remaining stem is long enough.
+    # Axis suffixes are treated similarly when the remaining stem is long enough.
     for suffix in _AXIS_SUFFIXES:
         if token.endswith(suffix) and len(token) - len(suffix) >= 4:
-            # Lets -cytosis and -cytopenia share a non-word stem.
+            # Use a non-word stem so suffix-derived and prefix-derived axes cannot collide.
             return token[: -len(suffix)] + "\x00"
     return token
 
