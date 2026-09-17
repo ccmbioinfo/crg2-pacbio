@@ -39,7 +39,7 @@ def join_unique(values):
     return "; ".join(dict.fromkeys(str(value) for value in values))
 
 
-def prepare_hpo_matches(hpo_file, hpo_dir, output_file):
+def prepare_hpo_matches(hpo_file, hpo_dir, ensembl_to_ncbi_file, output_file):
     """Combine exact and indirect matches in the original one-row-per-gene format."""
     hpo, hpo_ids = get_patient_hpo_ids(hpo_file)
     hpo_mapping = pd.read_csv(f"{hpo_dir}/genes_to_phenotype.txt", sep="\t")
@@ -56,9 +56,9 @@ def prepare_hpo_matches(hpo_file, hpo_dir, output_file):
     hpo_matches = hpo_matches.sort_values("HPO Match Score", ascending=False)
     hpo_matches = hpo_matches.drop_duplicates(["gene_symbol", "hpo_id"])
 
-    # Reuse setup-resolved IDs for direct genes and the standard HGNC map for
-    # genes introduced by indirect matching.
-    hgnc = pd.read_csv(f"{hpo_dir}/HGNC_ensembl_map.csv", dtype=str)
+    # Reuse setup-resolved IDs for direct genes and the standard annotation map
+    # for genes introduced by indirect matching.
+    hgnc = pd.read_csv(ensembl_to_ncbi_file, dtype=str)
     gene_ids = dict(zip(hgnc["hgnc_symbol"], hgnc["ensembl_gene_id"]))
     gene_ids.update(dict(zip(hpo["Gene Symbol"], hpo["Gene ID"])))
     hpo_matches["Gene ID"] = hpo_matches["gene_symbol"].map(gene_ids)
@@ -96,5 +96,6 @@ if "snakemake" in globals():
     prepare_hpo_matches(
         snakemake.input.hpo,
         snakemake.params.hpo_dir,
+        snakemake.input.ensembl_to_ncbi,
         snakemake.output.hpo,
     )
