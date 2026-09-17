@@ -581,6 +581,7 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
     if "Ensembl_gene_id_all" in report.columns:
         hpo_features = hpo_df["Features"].to_dict()
         hpo_ids = hpo_df["HPO IDs"].to_dict()
+        term_separator = ";" if "HPO Match Score" in hpo_df.columns else ","
 
         # Concatenate the HPO terms over every panel gene the variant overlaps,
         # then remove repeated terms and count unique HPO IDs.
@@ -588,9 +589,13 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
             genes = [g.strip() for g in str(gene_ids_text).split(",") if g.strip() in hpo_features]
             if not genes:
                 return ".", "."
-            terms = ", ".join(hpo_features[g] for g in genes)
+            terms = term_separator.join(hpo_features[g] for g in genes)
             terms = ", ".join(
-                dict.fromkeys(term.strip() for term in terms.split(",") if term.strip())
+                dict.fromkeys(
+                    term.strip()
+                    for term in terms.split(term_separator)
+                    if term.strip()
+                )
             )
             ids = set(
                 re.findall(r"HP:\d+", ", ".join(str(hpo_ids[g]) for g in genes))

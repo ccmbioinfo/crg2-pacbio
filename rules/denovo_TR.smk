@@ -78,7 +78,9 @@ rule trgt_denovo:
         """   
 
 rule annotate_trgt_denovo:
-    input: "TRGT_denovo/{child}.TRGT.denovo.tsv"
+    input:
+      "TRGT_denovo/{child}.TRGT.denovo.tsv",
+      hpo = [hpo_matches] if config["run"]["hpo"] else [],
     output: "reports/{child}.TRGT.denovo.annotated.csv"
     params:
       crg2_pacbio = config["tools"]["crg2_pacbio"],
@@ -88,7 +90,7 @@ rule annotate_trgt_denovo:
       long_read_regions = config["annotation"]["general"]["long_read_regions"],
       controls = config["trgt"]["control_alleles_tsv"],
       c4r = config["annotation"]["c4r"],
-      HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
+      HPO = hpo_matches if config["run"]["hpo"] else "none",
       c4r_outliers = config["trgt"]["C4R_outliers"]
     log:  "logs/denovo_TRs/{child}.annotate.TRGT.denovo.log"
     conda: 
@@ -97,7 +99,7 @@ rule annotate_trgt_denovo:
         """
         if [[ {params.HPO} == "none" ]]
         then
-            (python3 {params.crg2_pacbio}/scripts/annotate_denovo_TRs.py --repeats {input} \
+            (python3 {params.crg2_pacbio}/scripts/annotate_denovo_TRs.py --repeats {input[0]} \
                 --output_file  {output} \
                 --ensembl {params.genes} \
                 --gnomad_constraint {params.constraint} \
@@ -107,7 +109,7 @@ rule annotate_trgt_denovo:
                 --controls {params.controls} \
 		        --c4r_outliers {params.c4r_outliers}) > {log} 2>&1
         else
-            (python3 {params.crg2_pacbio}/scripts/annotate_denovo_TRs.py --repeats {input} \
+            (python3 {params.crg2_pacbio}/scripts/annotate_denovo_TRs.py --repeats {input[0]} \
                 --output_file  {output} \
                 --ensembl {params.genes} \
                 --gnomad_constraint {params.constraint} \
