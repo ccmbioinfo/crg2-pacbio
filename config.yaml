@@ -9,8 +9,6 @@ run:
   flank: 100000
   acmg_sf: false
 
-hpo_matching: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/HPO/download"
-
 genes:
   ensembl: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/for_gene_panels/Homo_sapiens.GRCh38.112.gtf_subset.csv"
   refseq: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/refseq/GRCh38_latest_genomic.gff_subset.csv"
@@ -55,6 +53,7 @@ annotation:
     data_dir: "/hpf/largeprojects/ccmbio/nhanafi/c4r/downloads/databases/snpeff/data"
   general:
     exon: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/MANE/MANE.GRCh38.v1.0.ensembl_genomic.bed"
+    hpo_matching: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/HPO/download"
     long_read_regions: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/long_read_regions/"
     clingen_path: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/ClinGen/"
     adotto_repeats: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/repeats/repeat_catalogs_for_TRGT/adotto_repeats.hg38.bed"

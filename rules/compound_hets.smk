@@ -9,7 +9,7 @@ if config["run"]["hpo"]:
         output:
             hpo=hpo_matches,
         params:
-            hpo_dir=config["hpo_matching"],
+            hpo_dir=config["annotation"]["general"]["hpo_matching"],
         log:
             "logs/hpo_matching/{project}.log".format(project=config["run"]["project"]),
         resources:
