@@ -91,12 +91,13 @@ rule cnv_report:
     input: 
         cnv_index = "cnv/{family}.cnv.truvari.merge.vcf.gz.tbi",
         snpeff = "cnv/{family}.cnv.snpeff.vcf",
-        annotsv = "cnv/{family}.AnnotSV.tsv"
+        annotsv = "cnv/{family}.AnnotSV.tsv",
+        hpo = [hpo_matches] if config["run"]["hpo"] else [],
     output: "cnv/{family}.cnv.csv"
     log: "logs/cnv/{family}.cnv.report.log"
     params:
         crg2_pacbio = config["tools"]["crg2_pacbio"],
-        HPO = config["run"]["hpo"] if config["run"]["hpo"] else "none",
+        HPO = hpo_matches if config["run"]["hpo"] else "none",
         omim = config["annotation"]["omim_path"],
         exon = config["annotation"]["general"]["exon"],
         long_read_regions = config["annotation"]["general"]["long_read_regions"],

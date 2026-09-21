@@ -1,4 +1,5 @@
 include: "rules/common.smk"
+include: "rules/compound_hets.smk"
 include: "rules/annotation.smk"
 include: "rules/snvreport.smk"
 include: "rules/svreport.smk"
@@ -6,7 +7,6 @@ include: "rules/annotate_mt_var.smk"
 include: "rules/outlier_expansions.smk"
 include: "rules/pathogenic_expansion_loci.smk"
 include: "rules/denovo_TR.smk"
-include: "rules/compound_hets.smk"
 include: "rules/cnvreport.smk"
 include: "rules/qc.smk"
 
