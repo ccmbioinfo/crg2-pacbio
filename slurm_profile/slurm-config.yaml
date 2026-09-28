@@ -23,6 +23,9 @@ __default__:
   time: "20:00:00"
   output: "slurm/%x-%j.out"
 
+vcfanno:
+  time: "48:00:00"
+
 methbat_build_cohort:
   mem: "600G"
 
