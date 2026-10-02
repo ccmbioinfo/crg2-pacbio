@@ -591,11 +591,7 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
                 return ".", "."
             terms = term_separator.join(hpo_features[g] for g in genes)
             terms = ", ".join(
-                dict.fromkeys(
-                    term.strip()
-                    for term in terms.split(term_separator)
-                    if term.strip()
-                )
+                dict.fromkeys(term.strip() for term in terms.split(term_separator) if term.strip())
             )
             ids = set(
                 re.findall(r"HP:\d+", ", ".join(str(hpo_ids[g]) for g in genes))

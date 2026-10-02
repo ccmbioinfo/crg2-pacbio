@@ -53,6 +53,8 @@ def prepare_hpo_matches(hpo_file, hpo_dir, ensembl_to_ncbi_file, output_file):
 
     indirect_hpo = get_indirect_hpo_gene_matches(hpo_ids, hpo_data)
     hpo_matches = pd.concat([exact_hpo, indirect_hpo], ignore_index=True)
+    # Exact and indirect rows now share the same gene/patient-term key. Sorting
+    # first makes the exact 1.0 score, or otherwise the best indirect score, win.
     hpo_matches = hpo_matches.sort_values("HPO Match Score", ascending=False)
     hpo_matches = hpo_matches.drop_duplicates(["gene_symbol", "hpo_id"])
 
