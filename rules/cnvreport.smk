@@ -6,15 +6,17 @@ rule bcftools_merge:
         "logs/cnv/{family}.cnv.bcftools.merge.log"
     conda:
         "../envs/common.yaml"
+    params:
+        pattern=lambda wildcards: "*.wf_cnv.vcf.gz" if get_platform(wildcards) == "ONT" else "*hificnv*.vcf.gz"
     shell:
         """
         (
-        n_vcfs=$(ls {input}/*hificnv*.vcf.gz | wc -l)
+        n_vcfs=$(ls {input}/{params.pattern} | wc -l)
         if [ "$n_vcfs" -eq 1 ]; then
-            cp {input}/*hificnv*.vcf.gz {output}
+            cp {input}/{params.pattern} {output}
             tabix {output}
         else
-            bcftools merge -m none {input}/*hificnv*.vcf.gz | bgzip > {output}
+            bcftools merge -m none {input}/{params.pattern} | bgzip > {output}
             tabix {output}
         fi
         ) > {log} 2>&1
@@ -53,8 +55,35 @@ rule fix_hifi_cnv_CI:
         (python3 {params.crg2_pacbio}/scripts/fix_hifi_cnv_CI.py -input_vcf {input} -output_vcf {output}) > {log} 2>&1
         """
 
+rule clean_cnv_input_annotations:
+    input:
+        vcf="cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
+    output:
+        vcf=temp("cnv/{family}.cnv.truvari.merge.fix.CIPOS.clean.vcf")
+    log:
+        "logs/cnv/{family}.clean.input.annotations.log"
+    conda:
+        "../envs/common.yaml"
+    shell:
+        """
+        (
+        header="$(bcftools view -h {input.vcf})"
+        if printf '%s\n' "$header" | grep '^##INFO=<ID=ANN,' > /dev/null; then
+            remove_tags="INFO/ANN"
+            for tag in LOF NMD CONTIG RNAMES; do
+                if printf '%s\n' "$header" | grep "^##INFO=<ID=${{tag}}," > /dev/null; then
+                    remove_tags="${{remove_tags}},INFO/${{tag}}"
+                fi
+            done
+            bcftools annotate -x "$remove_tags" {input.vcf} -Ov -o {output.vcf}
+        else
+            bcftools view {input.vcf} -Ov -o {output.vcf}
+        fi
+        ) > {log} 2>&1
+        """
+
 rule cnv_snpeff:
-    input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
+    input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.clean.vcf"
     output:
         vcf = temp("cnv/{family}.cnv.snpeff.vcf"),
     log:
@@ -67,10 +96,9 @@ rule cnv_snpeff:
         get_wrapper_path("snpeff")
 
 rule cnv_annotsv:
-    input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
+    input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.clean.vcf"
     output:
-        annotsv_annotated =  temp("cnv/{family}.AnnotSV.tsv"),
-        annotsv_unannotated =  temp("cnv/{family}.AnnotSV.unannotated.tsv")
+        annotsv_annotated =  temp("cnv/{family}.AnnotSV.tsv")
     log: "logs/cnv/{family}.annotsv.log"
     params:
         annotsv_path = config["tools"]["annotSV"]
@@ -109,7 +137,8 @@ rule cnv_report:
         ensembl = config["annotation"]["general"]["ensembl"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
-        samples = config["run"]["samples"]
+        samples = config["run"]["samples"],
+        platform = get_platform,
     conda:
         "../envs/str_sv.yaml"
     shell:
@@ -121,6 +150,7 @@ rule cnv_report:
                         -snpeff {input.snpeff} \
                         -variant_type CNV \
                         -samples {params.samples} \
+                        -platform {params.platform} \
                         -omim {params.omim} \
                         -exon {params.exon} \
                         -gnomad {params.gnomad_SV} \
@@ -143,6 +173,7 @@ rule cnv_report:
                     -snpeff {input.snpeff} \
                     -variant_type CNV \
                     -samples {params.samples} \
+                    -platform {params.platform} \
                     -omim {params.omim} \
                     -hpo {params.HPO} \
                     -exon {params.exon} \
