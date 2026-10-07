@@ -55,7 +55,7 @@ if config["run"]["hpo"]:
     rule annotate_hpo:
         input:
             reports=expand("small_variants/{p}/{family}",p=["coding", "panel", "panel-flank", "denovo"] if config["run"]["ped"] else ["coding", "panel", "panel-flank"], family=project),
-            hpo=config["run"]["hpo"]
+            hpo=hpo_matches,
         output: 
             directory("report/hpo_annotated")
         conda: 
