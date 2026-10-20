@@ -26,6 +26,9 @@ if config["run"]["variants_for_methbat"] != "":
 
 project = config["run"]["project"]
 
+def get_platform(wildcards=None):
+    return units.loc[project, "platform"].upper()
+
 # Restrict the `sample` wildcard to the exact set of names declared in samples.tsv
 # and the `family` wildcard to the project name. Without this, Snakemake's default
 # `.+` wildcard regex makes paths like "{family}_{sample}" ambiguous whenever a
@@ -123,10 +126,15 @@ def get_trgt_path_str_vcf_dir(wildcards):
 
     return input_vcf
 
-def get_bam(wildcards):
-    bam = samples.loc[wildcards.sample, "BAM"]
+def get_alignment(wildcards):
+    return samples.loc[wildcards.sample, "BAM"]
 
-    return bam
+# if cram inputs are provided, run the qc cram_to_bam rule
+def get_bam(wildcards):
+    alignment = get_alignment(wildcards)
+    if alignment.lower().endswith(".cram"):
+        return f"qc/bam/{wildcards.sample}.bam"
+    return alignment
 
 def get_methbat_profiles(wildcards):
     return [f"methbat/profiles/{sample}.profile.tsv" for sample in controls.index]

@@ -1,3 +1,23 @@
+rule cram_to_bam:
+    input:
+        cram=get_alignment
+    output:
+        bam=temp("qc/bam/{sample}.bam"),
+        bai=temp("qc/bam/{sample}.bam.bai")
+    log:
+        "logs/qc/bam/{sample}.cram_to_bam.log"
+    conda:
+        "../envs/samtools.yaml"
+    threads: 8
+    params:
+        ref=config["ref"]["genome"]
+    shell:
+        """
+        mkdir -p qc/bam logs/qc/bam
+        samtools view -@ {threads} -T {params.ref} -b -o {output.bam} {input.cram} 2> {log}
+        samtools index -@ {threads} {output.bam} {output.bai} 2>> {log}
+        """
+
 rule peddy_unphase_vcf:
     input:
         vcf=get_smallvariants_vcf

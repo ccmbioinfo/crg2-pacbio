@@ -6,6 +6,9 @@ samples = pd.read_table(config["run"]["samples"], dtype=str).set_index("sample",
 case = samples[samples["case_or_control"] == "case"]
 controls = samples[samples["case_or_control"] == "control"]
 
+if get_platform() == "ONT":
+    raise ValueError("The methylation outlier workflow is only supported for PacBio input")
+
 rule all:
     input:
        expand("methbat/outliers/{sample}.annotated.outliers.csv", sample=case.index)

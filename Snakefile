@@ -26,6 +26,7 @@ samples = pd.read_table(config["run"]["samples"], dtype=str).set_index("sample",
     
 ##### Target rules #####
 project = config["run"]["project"]
+platform = get_platform()
 children = []
 if config["run"]["ped"]:
     children = get_children_ids(config["run"]["ped"])
@@ -45,6 +46,19 @@ if config["run"].get("hpo", ""):
         "reports/{family}.panel.CH.csv".format(family=project),
         "reports/{family}.panel-flank.CH.csv".format(family=project),
     ]
+
+pacbio_specific_reports = []
+if platform == "PACBIO":
+    pacbio_specific_reports = [
+        "reports/{family}.repeat.outliers.annotated.csv".format(family=project),
+        "reports/{family}.known.path.str.loci.csv".format(family=project),
+        "reports/{family}.mito.csv".format(family=project),
+    ]
+    if len(children) > 0:
+        pacbio_specific_reports += expand(
+            "reports/{child}.TRGT.denovo.annotated.csv",
+            child=children,
+        )
     
 rule all:
     input:
@@ -53,12 +67,7 @@ rule all:
         "reports/{family}.cnv.CH{sf}.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.compound.het.status.CH.csv".format(family=project, sf=sf_suffix),
         "reports/{family}.wgs.high.impact.CH{sf}.csv".format(family=project, sf=sf_suffix),
-        "reports/{family}.repeat.outliers.annotated.csv".format(family=project),
-        "reports/{family}.known.path.str.loci.csv".format(family=project),
         "reports/{family}.multiqc_report.html".format(family=project),
         *hpo_reports,
-        "reports/{family}.mito.csv".format(family=project),
         *acmg_sf_report_output,
-        expand("reports/{child}.TRGT.denovo.annotated.csv",
-               child=children) if len(children) > 0 else []
-
+        *pacbio_specific_reports,
