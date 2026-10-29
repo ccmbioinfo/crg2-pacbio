@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# NOTE: Changes to this script may affect the CPHI DRAGEN pipeline.
+# Test both pipelines after modifying it.
 """Match patient HPO terms to indirect candidate terms."""
 
 from __future__ import annotations

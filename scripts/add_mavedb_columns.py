@@ -1,3 +1,6 @@
+# NOTE: Changes to this script may affect the CPHI DRAGEN pipeline.
+# Test both pipelines after modifying it.
+
 from __future__ import annotations
 
 import argparse
