@@ -36,6 +36,8 @@ COMPOUND_HET_STATUS_FALSE = "FALSE"
 COMPOUND_HET_STATUS_UNKNOWN = "UNKNOWN"
 
 MISSING_VALUE = "."
+EXCEL_CELL_CHAR_LIMIT = 30000
+LONG_GENE_COLUMNS = ("GENE_NAME", "ENSEMBL_GENE")
 
 
 def setup_logging() -> logging.Logger:
@@ -209,6 +211,44 @@ def map_zygosity_from_gt_type(gt_type: int) -> str:
         return ZYGOSITY_MISSING
 
 
+def split_long_gene_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Split long gene lists across Excel-safe continuation columns."""
+    df = df.copy()
+    for column in LONG_GENE_COLUMNS:
+        if column not in df.columns:
+            continue
+
+        split_values = []
+        for value in df[column]:
+            value = str(value)
+            genes = value.split(";")
+            chunks = []
+            current_chunk = ""
+            for gene in genes:
+                combined = f"{current_chunk};{gene}" if current_chunk else gene
+                if current_chunk and len(combined) > EXCEL_CELL_CHAR_LIMIT:
+                    chunks.append(current_chunk)
+                    current_chunk = gene
+                else:
+                    current_chunk = combined
+            chunks.append(current_chunk)
+            split_values.append(chunks)
+
+        max_chunks = max((len(chunks) for chunks in split_values), default=1)
+        df[column] = [chunks[0] for chunks in split_values]
+        for chunk_index in range(1, max_chunks):
+            continued_column = f"{column}_CONTINUED_{chunk_index}"
+            df.insert(
+                df.columns.get_loc(column) + chunk_index,
+                continued_column,
+                [
+                    chunks[chunk_index] if chunk_index < len(chunks) else MISSING_VALUE
+                    for chunks in split_values
+                ],
+            )
+    return df
+
+
 # create dated outputs for final files; skip coding, sv, cnv reports if files will be further processed for acmg secondary finding annotation
 def write_report(df: pd.DataFrame, family: str, report_type: str, seq_type: str, logger: logging.Logger, acmg_sf_enabled: bool = False,) -> None:
     """Write report to file."""
@@ -219,6 +259,9 @@ def write_report(df: pd.DataFrame, family: str, report_type: str, seq_type: str,
     # Write a symlink instead of a new copy for the Snakemake target, unless target will be further annotated
     acmg_input_report_types = {"wgs.coding", "wgs.high.impact", "sv", "cnv", "wgs.denovo"}
     write_undated_only = acmg_sf_enabled and report_type in acmg_input_report_types
+
+    if report_type in {"sv", "cnv"}:
+        df = split_long_gene_columns(df)
 
     if write_undated_only:
         output_path = f"reports/{family}.{report_type}.CH.{suffix}"
