@@ -206,12 +206,21 @@ def add_omim(omim_df, gene):
     return [phenos, inheritance]
 
 
+def get_format_value(sample_field, format_field, tag):
+    try:
+        index = format_field.split(":").index(tag)
+        return sample_field.split(":")[index]
+    except (ValueError, IndexError):
+        return "."
+
+
 def get_genotype(sample_GT_AD_DP):
     genotype = sample_GT_AD_DP.split(":")[0]
     if genotype == "0/1" or genotype == "0|1" or genotype == "1|0":
         zyg = "het"
     elif genotype == "1/1":
         zyg =  "hom"
+        # Prevent Excel from converting the genotype to a date.
         genotype = "1//1"
     elif genotype == "./.":
         zyg = genotype
@@ -225,33 +234,32 @@ def get_genotype(sample_GT_AD_DP):
         zyg = genotype
     return [zyg, genotype]
 
-def get_phase_set(sample_GT_AD_DP):
-    try:
-        ps = sample_GT_AD_DP.split(":")[3]
-    except IndexError:
-        ps = "."
-    return ps
+def get_phase_set(sample_field, format_field):
+    return get_format_value(sample_field, format_field, "PS")
 
-def get_alt_depth(sample_GT_AD_DP):
+def get_alt_depth(sample_field, format_field):
     try:
-        alt_depth = sample_GT_AD_DP.split(":")[1].split(",")[1]
-    except:
+        AD = get_format_value(sample_field, format_field, "AD")
+        alt_depth = AD.split(",")[1]
+    except IndexError:
         alt_depth = 0
     return alt_depth
 
 
-def get_depth(sample_GT_AD_DP):
-    depth = sample_GT_AD_DP.split(":")[2]
-    return depth
+def get_depth(sample_field, format_field):
+    depth = get_format_value(sample_field, format_field, "DP")
+    if depth != ".":
+        return depth
+    # WDL4 Sawfish does not provide DP, so derive it from the AD values.
+    try:
+        AD = get_format_value(sample_field, format_field, "AD")
+        return sum(int(depth) for depth in AD.split(","))
+    except ValueError:
+        return "."
 
-def get_CN(sample_fields, format_fields, pipeline):
+def get_CN(sample_field, format_field):
     # copy number: for CNV calls
-    if pipeline == "pacbio-legacy":
-        return sample_fields.split(":")[1]
-    # WDL4 Sawfish records do not use a consistent FORMAT order.
-    CN_index = format_fields.split(":").index("CN")
-    CN = sample_fields.split(":")[CN_index]
-    return CN
+    return get_format_value(sample_field, format_field, "CN")
 
 def get_exon_counts(annotsv_df, exon_bed):
     # original functions from SVRecords/SVAnnotator.py
@@ -970,32 +978,37 @@ def main(
                      
     # extract genotype and alt allele depth
     for sample in sample_cols:
-        df_merge[f"{sample}_GT"] = [
-            get_genotype(row[sample])[1] for index, row in df_merge.iterrows()
+        genotypes = [
+            get_genotype(get_format_value(row[sample], row["FORMAT"], "GT")) for index, row in df_merge.iterrows()
         ]
+        df_merge[f"{sample}_GT"] = [genotype[1] for genotype in genotypes]
         if variant_type == "CNV":
             df_merge[f"{sample}_CN"] = [
-                get_CN(row[sample], row["FORMAT"], pipeline) for index, row in df_merge.iterrows()
+                get_CN(row[sample], row["FORMAT"]) for index, row in df_merge.iterrows()
             ]
             # map genotype to copy number
             df_merge[f"{sample}_GT"] = [
                 map_CN_to_GT(row["SVTYPE"], row[f"{sample}_CN"], row[f"{sample}_GT"], row["CHROM"]) for index, row in df_merge.iterrows()
             ]
+            genotypes = [
+                get_genotype(genotype) for genotype in df_merge[f"{sample}_GT"]
+            ]
+            df_merge[f"{sample}_GT"] = [genotype[1] for genotype in genotypes]
             df_merge[f"{sample}_zyg"] = [
-                get_genotype(row[f"{sample}_GT"])[0] for index, row in df_merge.iterrows()
+                genotype[0] for genotype in genotypes
             ]
         else:
             df_merge[f"{sample}_zyg"] = [
-                get_genotype(row[f"{sample}_GT"])[0] for index, row in df_merge.iterrows()
+                genotype[0] for genotype in genotypes
             ]
             df_merge[f"{sample}_AD"] = [
-                get_alt_depth(row[sample]) for index, row in df_merge.iterrows()
+                get_alt_depth(row[sample], row["FORMAT"]) for index, row in df_merge.iterrows()
             ]
             df_merge[f"{sample}_DP"] = [
-                get_depth(row[sample]) for index, row in df_merge.iterrows()
+                get_depth(row[sample], row["FORMAT"]) for index, row in df_merge.iterrows()
             ]
             df_merge[f"{sample}_PS"] = [
-                get_phase_set(row[sample]) for index, row in df_merge.iterrows()
+                get_phase_set(row[sample], row["FORMAT"]) for index, row in df_merge.iterrows()
         ]
     zyg_cols = [col for col in df_merge.columns if "_zyg" in col]
     gt_cols = [col for col in df_merge.columns if "_GT" in col]
