@@ -1,3 +1,26 @@
+if config["run"]["pipeline"] == "pacbio":
+    cnv_annotation_vcf = "cnv/{family}.sawfish.vcf.gz"
+    cnv_annotation_index = "cnv/{family}.sawfish.vcf.gz.tbi"
+else:
+    cnv_annotation_vcf = "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
+    cnv_annotation_index = "cnv/{family}.cnv.truvari.merge.vcf.gz.tbi"
+
+rule split_sawfish_cnv_vcf:
+    input: get_sawfish_vcf
+    output:
+        vcf = temp("cnv/{family}.sawfish.vcf.gz"),
+    log:
+        "logs/cnv/{family}.sawfish.split.log"
+    conda:
+        "../envs/common.yaml"
+    shell:
+        """
+        (
+        # Sawfish CNVs can have SVCLAIM D or DJ, or SVTYPE CNV.
+        bcftools view -i '(INFO/SVCLAIM="D" || INFO/SVCLAIM="DJ" || INFO/SVTYPE="CNV") && FORMAT/CN!="."' -Oz -o {output.vcf} {input}
+        ) > {log} 2>&1
+        """
+
 rule bcftools_merge:
     input: get_cnv_dir
     output:
@@ -54,7 +77,7 @@ rule fix_hifi_cnv_CI:
         """
 
 rule cnv_snpeff:
-    input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
+    input: cnv_annotation_vcf
     output:
         vcf = temp("cnv/{family}.cnv.snpeff.vcf"),
     log:
@@ -67,7 +90,7 @@ rule cnv_snpeff:
         get_wrapper_path("snpeff")
 
 rule cnv_annotsv:
-    input: "cnv/{family}.cnv.truvari.merge.fix.CIPOS.vcf"
+    input: cnv_annotation_vcf
     output:
         annotsv_annotated =  temp("cnv/{family}.AnnotSV.tsv"),
         annotsv_unannotated =  temp("cnv/{family}.AnnotSV.unannotated.tsv")
@@ -89,7 +112,7 @@ rule cnv_annotsv:
 
 rule cnv_report:
     input: 
-        cnv_index = "cnv/{family}.cnv.truvari.merge.vcf.gz.tbi",
+        cnv_index = cnv_annotation_index,
         snpeff = "cnv/{family}.cnv.snpeff.vcf",
         annotsv = "cnv/{family}.AnnotSV.tsv",
         hpo = [hpo_matches] if config["run"]["hpo"] else [],
@@ -110,7 +133,8 @@ rule cnv_report:
         ensembl = config["annotation"]["general"]["ensembl"],
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
-        samples = config["run"]["samples"]
+        samples = config["run"]["samples"],
+        pipeline = config["run"]["pipeline"],
     conda:
         "../envs/str_sv.yaml"
     shell:
@@ -121,6 +145,7 @@ rule cnv_report:
                         -annotsv {input.annotsv} \
                         -snpeff {input.snpeff} \
                         -variant_type CNV \
+                        -pipeline {params.pipeline} \
                         -samples {params.samples} \
                         -omim {params.omim} \
                         -exon {params.exon} \
@@ -143,6 +168,7 @@ rule cnv_report:
                     -annotsv {input.annotsv} \
                     -snpeff {input.snpeff} \
                     -variant_type CNV \
+                    -pipeline {params.pipeline} \
                     -samples {params.samples} \
                     -omim {params.omim} \
                     -hpo {params.HPO} \

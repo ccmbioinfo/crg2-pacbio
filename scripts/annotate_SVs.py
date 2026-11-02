@@ -244,9 +244,13 @@ def get_depth(sample_GT_AD_DP):
     depth = sample_GT_AD_DP.split(":")[2]
     return depth
 
-def get_CN(sample_GT_AD_DP):
+def get_CN(sample_fields, format_fields, pipeline):
     # copy number: for CNV calls
-    CN = sample_GT_AD_DP.split(":")[1]
+    if pipeline == "pacbio-legacy":
+        return sample_fields.split(":")[1]
+    # WDL4 Sawfish records do not use a consistent FORMAT order.
+    CN_index = format_fields.split(":").index("CN")
+    CN = sample_fields.split(":")[CN_index]
     return CN
 
 def get_exon_counts(annotsv_df, exon_bed):
@@ -575,7 +579,7 @@ def vcf_to_df(vcf_path):
     ).rename(columns={"#CHROM": "CHROM"})
 
 
-def parse_snpeff(snpeff_df, variant_type):
+def parse_snpeff(snpeff_df, variant_type, pipeline):
     svtype_list = []
     end_list = []
     ann_list = []
@@ -586,27 +590,39 @@ def parse_snpeff(snpeff_df, variant_type):
         pos = row["POS"]
         svtype = [i for i in info if "SVTYPE=" in i][0].split("=")[1]
         svtype_list.append(svtype)
-        try:
-            end = [i for i in info if "END=" in i][0].split("=")[1]
-            if svtype == "BND" or svtype == "INS":
-                end = int(end) + 1
-            elif variant_type == "CNV":
-                CIEND = [i for i in info if "CIEND=" in i][0].split("=")[1].split(",")[1]
-                end = int(end) + int(CIEND)
-        except IndexError:
-            end = int(pos) + 1
+        if pipeline == "pacbio-legacy":
+            try:
+                end = [i for i in info if "END=" in i][0].split("=")[1]
+                if svtype == "BND" or svtype == "INS":
+                    end = int(end) + 1
+                elif variant_type == "CNV":
+                    CIEND = [i for i in info if "CIEND=" in i][0].split("=")[1].split(",")[1]
+                    end = int(end) + int(CIEND)
+            except IndexError:
+                end = int(pos) + 1
+        else:
+            # WDL4 Sawfish records use SVLEN instead of END.
+            svlen_info = [i for i in info if i.startswith("SVLEN=")]
+            if svlen_info and svtype in ["DEL", "DUP", "INV", "CNV"]:
+                end = int(pos) + abs(int(svlen_info[0].split("=")[1].split(",")[0]))
+            elif svtype == "INS":
+                # WDL4 Sawfish can represent an insertion that replaces a reference span.
+                end = int(pos) + max(len(row["REF"]) - 1, 1)
+            else:
+                end = int(pos) + 1
         end_list.append(end)
         try:
             ann = [i for i in info if "ANN=" in i and "SVANN=" not in i][0]
             ann_list.append(ann)
         except IndexError:
             ann_list.append("NA")
-        if svtype == "BND":
-            CIPOS = [i for i in info if "CIPOS=" in i][0].split("=")[1].split(",")[0]
-            pos = int(pos) + int(CIPOS)
-        elif variant_type == "CNV":
-            CIPOS = [i for i in info if "CIPOS=" in i][0].split("=")[1].split(",")[0]
-            pos = int(pos) + int(CIPOS)
+        if pipeline == "pacbio-legacy":
+            if svtype == "BND":
+                CIPOS = [i for i in info if "CIPOS=" in i][0].split("=")[1].split(",")[0]
+                pos = int(pos) + int(CIPOS)
+            elif variant_type == "CNV":
+                CIPOS = [i for i in info if "CIPOS=" in i][0].split("=")[1].split(",")[0]
+                pos = int(pos) + int(CIPOS)
         pos_list.append(pos)
     snpeff_df["SVTYPE"] = svtype_list
     snpeff_df["END"] = end_list
@@ -672,9 +688,26 @@ def parse_snpeff(snpeff_df, variant_type):
 
 
 def merge_annotsv_snpeff(annotsv_df, snpeff_df):
-    merged = annotsv_df.merge(
-        snpeff_df, on=["CHROM", "POS", "END", "SVTYPE", "ID"], how="left"
+    merge_keys = ["CHROM", "POS", "END", "SVTYPE", "ID"]
+    key_comparison = annotsv_df[merge_keys].drop_duplicates().merge(
+        snpeff_df[merge_keys].drop_duplicates(), on=merge_keys, how="outer", indicator=True
     )
+    print(
+        "AnnotSV/SnpEff merge keys: "
+        f"{(key_comparison['_merge'] == 'both').sum()} matched, "
+        f"{(key_comparison['_merge'] == 'left_only').sum()} AnnotSV-only, "
+        f"{(key_comparison['_merge'] == 'right_only').sum()} SnpEff-only"
+    )
+    for label, merge_type in [("AnnotSV-only", "left_only"), ("SnpEff-only", "right_only")]:
+        unmatched = key_comparison[key_comparison["_merge"] == merge_type]
+        if not unmatched.empty:
+            print(f"{label} merge keys (showing up to 20):")
+            print(unmatched[merge_keys].head(20).to_csv(sep="\t", index=False).rstrip())
+
+    merged = annotsv_df.merge(
+        snpeff_df, on=merge_keys, how="left"
+    )
+    print(f"Records without a SnpEff gene annotation: {merged['ENSEMBL_GENE'].isna().sum()}")
     merged = merged.drop(columns=["ANN"])
     return merged
 
@@ -890,7 +923,7 @@ def map_CN_to_GT(SVTYPE, CN, GT, CHROM):
     elif CHROM == "X": # haploid (male) or diploid (female)
         GT = "./1"
     else:
-        if SVTYPE == "DEL":
+        if SVTYPE == "DEL" or (SVTYPE == "CNV" and CN in ["0", "1"]): # WDL4 can use generic CNV for copy-number losses.
             GT = DEL_CN_GT_dict_diploid.get(CN, ".")
         else:
             if CN == "2":
@@ -924,7 +957,8 @@ def main(
     clingen_TS,
     clingen_disease,
     clingen_regions,
-    samples
+    samples,
+    pipeline,
 ):
     print(c4r)
     # filter out SVs < 50bp
@@ -941,7 +975,7 @@ def main(
         ]
         if variant_type == "CNV":
             df_merge[f"{sample}_CN"] = [
-                get_CN(row[sample]) for index, row in df_merge.iterrows()
+                get_CN(row[sample], row["FORMAT"], pipeline) for index, row in df_merge.iterrows()
             ]
             # map genotype to copy number
             df_merge[f"{sample}_GT"] = [
@@ -974,13 +1008,15 @@ def main(
     # df_merge_notbenign = df_merge[apply_filter_benign(df_merge)]
 
     # add snpeff annos
-    snpeff_df = parse_snpeff(snpeff_df, variant_type)
+    snpeff_df = parse_snpeff(snpeff_df, variant_type, pipeline)
     for col in ["POS", "END"]:
         snpeff_df[col] = snpeff_df[col].astype(int)
         df_merge[col] = df_merge[col].astype(int)
 
     # merge snpeff and annotsv df
     df_merge = merge_annotsv_snpeff(df_merge, snpeff_df)
+    snpeff_annotation_cols = ["VARIANT", "IMPACT", "GENE_NAME", "ENSEMBL_GENE"]
+    df_merge[snpeff_annotation_cols] = df_merge[snpeff_annotation_cols].fillna(".")
 
     # add HPO terms by gene matching
     try:
@@ -1198,9 +1234,10 @@ def main(
     if variant_type == "CNV":
         # exclude splice site annotations for CNVs
         df_merge = df_merge.drop(columns=["Nearest_SS_type", "Dist_nearest_SS", "ID"])
-        # add back confidence intervals for CNV length now that annotation is done
-        df_merge["POS"] = df_merge["POS"] + 2000
-        df_merge["END"] = df_merge["END"] - 2000
+        if pipeline == "pacbio-legacy":
+            # add back confidence intervals for CNV length now that annotation is done
+            df_merge["POS"] = df_merge["POS"] + 2000
+            df_merge["END"] = df_merge["END"] - 2000
     df_merge = df_merge.replace("nan", ".")
     df_merge = df_merge.fillna(".")
     df_merge = df_merge.drop_duplicates()
@@ -1217,6 +1254,7 @@ if __name__ == "__main__":
     parser.add_argument("-annotsv", type=str, help="AnnotSV tsv file", required=True)
     parser.add_argument("-snpeff", type=str, help="Snpeff vcf file", required=True)
     parser.add_argument("-variant_type", type=str, help="Variant type: SV or CNV", required=True)
+    parser.add_argument("-pipeline", type=str, help="PacBio pipeline input layout", required=True)
     parser.add_argument(
         "-hpo",
         help="Tab delimited file containing gene names and HPO terms",
@@ -1418,4 +1456,5 @@ if __name__ == "__main__":
         clingen_disease,
         clingen_regions,
         samples,
+        args.pipeline,
     )
