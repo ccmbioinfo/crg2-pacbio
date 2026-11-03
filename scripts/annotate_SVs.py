@@ -671,9 +671,8 @@ def parse_snpeff(snpeff_df, variant_type, pipeline):
                         l.append("NA")
         variant_list_all.append(";".join(set(variant_list)))
         impact_list_all.append(";".join(set(impact_list)))
-        # Preserve annotation order so gene and CH status ordering is reproducible.
-        gene_list_all.append(";".join(dict.fromkeys(gene_list)))
-        ens_gene_list_all.append(";".join(dict.fromkeys(ens_gene_list)))
+        gene_list_all.append(";".join(set(gene_list)))
+        ens_gene_list_all.append(";".join(set(ens_gene_list)))
     snpeff_df["IMPACT"] = impact_list_all
     snpeff_df["GENE_NAME"] = gene_list_all
     snpeff_df["ENSEMBL_GENE"] = ens_gene_list_all
@@ -697,26 +696,9 @@ def parse_snpeff(snpeff_df, variant_type, pipeline):
 
 
 def merge_annotsv_snpeff(annotsv_df, snpeff_df):
-    merge_keys = ["CHROM", "POS", "END", "SVTYPE", "ID"]
-    key_comparison = annotsv_df[merge_keys].drop_duplicates().merge(
-        snpeff_df[merge_keys].drop_duplicates(), on=merge_keys, how="outer", indicator=True
-    )
-    print(
-        "AnnotSV/SnpEff merge keys: "
-        f"{(key_comparison['_merge'] == 'both').sum()} matched, "
-        f"{(key_comparison['_merge'] == 'left_only').sum()} AnnotSV-only, "
-        f"{(key_comparison['_merge'] == 'right_only').sum()} SnpEff-only"
-    )
-    for label, merge_type in [("AnnotSV-only", "left_only"), ("SnpEff-only", "right_only")]:
-        unmatched = key_comparison[key_comparison["_merge"] == merge_type]
-        if not unmatched.empty:
-            print(f"{label} merge keys (showing up to 20):")
-            print(unmatched[merge_keys].head(20).to_csv(sep="\t", index=False).rstrip())
-
     merged = annotsv_df.merge(
-        snpeff_df, on=merge_keys, how="left"
+        snpeff_df, on=["CHROM", "POS", "END", "SVTYPE", "ID"], how="left"
     )
-    print(f"Records without a SnpEff gene annotation: {merged['ENSEMBL_GENE'].isna().sum()}")
     merged = merged.drop(columns=["ANN"])
     return merged
 
