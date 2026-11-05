@@ -99,8 +99,15 @@ def format_pedigree_qc(wildcards):
     ped.to_csv(out, sep="\t", index=False, header=False)
     return out
 
+def get_sawfish_vcf(wildcards):
+    family = project
+    return units.loc[family, "pbsv_vcf"]
+
 def get_pbsv_vcf(wildcards):
     family = project
+    if config["run"]["pipeline"] == "pacbio":
+        return f"sv/{family}.sawfish.vcf.gz"
+
     input_vcf = units.loc[family, "pbsv_vcf"]
 
     return input_vcf

@@ -1,3 +1,19 @@
+rule split_sawfish_sv_vcf:
+    input: get_sawfish_vcf
+    output:
+        vcf = temp("sv/{family}.sawfish.vcf.gz"),
+    log:
+        "logs/sv/{family}.sawfish.split.log"
+    conda:
+        "../envs/common.yaml"
+    shell:
+        """
+        (
+        # Anything other than a depth-only D record or SVTYPE CNV is an SV. DJ is retained because it also has junction support.
+        bcftools view -e 'INFO/SVCLAIM="D" || INFO/SVTYPE="CNV"' -Oz -o {output.vcf} {input}
+        ) > {log} 2>&1
+        """
+
 rule snpeff:
     input: get_pbsv_vcf
     output:
@@ -55,6 +71,7 @@ rule sv_report:
         colorsdb = config["annotation"]["sv_report"]["colorsdb"],
         c4r = config["annotation"]["c4r"],
         samples = config["run"]["samples"],
+        pipeline = config["run"]["pipeline"],
     conda:
         "../envs/str_sv.yaml"
     shell:
@@ -65,6 +82,7 @@ rule sv_report:
                         -annotsv {input.annotsv} \
                         -snpeff {input.snpeff} \
                         -variant_type SV \
+                        -pipeline {params.pipeline} \
                         -samples {params.samples} \
                         -omim {params.omim} \
                         -exon {params.exon} \
@@ -87,6 +105,7 @@ rule sv_report:
                     -annotsv {input.annotsv} \
                     -snpeff {input.snpeff} \
                     -variant_type SV \
+                    -pipeline {params.pipeline} \
                     -samples {params.samples} \
                     -omim {params.omim} \
                     -hpo {params.HPO} \
