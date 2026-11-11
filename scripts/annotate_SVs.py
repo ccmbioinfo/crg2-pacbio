@@ -11,6 +11,37 @@ from datetime import date
 import io
 import sys
 
+EXCEL_CELL_CHAR_LIMIT = 30000  # Set a little bit lower than actual limit
+
+
+def split_long_columns(df, columns):
+    """Split long semicolon delimited values across multiple Excel columns that do not break."""
+    for column in columns:
+        split_values = []
+        for value in df[column].astype(str):
+            chunks = [""]
+            for item in value.split(";"):
+                # First try adding the gene to the current chunk
+                combined = f"{chunks[-1]};{item}" if chunks[-1] else item
+                # Start a new chunk if the combined value would exceed the limit
+                if chunks[-1] and len(combined) > EXCEL_CELL_CHAR_LIMIT:
+                    chunks.append(item)
+                else:
+                    chunks[-1] = combined
+            split_values.append(chunks)
+
+        # Find the maximum number of additional columns needed based on the largest row
+        for index in range(1, max((len(parts) for parts in split_values), default=1)):
+            df.insert(
+                df.columns.get_loc(column) + index,
+                f"{column}_{index + 1}",
+                # For rows without an additional chunk, add a "." instead
+                [parts[index] if index < len(parts) else "." for parts in split_values],
+            )
+        df[column] = [parts[0] for parts in split_values]
+    return df
+
+
 def rename_SV_cols(annotsv_df):
     annotsv_df.rename(
         columns={
@@ -1238,6 +1269,7 @@ def main(
     df_merge = df_merge.replace("nan", ".")
     df_merge = df_merge.fillna(".")
     df_merge = df_merge.drop_duplicates()
+    df_merge = split_long_columns(df_merge, ["GENE_NAME", "ENSEMBL_GENE"])
     today = date.today()
     today = today.strftime("%Y-%m-%d")
     df_merge.to_csv(f"{prefix}.{variant_type.lower()}.csv", index=False)

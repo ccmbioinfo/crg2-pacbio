@@ -209,6 +209,28 @@ def map_zygosity_from_gt_type(gt_type: int) -> str:
         return ZYGOSITY_MISSING
 
 
+def get_numbered_columns(df: pd.DataFrame, base: str) -> list:
+    """Find the base column and any extra numbered columns."""
+    columns = [
+        col
+        for col in df.columns
+        if col == base or re.fullmatch(rf"{re.escape(base)}_\d+", col)
+    ]
+    # Keep the base column first and sort continuation columns by their number
+    return sorted(
+        columns, key=lambda col: 1 if col == base else int(col.rsplit("_", 1)[1])
+    )
+
+
+def join_numbered_values(row: pd.Series, columns: list) -> str:
+    """Join values from a base column and its continuation columns."""
+    return ";".join(
+        str(row[col])
+        for col in columns
+        if pd.notna(row[col]) and row[col] != MISSING_VALUE
+    )
+
+
 # create dated outputs for final files; skip coding, sv, cnv reports if files will be further processed for acmg secondary finding annotation
 def write_report(df: pd.DataFrame, family: str, report_type: str, seq_type: str, logger: logging.Logger, acmg_sf_enabled: bool = False,) -> None:
     """Write report to file."""
@@ -423,10 +445,6 @@ def process_structural_variants(
             + "-"
             + SV_rare_high_impact["SVTYPE"]
         )
-    SV_rare_high_impact.rename(
-        columns={"ENSEMBL_GENE": "Ensembl_gene_id"}, inplace=True
-    )
-    
     # Filter heterozygous variants
     if fam_dict.get("mother") == "0" and fam_dict.get("father") == "0": # no parents in pedigree
         SV_rare_high_impact = SV_rare_high_impact[SV_rare_high_impact[f"{proband_id}_zyg"] == "het"]
@@ -483,9 +501,12 @@ def process_structural_variants(
     SV_gt_details = merge_melted_dataframes(dfs, ["Variant_id", "Sample"])
     
     # Process gene information
-    SV_to_gene = SV_rare_high_impact[
-        ["Variant_id", "Ensembl_gene_id"]
-    ].drop_duplicates()
+    # Find ENSEMBL_GENE and any continuation columns added for long gene lists
+    gene_columns = get_numbered_columns(SV_rare_high_impact, "ENSEMBL_GENE")
+    # Convert the numbered columns into one Ensembl gene column for CH processing
+    SV_to_gene = SV_rare_high_impact[["Variant_id"] + gene_columns].melt(
+        id_vars="Variant_id", value_name="Ensembl_gene_id"
+    ).drop(columns="variable").drop_duplicates()
     SV_to_gene = SV_to_gene[SV_to_gene["Ensembl_gene_id"].notna()]
     
     # Split and explode gene IDs
@@ -806,9 +827,11 @@ def annotate_reports(
 
     # Annotate SV report
     SV = pd.read_csv(sv_path, low_memory=False)
+    # Use the full Ensembl gene list when adding CH status to each SV
+    sv_gene_columns = get_numbered_columns(SV, "ENSEMBL_GENE")
     CH_status_series = SV.apply(
         lambda x: compound_hets.SV_comp_het_status(
-            x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id"), ensembl_to_NCBI_df
+            join_numbered_values(x, sv_gene_columns), x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id"), ensembl_to_NCBI_df
         ),
         axis=1,
     )
@@ -830,9 +853,11 @@ def annotate_reports(
 
     # Annotate CNV report
     CNV = pd.read_csv(cnv_path, low_memory=False)
+    # Use the full Ensembl gene list when adding CH status to each CNV
+    cnv_gene_columns = get_numbered_columns(CNV, "ENSEMBL_GENE")
     CH_status_series = CNV.apply(
         lambda x: compound_hets.SV_comp_het_status(
-            x["ENSEMBL_GENE"], x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id"), ensembl_to_NCBI_df
+            join_numbered_values(x, cnv_gene_columns), x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id"), ensembl_to_NCBI_df
         ),
         axis=1, 
     )
