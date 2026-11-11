@@ -562,6 +562,18 @@ def replace_NCBI_IDs_with_Ensembl_IDs(variant_df, ensembl_df, ensembl_to_NCBI_df
             if gene in ID_dict and pd.notnull(ID_dict[gene]):
                 variant_df.at[idx, "Ensembl_gene_id"] = ID_dict[gene] 
 
+def keep_best_hpo_scores(terms: list) -> list:
+    """Deduplicate scored HPO terms, keeping the highest score per term."""
+    best_terms = {}
+    for term in terms:
+        term = term.strip()
+        name, score = term.rsplit(" (", 1)
+        score = float(score.rstrip(")"))
+        if name not in best_terms or score > best_terms[name][0]:
+            best_terms[name] = (score, term)
+    return [term for _, term in best_terms.values()]
+
+
 def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFrame:
     """
     Add HPO terms to a sequence variant report dataframe.
@@ -578,35 +590,54 @@ def add_hpo_terms_to_report(report: pd.DataFrame, hpo_terms: str) -> pd.DataFram
     hpo_df = hpo_df.set_index("Gene ID").drop(columns=["Gene Symbol"])
 
     # Ensembl_gene_id_all lists every gene the variant overlaps and is only present in
-    # the slivar reports. Match on all of them so the primary gene's terms are never
-    # dropped when another overlapping gene sorts earlier. Reports without the column
-    # keep the original single-gene join.
+    # the slivar reports. Use it to improve scores for the primary gene's terms and to
+    # report terms contributed only by additional genes in a separate column.
     if "Ensembl_gene_id_all" in report.columns:
         hpo_features = hpo_df["Features"].to_dict()
-        hpo_ids = hpo_df["HPO IDs"].to_dict()
+        hpo_counts = hpo_df["Number of occurrences"].to_dict()
         term_separator = ";" if "HPO Match Score" in hpo_df.columns else ","
 
-        # Concatenate the HPO terms over every panel gene the variant overlaps,
-        # then remove repeated terms and count unique HPO IDs.
-        def collect_hpo(gene_ids_text):
-            genes = [g.strip() for g in str(gene_ids_text).split(",") if g.strip() in hpo_features]
-            if not genes:
-                return ".", "."
-            terms = term_separator.join(hpo_features[g] for g in genes)
-            terms = ", ".join(
-                dict.fromkeys(term.strip() for term in terms.split(term_separator) if term.strip())
-            )
-            ids = set(
-                re.findall(r"HP:\d+", ", ".join(str(hpo_ids[g]) for g in genes))
-            )
-            count = len(ids)
-            return terms, count
+        def collect_hpo(row):
+            # Get HPO terms and scores from the prepared exact and indirect matches for the primary gene and all overlapping genes
+            primary_gene = row["Ensembl_gene_id"]
+            primary_terms = [
+                term.strip()
+                for term in str(hpo_features.get(primary_gene, "")).split(term_separator)
+                if term.strip()
+            ]
+            genes = [gene.strip() for gene in str(row["Ensembl_gene_id_all"]).split(",")]
+            # Combine terms from different genes together
+            all_terms = term_separator.join(str(hpo_features[gene]) for gene in genes if gene in hpo_features)
+            all_terms = [term.strip() for term in all_terms.split(term_separator) if term.strip()]
 
-        collected = report["Ensembl_gene_id_all"].fillna("").apply(collect_hpo)
+            # We retain the terms from the primary gene in the main HPO column
+            # And for the HPO_additional column, only add terms that are not associated with the primary gene
+            # If scores for a term are greater in the additional genes, upgrade the primary term score to the highest
+            if "HPO Match Score" in hpo_df.columns:
+                primary_names = {term.rsplit(" (", 1)[0] for term in primary_terms}
+                best_terms = keep_best_hpo_scores(primary_terms + all_terms)
+                primary_terms = [term for term in best_terms if term.rsplit(" (", 1)[0] in primary_names]
+                additional_terms = [term for term in best_terms if term.rsplit(" (", 1)[0] not in primary_names]
+            else:
+                primary_terms = list(dict.fromkeys(primary_terms))
+                primary_names = set(primary_terms)
+                additional_terms = list(
+                    dict.fromkeys(term for term in all_terms if term not in primary_names)
+                )
+
+            return (
+                ", ".join(primary_terms) or ".",
+                ", ".join(additional_terms) or ".",
+                hpo_counts.get(primary_gene, "."),
+            )
+
+        collected = report.apply(collect_hpo, axis=1)
         report["HPO_terms"] = collected.apply(lambda x: x[0])
-        report["HPO_count"] = collected.apply(lambda x: x[1])
+        report["HPO_additional"] = collected.apply(lambda x: x[1])
+        report["HPO_count"] = collected.apply(lambda x: x[2])
     else:
         report = report.join(hpo_df.drop(columns=["HPO IDs"]), on="Ensembl_gene_id")
         report = report.rename(columns={"Number of occurrences": "HPO_count", "Features": "HPO_terms"})
+        report["HPO_additional"] = "."
 
     return report
