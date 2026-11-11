@@ -14,4 +14,4 @@ module purge
 source /hpf/largeprojects/ccm_dccforge/dccdipg/Common/anaconda3/etc/profile.d/conda.sh
 conda activate snakemake
 
-snakemake --use-conda -s ${SF} --cores 4 --conda-prefix ${CP} --configfile ${CONFIG} --profile ${SLURM}
+snakemake --use-conda -s ${SF} --cores 16 --conda-prefix ${CP} --configfile ${CONFIG} --profile ${SLURM}
