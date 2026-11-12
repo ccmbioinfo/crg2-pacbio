@@ -931,7 +931,8 @@ def main():
             "Clinvar",
             "Gnomad_af_grpmax",
             "Cadd_score",
-            "SpliceAI_score",
+            "spliceai2_impact",
+            "spliceai2_score",
             "promoterAI_score",
             "Nucleotide_change_ensembl",
         ]
@@ -964,7 +965,8 @@ def main():
             "Clinvar",
             "Gnomad_af_grpmax",
             "Cadd_score",
-            "SpliceAI_score",
+            "spliceai2_impact",
+            "spliceai2_score",
             "promoterAI_score",
             "Nucleotide_change_ensembl",
         ]

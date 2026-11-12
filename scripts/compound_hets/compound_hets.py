@@ -32,7 +32,7 @@ def filter_low_impact_variants(low: pd.DataFrame) -> pd.DataFrame:
         low (pd.DataFrame): DataFrame with low impact variants queried from gemini database
 
     Returns:
-        pd.DataFrame: DataFrame with genic low impact variants that may be damaging (SNVs with SpliceAI >=0.2, CADD >= 10, promoterAI >= 0.1, or indel with no SpliceAI or CADD score)
+        pd.DataFrame: DataFrame with genic low impact variants that may be damaging (SNVs with SpliceAI2 >= 0.1, CADD >= 10, promoterAI >= 0.1, or indel with no SpliceAI2 or CADD score)
     """
     # filter out intergenic variants
     low_impact_var_filter = low[
@@ -47,13 +47,10 @@ def filter_low_impact_variants(low: pd.DataFrame) -> pd.DataFrame:
             ]
         )
     ].copy()
-    # parse SpliceAI, CADD, and promoterAI scores
-    low_impact_var_filter["SpliceAI_score_parsed"] = low_impact_var_filter[
-        "SpliceAI_score"
-    ].apply(lambda x: max(x.split("|")[2:6]) if not pd.isna(x) else np.nan)
-    low_impact_var_filter["SpliceAI_score_parsed"] = low_impact_var_filter[
-        "SpliceAI_score_parsed"
-    ].astype(float)
+    # parse SpliceAI2, CADD, and promoterAI scores
+    low_impact_var_filter["spliceai2_score_parsed"] = low_impact_var_filter[
+        "spliceai2_score"
+    ].apply(lambda x: float(x) if not pd.isna(x) else np.nan)
     low_impact_var_filter["Cadd_score"] = low_impact_var_filter["Cadd_score"].astype(
         float
     )
@@ -65,16 +62,16 @@ def filter_low_impact_variants(low: pd.DataFrame) -> pd.DataFrame:
     low_impact_var_filter["variant_type"] = low_impact_var_filter[
         "sum_ref_alt_length"
     ].apply(lambda x: "SNV" if x == 2 else "indel")
-    # retain SNVs with SpliceAI >=0.2, CADD >= 10, promoterAI >= 0.1, or indel with no SpliceAI or CADD score:
+    # retain SNVs with SpliceAI2 >= 0.1, CADD >= 10, promoterAI >= 0.1, or indel with no SpliceAI2 or CADD score:
     low_impact_var_filter_scores = low_impact_var_filter[
-        (low_impact_var_filter["SpliceAI_score_parsed"] >= 0.2)
+        (low_impact_var_filter["spliceai2_score_parsed"] >= 0.1)
         | (low_impact_var_filter["Cadd_score"] >= 10)
         | (low_impact_var_filter["promoterAI_score_parsed"] >= 0.1)
         | (
             (low_impact_var_filter["variant_type"] == "indel")
-            & (low_impact_var_filter["SpliceAI_score_parsed"].isna())
+            & (low_impact_var_filter["spliceai2_score_parsed"].isna())
             & (low_impact_var_filter["Cadd_score"].isna())
-        )  # missing spliceAI and cadd score
+        )  # missing spliceAI2 and cadd score
     ]
 
     return low_impact_var_filter_scores
@@ -391,7 +388,8 @@ def get_compound_het_variants(
             "Ensembl_gene_id",
             "Gnomad_af_popmax",
             "Cadd_score",
-            "SpliceAI_score",
+            "spliceai2_impact",
+            "spliceai2_score",
         ]
         + [f"gts.{sample}" for sample in sample_ids]
         + [f"gt_alt_depths.{sample}" for sample in sample_ids]
