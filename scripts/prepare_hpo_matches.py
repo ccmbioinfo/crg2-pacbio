@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# NOTE: Changes to this script may affect the CPHI DRAGEN pipeline.
+# Test both pipelines after modifying it.
 """Add indirect HPO matches to the setup-generated patient HPO file."""
 
 import logging
