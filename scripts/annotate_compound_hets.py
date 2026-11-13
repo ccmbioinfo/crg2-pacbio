@@ -512,8 +512,12 @@ def process_structural_variants(
     # Split and explode gene IDs
     SV_to_gene["Ensembl_gene_id"] = SV_to_gene["Ensembl_gene_id"].str.split(";")
     SV_to_gene = SV_to_gene.explode("Ensembl_gene_id")
+    SV_to_gene["Ensembl_gene_id"] = SV_to_gene["Ensembl_gene_id"].str.split("&")
+    SV_to_gene = SV_to_gene.explode("Ensembl_gene_id")
     SV_to_gene["Ensembl_gene_id"] = SV_to_gene["Ensembl_gene_id"].str.split("-")
     SV_to_gene = SV_to_gene.explode("Ensembl_gene_id")
+    # A gene may occur both alone and within a combined annotation.
+    SV_to_gene = SV_to_gene.drop_duplicates()
     
     # Add gene information
     SV_gt_details = SV_gt_details.merge(SV_to_gene, on="Variant_id", how="left")
@@ -831,7 +835,8 @@ def annotate_reports(
     sv_gene_columns = get_numbered_columns(SV, "ENSEMBL_GENE")
     CH_status_series = SV.apply(
         lambda x: compound_hets.SV_comp_het_status(
-            join_numbered_values(x, sv_gene_columns), x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id"), ensembl_to_NCBI_df
+            # for short-read, there can be a large number of genes in a variant which breaks the Excel rows, removing CH_status false from them
+            join_numbered_values(x, sv_gene_columns), x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id"), ensembl_to_NCBI_df, include_false=seq_type != "short",
         ),
         axis=1,
     )
@@ -857,7 +862,8 @@ def annotate_reports(
     cnv_gene_columns = get_numbered_columns(CNV, "ENSEMBL_GENE")
     CH_status_series = CNV.apply(
         lambda x: compound_hets.SV_comp_het_status(
-            join_numbered_values(x, cnv_gene_columns), x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id"), ensembl_to_NCBI_df
+            # for short-read, there can be a large number of genes in a variant which breaks the Excel rows, removing CH_status false from them
+            join_numbered_values(x, cnv_gene_columns), x["VARIANT"], gene_CH_status.set_index("Ensembl_gene_id"), ensembl_to_NCBI_df, include_false=seq_type != "short",
         ),
         axis=1, 
     )

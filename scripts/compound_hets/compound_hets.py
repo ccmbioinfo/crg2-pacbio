@@ -422,7 +422,7 @@ def melt_sample_columns_SV(
     return melted
 
 
-def SV_comp_het_status(genes, variant_impact, compound_het_status, ensembl_to_NCBI_df):
+def SV_comp_het_status(genes, variant_impact, compound_het_status, ensembl_to_NCBI_df, include_false=True):
     """
     Determine compound het status for SV variants
 
@@ -431,6 +431,7 @@ def SV_comp_het_status(genes, variant_impact, compound_het_status, ensembl_to_NC
         variant_impact (str): Variant impact
         compound_het_status (pd.DataFrame): DataFrame of compound het status for genes
         ensembl_to_NCBI_df (pd.DataFrame): DataFrame mapping Ensembl gene IDs to HGNC and NCBI gene IDs
+        include_false (bool): Whether to include genes with FALSE CH status
 
     Returns:
         dict: Dictionary with CH_status and CH_variant_types for the genes impacted by the SV
@@ -442,15 +443,19 @@ def SV_comp_het_status(genes, variant_impact, compound_het_status, ensembl_to_NC
     elif variant_impact == "intergenic_region":
         return {"CH_variant_types": ".", "CH_status": "."}
     else:
-        genes = re.split(";|-|&", genes)
+        genes = list(dict.fromkeys(re.split(";|-|&", genes)))
         for gene in genes:
             hgnc_symbol = map_ensembl_ID_to_HGNC(gene, ensembl_to_NCBI_df)
             try:
                 status = compound_het_status.loc[gene, "CH_status"]
+                variant_types = compound_het_status.loc[gene, "CH_variant_types"]
+                # DRAGEN reports omit FALSE genes to keep multi-gene SV/CNV CH
+                # annotations legible. PacBio reports retain the existing output.
+                if not include_false and status == "FALSE":
+                    continue
                 gene_compound_het_statuses.append(
                     f"{hgnc_symbol}:{status}"
                 )
-                variant_types = compound_het_status.loc[gene, "CH_variant_types"]
                 gene_compound_het_variant_types.append(
                     f"{hgnc_symbol}:{variant_types}"
                 )
@@ -458,8 +463,8 @@ def SV_comp_het_status(genes, variant_impact, compound_het_status, ensembl_to_NC
                 gene_compound_het_statuses.append(".")
                 gene_compound_het_variant_types.append(".")
         return {
-            "CH_variant_types": "|".join(gene_compound_het_variant_types),
-            "CH_status": "|".join(gene_compound_het_statuses),
+            "CH_variant_types": "|".join(gene_compound_het_variant_types) or ".",
+            "CH_status": "|".join(gene_compound_het_statuses) or ".",
         }  # return a dictionary with CH_status and CH_variant_types
 
 
@@ -513,7 +518,8 @@ def map_ensembl_ID_to_HGNC(ensembl_ID, ensembl_to_NCBI_df):
         str: The HGNC gene ID if found, otherwise the Ensembl gene ID.
     """
     try:
-        return ensembl_to_NCBI_df[ensembl_to_NCBI_df["ensembl_gene_id"] == ensembl_ID]["hgnc_symbol"].values[0]
+        hgnc_symbol = ensembl_to_NCBI_df[ensembl_to_NCBI_df["ensembl_gene_id"] == ensembl_ID]["hgnc_symbol"].values[0]
+        return ensembl_ID if pd.isna(hgnc_symbol) else hgnc_symbol
     except:
         return ensembl_ID
 
