@@ -18,10 +18,10 @@ tools:
   crg: "~/crg"
   crg2_pacbio: "~/crg2-pacbio"
   annotSV: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/AnnotSV-3.1.1"
-  trgt: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/TRGTv2.1.0/trgt-v2.1.0-x86_64-unknown-linux-gnu/trgt"
+  trgt: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/TRGTv5.0.0/trgt-v5.0.0-x86_64-unknown-linux-gnu/trgt"
   trgt-denovo: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/trgt-denovo-v0.2.0/trgt-denovo"
   mosdepth: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/mosdepth-0.3.11/mosdepth"
-  trgt-lps: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/TRGT-LPSv0.4.0/trgt-lps-v0.4.0"
+  trgt-lps: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-pacbio-non-conda-tools/TRGT-LPSv0.10.0/trgt-lps-v0.10.0"
   mity: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/crg2-non-conda-tools/mity_v2.0.1/bin"
 ref:
   name: GRCh38.86
@@ -56,13 +56,15 @@ annotation:
     hpo_matching: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/HPO/download"
     long_read_regions: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/long_read_regions/"
     clingen_path: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/ClinGen/"
-    adotto_repeats: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/repeats/repeat_catalogs_for_TRGT/adotto_repeats.hg38.bed"
+    TRExplorer_catalog: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRExplorer/v2.1/TRGT_catalog/TRExplorer.variation_clusters_and_all_repeats_v2.1.hg38.TRGT.motif.len.gt.2.bed.gz"
     promoters: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/non_coding/promoters/GRCh38-PLS.bed"
     ensembl: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/ensembl/Homo_sapiens.GRCh38.109.chr.processed.csv"
     gnomad_constraint: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/gnomAD/v4.1/constraint/gnomad.v4.1.constraint_metrics.tsv"
     acmg_sf_list: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/ACMG/ACMG_SF_v3.3.tsv"
     acmg_sf_version: "3.3"
     mavedb_tsv: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/MaveDB/final/mavedb_final_compact.tsv"
+    gencode_gtf: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/genes/GENCODE/gencode.v50.basic.annotation.gtf.gz"
+    promoter_size: 5000
   sv_report:
     inhouse_c4r: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/C4R_LRWGS_db/pbsv.allsamples.counts.2026-02-02.bed"
     cnv_inhouse_c4r: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/C4R_LRWGS_db/hificnv.allsamples.counts.2025-12-18.bed"
@@ -97,8 +99,10 @@ params:
     java_opts: "-Xms750m -Xmx20g"
 
 trgt:
-  control_alleles: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRGT/CMH/VCF/cmh_0.4.0.sorted.no.missing.95perc.vcf.gz"
+  HPRC_AL_DBSCAN_cutoffs: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRExplorer/scripts/DBSCAN/DBSCAN_results/EHdn.cutoffs.AL.2026-09-30.multiplier2.minclus15.tsv"
+  HPRC_LPS_DBSCAN_cutoffs: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRExplorer/scripts/DBSCAN/DBSCAN_results/EHdn.cutoffs.LPS.2026-10-01.multiplier2.minclus15.tsv"
+  HPRC_stats: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRExplorer/v2.0/HPRC_AL_LPS_from_scratch_by_chrom/all/hprc-lps.stats.tsv.gz"
+  TRExplorer_annotated_catalog: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRExplorer/v2.1/annotated_catalog/TRExplorer.repeat_catalog_v2.1.hg38.1_to_1000bp_motifs.EH.with_annotations.tsv.gz"
   control_alleles_tsv: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRGT/CMH/VCF/CMH.trgt.v0.5.0.alleles.1436.samples.20240624.tsv"
   C4R_outliers: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRGT/C4R/aggregated_outliers_2025-05-05.csv"
-  TR_constraint: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRGT/TR_constraint/Danzi_et_al_2025_supp_table_3.csv"
-  control_lps: "/hpf/largeprojects/ccm_dccforge/dccdipg/Common/annotation_hg38/TRGT/CMH/LPS/CMH_combined_LPS.tsv.gz"
+

@@ -6,7 +6,7 @@ rule genotype_adotto_loci:
     params: 
         trgt = config["tools"]["trgt"],
         ref = config["ref"]["genome"],
-        repeats = config["annotation"]["general"]["adotto_repeats"]
+        repeats = config["annotation"]["general"]["TRExplorer_catalog"]
     log: "logs/repeat_outliers/{sample}.trgt.log"
     conda:
         "../envs/common.yaml"
@@ -71,31 +71,31 @@ rule merge_trgt_vcf:
             --output-type z > {output}
         """
 
-rule calculate_lps: 
-    input: "repeat_outliers/{sample}.trgt.sorted.vcf.gz"
-    output: temp("repeat_outliers/{sample}.trgt.lps.tsv")
-    params:
-        trgt_lps = config["tools"]["trgt-lps"]
-    log: "logs/repeat_outliers/{sample}.trgt.lps.log"
+rule filter_trgt_vcf:
+    input: "repeat_outliers/{family}.trgt.vcf.gz"
+    output: "repeat_outliers/{family}.trgt.filtered.vcf.gz"
+    log: "logs/repeat_outliers/{family}.trgt.filtered.vcf.log"
+    conda:
+        "../envs/common.yaml"
     shell:
         """
-        {params.trgt_lps} --vcf {input} > {output}
+        # filter out sites with no ALT allele
+        bcftools view -e 'ALT="."' -Oz -o {output} {input}
         """
 
-rule combine_lps: 
+rule calculate_lps: 
     input: 
-        lps = expand("repeat_outliers/{sample}.trgt.lps.tsv", sample=samples.index)
-    output: "repeat_outliers/{family}.trgt.lps.combined.tsv.gz"
-    log: "logs/repeat_outliers/{family}.trgt.lps.combined.log"
-    run:
-        import pandas as pd
-        lps_list = []
-        for file, sample in zip(input.lps, samples.index):
-            df = pd.read_csv(file, sep="\t")
-            df["sample"] = sample
-            lps_list.append(df)
-        lps_df = pd.concat(lps_list)
-        lps_df.to_csv(output[0], sep="\t", index=False, compression="gzip")
+        vcf = "repeat_outliers/{family}.trgt.filtered.vcf.gz",
+        index = "repeat_outliers/{family}.trgt.filtered.vcf.gz.tbi"
+    output: temp("repeat_outliers/{family}.trgt.lps.tsv")
+    params:
+        trgt_lps = config["tools"]["trgt-lps"],
+        threads = 8
+    log: "logs/repeat_outliers/{family}.trgt.lps.log"
+    shell:
+        """
+        {params.trgt_lps} --vcf {input.vcf} --threads {params.threads} > {output}
+        """
 
 # rule sort_merged_trgt_vcf:
 #     input: "repeat_outliers/{family}.trgt.vcf.gz"
@@ -109,46 +109,27 @@ rule combine_lps:
 #         tabix {output}
 #         """
 
-rule find_repeat_outliers:
-    input: 
-        case_vcf = "repeat_outliers/{family}.trgt.vcf.gz",
-        control_vcf = config["trgt"]["control_alleles"], 
-        lps = "repeat_outliers/{family}.trgt.lps.combined.tsv.gz",
-        control_lps = config["trgt"]["control_lps"]
-    output: "repeat_outliers/{family}.repeat.outliers.tsv"
-    params:
-        crg2_pacbio = config["tools"]["crg2_pacbio"]
-    log:  "logs/repeat_outliers/{family}.repeat.outliers.log"
-    resources:
-        mem_mb = 300000
-    conda: 
-        "../envs/str_sv.yaml"
-    shell: 
-        """
-        (python3 {params.crg2_pacbio}/scripts/find_repeat_outliers.py --case_vcf {input.case_vcf} \
-            --control_vcf {input.control_vcf} \
-            --case_lps {input.lps} \
-            --control_lps {input.control_lps} \
-            --output_file  {output}) > {log} 2>&1 
-        """
 
 rule annotate_repeat_outliers:
     input:
-      "repeat_outliers/{family}.repeat.outliers.tsv",
+      TRGT_vcf = "repeat_outliers/{family}.trgt.filtered.vcf.gz",
+      LPS = "repeat_outliers/{family}.trgt.lps.tsv",
       hpo = [hpo_matches] if config["run"]["hpo"] else [],
     output: "reports/{family}.repeat.outliers.annotated.csv"
     log:  "logs/repeat_outliers/{family}.annotate.repeat.outliers.log"
     params: 
+      HPRC_AL_DBSCAN_cutoffs = config["trgt"]["HPRC_AL_DBSCAN_cutoffs"],
+      HPRC_LPS_DBSCAN_cutoffs = config["trgt"]["HPRC_LPS_DBSCAN_cutoffs"],
+      HPRC_stats = config["trgt"]["HPRC_stats"],
+      TRExplorer_annotated_catalog = config["trgt"]["TRExplorer_annotated_catalog"],
       crg2_pacbio = config["tools"]["crg2_pacbio"],
-      genes = config["annotation"]["general"]["ensembl"],
+      gencode_gtf = config["annotation"]["general"]["gencode_gtf"],
       OMIM = config["annotation"]["omim_path"],
       HPO = hpo_matches if config["run"]["hpo"] else "none",
       constraint = config["annotation"]["general"]["gnomad_constraint"],
-      c4r_outliers = config["trgt"]["C4R_outliers"],
-      c4r = config["annotation"]["c4r"],
       promoters = config["annotation"]["general"]["promoters"],
-      TR_constraint = config["trgt"]["TR_constraint"],
-      repeat_catalog = config["annotation"]["general"]["adotto_repeats"]
+      promoter_size = config["annotation"]["general"]["promoter_size"],
+      ped = config["run"]["ped"],
     resources:
         mem_mb = 20000
     conda: 
@@ -157,28 +138,32 @@ rule annotate_repeat_outliers:
         """
         if [[ {params.HPO} == "none" ]]
         then
-            (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input[0]} \
-                --output_file  {output} \
-                --ensembl {params.genes} \
-                --gnomad_constraint {params.constraint} \
-                --OMIM_path {params.OMIM} \
-                --promoters {params.promoters} \
-                --TR_constraint {params.TR_constraint} \
-                --c4r {params.c4r} \
-                --repeat_catalog {params.repeat_catalog} \
-		        --c4r_outliers {params.c4r_outliers}) > {log} 2>&1
+            (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --vcf {input.TRGT_vcf} \
+                --lps {input.LPS} \
+                --dbscan_cutoffs_lps {params.HPRC_LPS_DBSCAN_cutoffs} \
+                --dbscan_cutoffs_al {params.HPRC_AL_DBSCAN_cutoffs} \
+                --hprc_stats {params.HPRC_stats} \
+                --annotated_catalog {params.TRExplorer_annotated_catalog} \
+                --gtf {params.gencode_gtf} \
+                --SCREEN_promoters {params.promoters} \
+                --promoter_size {params.promoter_size} \
+                --ped {params.ped} \
+                --omim {params.OMIM} \
+                --outfile  {output}) > {log} 2>&1
         else
-            (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --repeats {input[0]} \
-                --output_file  {output} \
-                --ensembl {params.genes} \
-                --gnomad_constraint {params.constraint} \
-                --OMIM_path {params.OMIM} \
-                --promoters {params.promoters} \
-                --TR_constraint {params.TR_constraint} \
-                --c4r {params.c4r} \
-                --repeat_catalog {params.repeat_catalog} \
+            (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --vcf {input.TRGT_vcf} \
+                --lps {input.LPS} \
+                --dbscan_cutoffs_lps {params.HPRC_LPS_DBSCAN_cutoffs} \
+                --dbscan_cutoffs_al {params.HPRC_AL_DBSCAN_cutoffs} \
+                --hprc_stats {params.HPRC_stats} \
+                --annotated_catalog {params.TRExplorer_annotated_catalog} \
+                --gtf {params.gencode_gtf} \
+                --SCREEN_promoters {params.promoters} \
+                --promoter_size {params.promoter_size} \
+                --ped {params.ped} \
+                --omim {params.OMIM} \
                 --hpo {params.HPO} \
-                --c4r_outliers {params.c4r_outliers}) > {log} 2>&1
+                --outfile  {output}) > {log} 2>&1
         fi
         """
           

@@ -27,7 +27,7 @@ rule trgt_denovo:
     params:
         trgt_denovo = config["tools"]["trgt-denovo"],
         ref = config["ref"]["genome"],
-        bed = config["annotation"]["general"]["adotto_repeats"]
+        bed = config["annotation"]["general"]["TRExplorer_catalog"]
     output: "TRGT_denovo/{child}.TRGT.denovo.tsv"
     log: "logs/denovo_TRs/{child}.TRGT-denovo.log"
     resources:

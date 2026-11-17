@@ -125,7 +125,7 @@ rule cnv_report:
         exon = config["annotation"]["general"]["exon"],
         long_read_regions = config["annotation"]["general"]["long_read_regions"],
         clingen_path = config["annotation"]["general"]["clingen_path"],
-        repeats = config["annotation"]["general"]["adotto_repeats"],
+        repeats = config["annotation"]["general"]["TRExplorer_catalog"],
         cnv_inhouse_c4r = config["annotation"]["sv_report"]["cnv_inhouse_c4r"],
         cnv_inhouse_tg = config["annotation"]["sv_report"]["cnv_inhouse_tg"],
         gnomad_SV = config["annotation"]["sv_report"]["gnomad_SV"],

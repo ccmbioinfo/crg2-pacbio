@@ -61,7 +61,7 @@ rule sv_report:
         omim = config["annotation"]["omim_path"],
         exon = config["annotation"]["general"]["exon"],
         long_read_regions = config["annotation"]["general"]["long_read_regions"],
-        repeats = config["annotation"]["general"]["adotto_repeats"],
+        repeats = config["annotation"]["general"]["TRExplorer_catalog"],
         inhouse_c4r = config["annotation"]["sv_report"]["inhouse_c4r"],
         inhouse_tg = config["annotation"]["sv_report"]["inhouse_tg"],
         gnomad_SV = config["annotation"]["sv_report"]["gnomad_SV"],
