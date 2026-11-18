@@ -97,18 +97,22 @@ rule calculate_lps:
         {params.trgt_lps} --vcf {input.vcf} --threads {params.threads} > {output}
         """
 
-# rule sort_merged_trgt_vcf:
-#     input: "repeat_outliers/{family}.trgt.vcf.gz"
-#     output: "repeat_outliers/{family}.trgt.sorted.vcf.gz"
-#     log: "logs/repeat_outliers/{family}.trgt.sorted.vcf.log"
-#     conda:
-#         "../envs/common.yaml"
-#     shell:
-#         """
-#         bcftools sort -O z -o {output} {input}
-#         tabix {output}
-#         """
+family = config["run"]["project"]
+hpo_matches = f"hpo/{family}.matched.tsv"
+hpo_available = config["run"].get("hpo", "")
+ped_available = config["run"].get("ped", "")
 
+def get_annotate_repeat_outliers_args(wildcards, input):
+    args = []
+    if hpo_available:
+        args.append(f'--hpo "{hpo_matches}"')
+    if ped_available:
+        args.append(f'--ped "{ped_available}"')
+
+    if len(args) > 0:
+        return ' '.join(args)
+    else:
+        return ""
 
 rule annotate_repeat_outliers:
     input:
@@ -125,19 +129,16 @@ rule annotate_repeat_outliers:
       crg2_pacbio = config["tools"]["crg2_pacbio"],
       gencode_gtf = config["annotation"]["general"]["gencode_gtf"],
       OMIM = config["annotation"]["omim_path"],
-      HPO = hpo_matches if config["run"]["hpo"] else "none",
       constraint = config["annotation"]["general"]["gnomad_constraint"],
       promoters = config["annotation"]["general"]["promoters"],
       promoter_size = config["annotation"]["general"]["promoter_size"],
-      ped = config["run"]["ped"],
+      hpo_ped = get_annotate_repeat_outliers_args
     resources:
         mem_mb = 20000
     conda: 
         "../envs/str_sv.yaml"
     shell: 
         """
-        if [[ {params.HPO} == "none" ]]
-        then
             (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --vcf {input.TRGT_vcf} \
                 --lps {input.LPS} \
                 --dbscan_cutoffs_lps {params.HPRC_LPS_DBSCAN_cutoffs} \
@@ -147,23 +148,9 @@ rule annotate_repeat_outliers:
                 --gtf {params.gencode_gtf} \
                 --SCREEN_promoters {params.promoters} \
                 --promoter_size {params.promoter_size} \
-                --ped {params.ped} \
                 --omim {params.OMIM} \
+                {params.hpo_ped} \
                 --outfile  {output}) > {log} 2>&1
-        else
-            (python3 {params.crg2_pacbio}/scripts/annotate_repeat_outliers.py --vcf {input.TRGT_vcf} \
-                --lps {input.LPS} \
-                --dbscan_cutoffs_lps {params.HPRC_LPS_DBSCAN_cutoffs} \
-                --dbscan_cutoffs_al {params.HPRC_AL_DBSCAN_cutoffs} \
-                --hprc_stats {params.HPRC_stats} \
-                --annotated_catalog {params.TRExplorer_annotated_catalog} \
-                --gtf {params.gencode_gtf} \
-                --SCREEN_promoters {params.promoters} \
-                --promoter_size {params.promoter_size} \
-                --ped {params.ped} \
-                --omim {params.OMIM} \
-                --hpo {params.HPO} \
-                --outfile  {output}) > {log} 2>&1
-        fi
+
         """
           

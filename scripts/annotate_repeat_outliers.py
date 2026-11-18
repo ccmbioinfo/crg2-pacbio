@@ -29,7 +29,7 @@ def parse_args():
     parser.add_argument("--outfile", type=str, required=True, help="Path to output file")
     parser.add_argument("--omim", type=str, required=True, help="Path to OMIM genemap2 file")
     parser.add_argument("--hpo", type=str, required=False, help="Path to HPO annotations file")
-    parser.add_argument("--ped", type=str, required=True, help="Path to PED file")
+    parser.add_argument("--ped", type=str, required=False, help="Path to PED file")
     return parser.parse_args()
 
 
@@ -262,9 +262,11 @@ def main():
     variant_df_cutoffs = variant_df_cutoffs.merge(LPS_cutoffs_hemi, on="TRID", how="left").merge(AL_cutoffs_hemi, on="TRID", how="left")
 
     # Filter out non-variant calls in proband
-    fam_dict = infer_pedigree_roles(args.ped)
-    proband_id = fam_dict["child"]
-    variant_df_cutoffs = variant_df_cutoffs[(variant_df_cutoffs[f"{proband_id}_GT"] != "0|0") & (variant_df_cutoffs[f"{proband_id}_GT"] != "None")].copy()
+    if args.ped is not None:
+        fam_dict = infer_pedigree_roles(args.ped)
+        proband_id = fam_dict["child"]
+        variant_df_cutoffs = variant_df_cutoffs[(variant_df_cutoffs[f"{proband_id}_GT"] != "0|0") & (variant_df_cutoffs[f"{proband_id}_GT"] != "None")].copy()
+
     # Filter out loci not present in cutoffs file, i.e. not in HPRC v2.0 VCF
     variant_df_cutoffs = variant_df_cutoffs[variant_df_cutoffs["AL_cutoff_DBSCAN"].notna()]
 
@@ -389,14 +391,17 @@ def main():
     "GencodeGeneName": "GENCODE_gene_name", "GencodeGeneRegion": "GENCODE_gene_region", "GencodeGeneId": "GENCODE_gene_id",
     "KnownDiseaseAssociatedMotif": "Known_disease_asociated_motif", "KnownDiseaseAssociatedLocus": "Known_disease_associated_locus"}, inplace=True)
 
-    # Filter for outliers in proband
-    variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno[variant_df_cutoffs_anno[f"{proband_id}_OUTLIER"] != "False"].copy()
+    if args.ped is not None:
+        # Filter for outliers in proband
+        variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno[variant_df_cutoffs_anno[f"{proband_id}_OUTLIER"] != "False"].copy()
 
-    # Filter out variants with allele length less than max HPRC
-    variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno_outliers[variant_df_cutoffs_anno_outliers[f"{proband_id}_greater_than_max_HPRC_AoU1027"] == "True"]
+        # Filter out variants with allele length less than max HPRC
+        variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno_outliers[variant_df_cutoffs_anno_outliers[f"{proband_id}_greater_than_max_HPRC_AoU1027"] == "True"]
 
-    variant_df_cutoffs_anno_outliers.replace(np.nan, ".", inplace=True)
-    variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno_outliers.sort_values(by=[f"{proband_id}_z_score_max"], ascending=False)
+        variant_df_cutoffs_anno_outliers.replace(np.nan, ".", inplace=True)
+        variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno_outliers.sort_values(by=[f"{proband_id}_z_score_max"], ascending=False)
+    else:
+        variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno.copy()
 
     # Filter out intergenic variants
     variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno_outliers[variant_df_cutoffs_anno_outliers["GENCODE_gene_region"] != "intergenic"]
