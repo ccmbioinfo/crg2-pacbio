@@ -9,7 +9,9 @@ import sys
 from annotation.annotate import (
     prepare_OMIM
 )
-
+from compound_hets.compound_hets import (
+    infer_pedigree_roles
+)
 
 PROMOTER_SIZE = 5000
 
@@ -260,7 +262,8 @@ def main():
     variant_df_cutoffs = variant_df_cutoffs.merge(LPS_cutoffs_hemi, on="TRID", how="left").merge(AL_cutoffs_hemi, on="TRID", how="left")
 
     # Filter out non-variant calls in proband
-    proband_id = "03"
+    fam_dict = infer_pedigree_roles(args.ped)
+    proband_id = fam_dict["child"]
     variant_df_cutoffs = variant_df_cutoffs[(variant_df_cutoffs[f"{proband_id}_GT"] != "0|0") & (variant_df_cutoffs[f"{proband_id}_GT"] != "None")].copy()
     # Filter out loci not present in cutoffs file, i.e. not in HPRC v2.0 VCF
     variant_df_cutoffs = variant_df_cutoffs[variant_df_cutoffs["AL_cutoff_DBSCAN"].notna()]
