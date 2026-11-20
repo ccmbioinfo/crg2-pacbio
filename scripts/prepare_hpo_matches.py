@@ -41,8 +41,35 @@ def join_unique(values):
     return "; ".join(dict.fromkeys(str(value) for value in values))
 
 
+def add_gene_ids(hpo_matches, hpo, ensembl_to_ncbi_file):
+    """Expand each gene symbol to every Ensembl ID in the annotation map.
+    A single HGNC/Entrez gene can have more than one Ensembl stable ID selecting only one can mismatch with VEP. 
+    Keep every unique symbol/ID pair so the downstream Ensembl-ID join matches whichever ID VEP reports.
+    """
+    hgnc = pd.read_csv(ensembl_to_ncbi_file, dtype=str)
+    standard_ids = hgnc[["hgnc_symbol", "ensembl_gene_id"]].rename(
+        columns={
+            "hgnc_symbol": "gene_symbol",
+            "ensembl_gene_id": "Gene ID",
+        }
+    )
+    input_ids = hpo[["Gene Symbol", "Gene ID"]].rename(
+        columns={"Gene Symbol": "gene_symbol"}
+    )
+    gene_ids = pd.concat([standard_ids, input_ids], ignore_index=True)
+    gene_ids["gene_symbol"] = gene_ids["gene_symbol"].str.strip()
+    gene_ids["Gene ID"] = gene_ids["Gene ID"].str.strip()
+    gene_ids = (
+        gene_ids.replace("", pd.NA)
+        .dropna(subset=["gene_symbol", "Gene ID"])
+        .drop_duplicates(["gene_symbol", "Gene ID"])
+    )
+
+    return hpo_matches.merge(gene_ids, how="left", on="gene_symbol")
+
+
 def prepare_hpo_matches(hpo_file, hpo_dir, ensembl_to_ncbi_file, output_file):
-    """Combine exact and indirect matches in the original one-row-per-gene format."""
+    """Combine exact and indirect matches in one-row-per-gene-ID format."""
     hpo, hpo_ids = get_patient_hpo_ids(hpo_file)
     hpo_mapping = pd.read_csv(f"{hpo_dir}/genes_to_phenotype.txt", sep="\t")
     hpo_data = load_references(f"{hpo_dir}/hp.json", hpo_mapping)
@@ -60,12 +87,8 @@ def prepare_hpo_matches(hpo_file, hpo_dir, ensembl_to_ncbi_file, output_file):
     hpo_matches = hpo_matches.sort_values("HPO Match Score", ascending=False)
     hpo_matches = hpo_matches.drop_duplicates(["gene_symbol", "hpo_id"])
 
-    # Reuse setup-resolved IDs for direct genes and the standard annotation map
-    # for genes introduced by indirect matching.
-    hgnc = pd.read_csv(ensembl_to_ncbi_file, dtype=str)
-    gene_ids = dict(zip(hgnc["hgnc_symbol"], hgnc["ensembl_gene_id"]))
-    gene_ids.update(dict(zip(hpo["Gene Symbol"], hpo["Gene ID"])))
-    hpo_matches["Gene ID"] = hpo_matches["gene_symbol"].map(gene_ids)
+    # Preserve every valid Ensembl ID for a symbol
+    hpo_matches = add_gene_ids(hpo_matches, hpo, ensembl_to_ncbi_file)
 
     hpo_matches["Features"] = hpo_matches.apply(
         lambda row: f'{row["hpo_name"]} ({format_score(row["HPO Match Score"])})',
@@ -91,7 +114,9 @@ def prepare_hpo_matches(hpo_file, hpo_dir, ensembl_to_ncbi_file, output_file):
     output_file = Path(output_file)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     hpo_matches.to_csv(output_file, sep="\t", index=False)
-    logging.info("Wrote HPO matches for %d genes to %s", len(hpo_matches), output_file)
+    logging.info(
+        "Wrote %d HPO gene/ID rows to %s", len(hpo_matches), output_file
+    )
 
 
 if "snakemake" in globals():
