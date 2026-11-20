@@ -8,5 +8,6 @@ input_vcf=units.loc[family, "small_variant_vcf"]
 log = snakemake.log_fmt_shell(stdout=True, stderr=True)
 
 shell(
-    "( bcftools filter -e 'STRLEN(REF) >=50 | STRLEN(ALT) >=50' {input_vcf} -O z -o filtered/{family}.vcf.gz ) {log}"
+    "( bcftools filter -e 'STRLEN(REF) >=50 | STRLEN(ALT) >=50' -Ou {input_vcf} "
+    "| bcftools sort -Oz -o filtered/{family}.vcf.gz - ) {log}"
 )
