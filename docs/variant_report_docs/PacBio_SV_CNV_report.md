@@ -74,6 +74,7 @@ And also any genic SV either in OMIM and/or in genes matching HPO terms
 - Also consider whether a region is part of a “dark region” or ENCODE blacklist region that has historically had poor sequencing coverage and is therefore not well represented in short-read control datasets. The columns related to PB_dark_region, PB_odd_region, ENCODE_blacklist_characteristics help with this.
 - PacBio recommends not putting too much weight in the genotype of SVs as heterozygous vs homozygous. We recommend mainly considering presence/absence of the variant in each sample, and if you have a strong candidate that is called as homozygous, confirm zygosity using read support (*sampleID*\_AD and *sampleID*\_DP), and checking BAM file if necessary.
 - Currently, the *sampleID*\_**GT** column reports on the variant genotypes as **phased genotypes**. 0 is reference, 1 is alt. A “/” is used when the genotype was not able to be phased, and “\|” is used for designating the phase. So ./. is a missing genotype (poor quality/no coverage to call; 0/1, 0\|1, 1\|0, etc are heterozygous genotypes; 0/0 is homozygous reference; and 1//1 is homozygous alt. The *sampleID*\_**PS** column reports on the phase set ID within which each variant resides. This corresponds to a block of the genome wherein variants could be phased to one haplotype or the other – if you have two variants that are annotated to the same phase set, you can therefore interpret their phased genotypes to determine whether they are in cis (e.g GT at SV1 = 0\|1 and SV2 = 0\|1) or in trans (e.g. GT at SV1 = 0\|1 and SV2 = 1\|0).
+- If the `GENE_NAME` or `ENSEMBL_GENE` value approaches the Excel cell limit, it is continued in dynamically created columns such as `GENE_NAME_2` or `ENSEMBL_GENE_2`. The complete gene list is retained in both intermediate and final CSV reports.
 
 ## Report columns
 
@@ -87,8 +88,8 @@ And also any genic SV either in OMIM and/or in genes matching HPO terms
 | ID | pbsv SV ID | pbsv | pbsv.INS.2747 |
 | INFO | pbsv VCF INFO field | pbsv | SVTYPE=INS;END=102995201;SVLEN=428;SVANN=TANDEM |
 | FILTER | Filter field from VCF | pbsv | PASS |
-| GENE_NAME | Gene symbol | snpEff | GTPBP4;IDI2 |
-| ENSEMBL_GENE | Ensembl gene ID | snpEff | ENSG00000148377;ENSG00000107937 |
+| GENE_NAME_* | Gene symbol(s) impacted by the SV/CNV. If needed for Excel compatibility, the list continues in dynamically numbered `GENE_NAME_2`, `GENE_NAME_3`, ... columns. | snpEff | GTPBP4;IDI2 |
+| ENSEMBL_GENE_* | Ensembl gene ID(s) impacted by the SV/CNV. If needed for Excel compatibility, the list continues in dynamically numbered `ENSEMBL_GENE_2`, `ENSEMBL_GENE_3`, ... columns. | snpEff | ENSG00000148377;ENSG00000107937 |
 | GENE_NAME_CDS | Ensembl CDS gene ID | Generated value | GTPBP4 |
 | GENE_NAME_START | Gene symbol of gene(s) overlapped by SV start coordinate | Generated value | GTPBP4 |
 | GENE_NAME_END | Gene symbol of gene(s) overlapped by SV end coordinate | Generated value | IDI2 |
@@ -104,7 +105,7 @@ And also any genic SV either in OMIM and/or in genes matching HPO terms
 | clingen_region_curation | Genomic disease region curation from ClinGen | ClinGen | 11q13.2q13.4 recurrent region (includes SHANK2, FGFs) |
 | clingen_region | Genomic disease region coordinates from ClinGen | ClinGen | 11:67996175-71525885 |
 | sample_SV_clingen_region_perc_overlap | Percent of ClinGen region overlapped by sample SV | Generated value | 100.0 |
-| HPO | HPO terms from panel associated with genes impacted by SV | Phenotips | nan |
+| HPO | HPO terms associated with impacted genes; only present if an HPO file is added in the config. A term associated with multiple genes is reported once with its highest exact or indirect match score. | Phenotips | Cataract (1.0), Ataxia (0.8) |
 | SAMPLENAME_zyg | Sample zygosity | pbsv | het |
 | SAMPLENAME_GT | Sample genotype. Note that 1/1 genotypes are set to 1//1 to avoid Excel interpreting them as dates | pbsv | 0\|1 |
 | SAMPLENAME_AD | Sample alt depth | pbsv | 6 |
