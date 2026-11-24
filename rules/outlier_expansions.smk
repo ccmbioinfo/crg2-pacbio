@@ -48,8 +48,10 @@ rule sort_trgt_adotto_vcf:
         "../envs/common.yaml"
     shell:
         """
-        bcftools sort -Ob -o {output} {input};
-        bcftools index {output}
+        TMPDIR="repeat_outliers/tmp/{wildcards.sample}"
+        mkdir -p $TMPDIR
+        bcftools sort -T $TMPDIR -Oz -o {output} {input};
+        rm -rf $TMPDIR*
         """
 
 rule merge_trgt_vcf:
