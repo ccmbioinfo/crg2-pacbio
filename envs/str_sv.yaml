@@ -1,10 +1,11 @@
 channels:
   - conda-forge
   - bioconda
-  - defaults
+  - nodefaults
 dependencies:
   - bedtools =2.29.2
-  - python=3
+  - python=3.11
+  - git
   - scikit-allel
   - numpy
   - pandas
@@ -12,3 +13,8 @@ dependencies:
   - pysam
   - pybedtools
   - sigfig
+  - pip
+  - pip:
+    - str-analysis@git+https://github.com/broadinstitute/str-analysis.git@0daf3dfc92b827de1981b9deab5804c8e020973f
+
+    

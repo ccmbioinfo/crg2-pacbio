@@ -1,317 +1,415 @@
 import argparse
-from datetime import date
-import numpy as np
 import pandas as pd
 import pyranges as pr
-import re
-from typing import Optional
+import numpy as np
+import pysam
+from str_analysis.utils.gtf_utils import compute_genomic_region_of_interval
+import sys
 
 from annotation.annotate import (
-    pivot_hits,
-    filter_outliers,
-    hits_to_pr,
-    annotate_motif,
-    annotate_genes,
-    gene_set,
-    num_expanded,
-    add_constraint,
-    prepare_OMIM,
-    annotate_OMIM,
-    add_hpo,
-    group_by_gene,
-    calculate_reciprocal_overlap
+    prepare_OMIM
+)
+from compound_hets.compound_hets import (
+    infer_pedigree_roles
 )
 
-def main(
-    hits: pd.DataFrame,
-    out_file: str,
-    ensembl: str,
-    constraint: str,
-    omim: str,
-    promoters: str,
-    TR_constraint: str,
-    c4r: bool,
-    repeat_catalog: str,
-    hpo: Optional[str] = None,
-    c4r_counts: Optional[str] = None
-) -> None:
-    # convert hits dataframe from long to wide format
-    hits = pd.read_csv(hits, sep="\t")
-    hits_pivot = pivot_hits(hits)
+PROMOTER_SIZE = 5000
 
-    # make a column with maximum z score for allele length across samples
-    z_score_cols = [col for col in hits_pivot.columns if "z_score_len" in col and "rank" not in col]
-    z_score_len_rank_cols = [col for col in hits_pivot.columns if "z_score_len_rank" in col]
-    for col in z_score_cols:
-        hits_pivot[col] = [
-            round(score, 3) if not pd.isnull(score) else None
-            for score in hits_pivot[col]
-        ]
-    # filter out non-outliers
-    print("Filter outliers by outlier cutoff and Z-score")
-    al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
-    hits_pivot["outlier"] = hits_pivot.apply(
-        lambda row: filter_outliers(row, al_cols), axis=1
-    )
-    hits_pivot = hits_pivot[hits_pivot["outlier"]]
-    hits_pivot["max_z_score_len"] = hits_pivot[z_score_cols].max(axis=1)
-    hits_pivot = hits_pivot[hits_pivot["max_z_score_len"] >= 3]
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--vcf", type=str, required=True, help="Path to TRGT VCF file")
+    parser.add_argument("--lps", type=str, required=True, help="Path to LPS file")
+    parser.add_argument("--dbscan_cutoffs_lps", type=str, required=True, help="Path to DBSCAN cutoffs for LPS")
+    parser.add_argument("--dbscan_cutoffs_al", type=str, required=True, help="Path to DBSCAN cutoffs for AL")
+    parser.add_argument("--hprc_stats", type=str, required=True, help="Path to HPRC stats file")
+    parser.add_argument("--annotated_catalog", type=str, required=True, help="Path to TRExplorer annotated catalog file")
+    parser.add_argument("--gtf", type=str, required=True, help="Path to GENCODE GTF file")
+    parser.add_argument("--promoter_size", type=int, required=True, help="Promoter size")
+    parser.add_argument("--SCREEN_promoters", type=str, required=True, help="Path to SCREEN promoters BED file")
+    parser.add_argument("--outfile", type=str, required=True, help="Path to output file")
+    parser.add_argument("--omim", type=str, required=True, help="Path to OMIM genemap2 file")
+    parser.add_argument("--hpo", type=str, required=False, help="Path to HPO annotations file")
+    parser.add_argument("--ped", type=str, required=False, help="Path to PED file")
+    return parser.parse_args()
 
 
-    hits_pivot["min_z_score_len_rank"] = hits_pivot[z_score_len_rank_cols].min(axis=1)
-    LPS_rank_cols = [col for col in hits_pivot.columns if "LPS_rank" in col]
-    hits_pivot["min_LPS_rank"] = hits_pivot[LPS_rank_cols].min(axis=1)
+def is_X(trid):
+    return "X" in trid or "X" in trid[0]
 
-    # make a column with maximum LPS across samples
-    lps_cols = [col for col in hits_pivot.columns if "LPS" in col and 'rank' not in col and 'z_score' not in col]
-    for col in lps_cols:
-        hits_pivot[col] = [
-            lps if not pd.isnull(lps) else None
-            for lps in hits_pivot[col]
-        ]
-    hits_pivot["max_LPS"] = hits_pivot[lps_cols].max(axis=1)
+def process_variant(trid, variant, samples, lps_dict):
+    tr_dict = {}
+    tr_dict = {"TRID": trid}
+    for sample in samples:
+        AL = list(variant.samples[sample]['AL'])
+        AM = [round(am, 2) if am is not None else None for am in variant.samples[sample]['AM']]
+        if AM == [None, None]:
+            AM = None
+        MP = [round(mp, 2) if mp is not None else None for mp in variant.samples[sample]["AP"]]
+        if MP == [None, None]:
+            MP = None
+        AL_hemi = None
+        if is_X(trid):
+            if AL is not None and len(AL) == 1: # if only one allele length reported, this is a male individual
+                AL_hemi = AL[0]
+        GT = list(variant.samples[sample]['GT'])
+        SD = list(variant.samples[sample]['SD'])
+        tr_dict[f'{sample}_LPS'] = lps_dict[trid][sample] 
+        tr_dict[f'{sample}_AL'] = AL
+        tr_dict[f'{sample}_AM'] = AM
+        tr_dict[f'{sample}_MP'] = MP
+        tr_dict[f'{sample}_AL_hemi'] = AL_hemi
+        tr_dict[f'{sample}_GT'] = GT
+        try:
+            tr_dict[f'{sample}_DP'] = sum([int(dp) for dp in SD])
+            tr_dict[f'{sample}_AD'] = SD[1] if GT != [0,0] else "."
+        except:
+            if is_X(trid):
+                tr_dict[f'{sample}_DP'] = SD[0]
+                tr_dict[f'{sample}_AD'] = SD[0] if GT != [0,0] else "."
+            else:
+                tr_dict[f'{sample}_DP'] = "."
+                tr_dict[f'{sample}_AD'] = "."
+    return tr_dict
 
-    # make a column with maximum allele length across samples
-    al_cols = [col for col in hits_pivot.columns if "_allele_len" in col]
-    hits_pivot["max_sample_allele_len"] = hits_pivot[al_cols].max(axis=1)
-
-    # annotate with motif
-    print("Annotate with motif")
-    hits_pivot = annotate_motif(hits_pivot, repeat_catalog)
-
-    # make a column that sums the number of individuals carrying a particular repeat expansion
-    hits_pivot["num_outlier_samples"] = hits_pivot.apply(
-        lambda row: num_expanded(row, al_cols, z_score_cols), axis=1
-    )
-
-    # convert hits to PyRanges object
-    hits_pr = hits_to_pr(hits_pivot)
-
-    # annotate hits with Ensembl genes
-    print("Annotate against Ensembl genes")
-    gene_gr = pd.read_csv(ensembl)
-    hits_gene = annotate_genes(hits_pr, pr.PyRanges(gene_gr))
-
-    # annotate with gene constraint
-    print("Add gnomAD gene constraint")
-    constraint_cols = ["gene", "mane_select", "lof.oe_ci.upper", "lof.pLI"]
-    constraint = pd.read_csv(constraint, sep="\t")[constraint_cols].dropna()
-    hits_gene = add_constraint(constraint, hits_gene)
-
-    # annotate with OMIM
-    print("Add OMIM phenotype")
-    omim = prepare_OMIM(f"{omim}/genemap2.txt")
-    hits_gene_omim = annotate_OMIM(hits_gene, omim)
-
-    # annotate with HPO terms
-    if hpo == None:
-        print("No HPO terms supplied")
-        hits_gene_omim["HPO"] = ""
+def list_col_to_str(col):
+    if col is None:
+        return "."
+    elif isinstance(col, int):
+        return str(col)
+    elif "," in col:
+        return col.replace(",", "|")
+    elif isinstance(col, list):
+        col = [str(c) for c in col]
+        return "|".join(col)
     else:
-        print("Add HPO terms")
-        hpo = pd.read_csv(hpo, sep="\t")
-        hits_gene_omim = add_hpo(hpo, hits_gene_omim)
+        return col
 
-    # group and aggregate gene columns
-    hits_gene_omim = group_by_gene(hits_gene_omim)
-
-    # annotate with C4R outlier counts
-    print("Adding inhouse outlier counts")
-    print(c4r)
-     
-    try: 
-        c4r_counts = pd.read_csv(c4r_counts)
-        c4r_counts["TRID"] = c4r_counts["TRID"].str.rsplit("_", n=3).str[0] + "_" + c4r_counts["TRID"].str.split("_").str[4]
-        hits_gene_omim = hits_gene_omim.merge(c4r_counts, left_on="trid", right_on="TRID", how="left")
-        hits_gene_omim["count"] = hits_gene_omim["count"].replace(np.nan, 0)
-        hits_gene_omim = hits_gene_omim.rename({"count": "C4R_outlier_count", "samples": "C4R_outlier_samples", "allele_lens": "C4R_outlier_allele_lens"}, axis=1)
-        c4r_col = ["C4R_outlier_count", "C4R_outlier_samples", "C4R_outlier_allele_lens"]
-    except:
-        print("Failed to add C4R counts") 
-        c4r_col = []
+def outlier_type(AL, LPS, cutoff_AL, cutoff_LPS):
+    if AL is None:
+        return "False"
     
-    if c4r != "True": 
-        c4r_col = ["C4R_outlier_count", "C4R_outlier_allele_lens"] # remove C4R sample IDs for non-C4R projects
+    if LPS > cutoff_LPS:
+        if AL > cutoff_AL:
+            return "LPS_AL_outlier"
+        else:
+            return "LPS_outlier"
+    elif AL > cutoff_AL:
+        return "AL_outlier"
+    else:
+        return "False"
 
+def is_outlier(row, proband_id):
 
-    # add promoters
-    promoters = pr.read_bed(promoters)
-    hits_gene_omim_pr = pr.PyRanges(hits_gene_omim)
-    hits_gene_omim = hits_gene_omim_pr.join(promoters, how="left", suffix="_promoter").df
-    hits_gene_omim.loc[hits_gene_omim["Score"] == "-1", "ENCODE_promoter_coord"] = "."
-    hits_gene_omim.loc[hits_gene_omim["Score"] != "-1", "ENCODE_promoter_coord"] = hits_gene_omim["Chromosome"].astype(str) + ":" + hits_gene_omim["Start_promoter"].astype(str) + "-" + hits_gene_omim["End_promoter"].astype(str)
-    hits_gene_omim.rename(columns={"Score": "ENCODE_promoter_ID"}, inplace=True)
-    hits_gene_omim = hits_gene_omim.drop(columns=["Start_promoter", "End_promoter", "Name", "Strand"])
-
-    # add TR constraints
-    # supplementary table 3 from 'Detailed tandem repeat allele profiling in 1,027 long-read genomes reveals genome-wide patterns of pathogenicity'
-    constraints = pd.read_csv(TR_constraint, dtype={"TRID": str, "combinedLPSStdev": float, "expectedCombinedLPSStdev": float, "OE_len": float, "CPS": float, "expectedCPS": float, "OE_motif": float})
-    constraints["OE_len"] = constraints["OE_len"].round(3)
-    hits_gene_omim["TRID_trim"] = hits_gene_omim["TRID"].str.rsplit("_", n=3).str[0]
-    constraint_bed = pd.DataFrame.from_dict({'Chromosome': constraints["TRID"].str.split("_").str[0], 
-                                            'Start': constraints["TRID"].str.split("_").str[1], 
-                                            'End': constraints["TRID"].str.split("_").str[2], 
-                                            'OE_len': constraints["OE_len"]})
+    cutoff_LPS = row["LPS_cutoff_DBSCAN"]
+    cutoff_AL = row["AL_cutoff_DBSCAN"]
+    cutoff_LPS_hemi = row["hemi_LPS_cutoff_DBSCAN"]
+    cutoff_AL_hemi = row["hemi_AL_cutoff_DBSCAN"]
+    AL = row[f'{proband_id}_AL']
+    LPS = row[f'{proband_id}_LPS']
     
-    constraint_bed["Chromosome"] = constraint_bed["Chromosome"].str.replace("chr", "")
-    constraint_pr = pr.PyRanges(constraint_bed)
-    hits_gene_omim_pr = pr.PyRanges(hits_gene_omim)
-    hits_gene_omim = hits_gene_omim_pr.join(constraint_pr, how="left", suffix="_constraint", report_overlap=True).df
-    hits_gene_omim.replace({-1: np.nan}, inplace=True)
+    # handle hemizygous genotypes
+    if len(AL.split("|")) == 1 and row["TRID"].startswith("X"): 
+        if AL != "None" and AL != ".":
+            AL = int(AL)
+        else:
+            AL = 0
+        if LPS != "None" and LPS != ".":
+            LPS = int(LPS)
+        else:
+            LPS = 0
+        return outlier_type(AL, LPS, cutoff_AL_hemi, cutoff_LPS_hemi)
+    else:
+        try:
+            AL = sum([int(al) for al in AL.split("|") if al is not None])
+        except:
+            AL = None
+        lps = row[f'{proband_id}_LPS']
+        if lps != ".":
+            LPS = sum([int(lps) for lps in LPS.split("|")])
+        else:
+            LPS = 0
 
-    hits_gene_omim["len_constraint"] = hits_gene_omim["End_constraint"] - hits_gene_omim["Start_constraint"]
-    hits_gene_omim["len_TRID"] = hits_gene_omim["End"] - hits_gene_omim["Start"]
-    hits_gene_omim["len_ratio"] = hits_gene_omim["len_constraint"] / hits_gene_omim["len_TRID"]
+        return outlier_type(AL, LPS, cutoff_AL, cutoff_LPS)
 
-    # calculate reciprocal overlap of TR locus and constraint region
-    hits_gene_omim['reciprocal_overlap'] = hits_gene_omim.apply(calculate_reciprocal_overlap, axis=1)
+def calc_z_score(x, mean, std):
+    # get max of the two alleles
+    if x != "." and not pd.isna(x) and x != "None":
+        x = max([int(lps) for lps in x.split("|")])
+        mean = float(mean)
+        std = float(std)
+        try:
+            return round((x - mean) / std, 3)
+        except ZeroDivisionError:
+            return round((x - mean) / (std + 0.1), 3)
+        except TypeError:
+            print(f"TypeError: {x} - {mean} / {std}")
+            return np.nan
+    else:
+        return np.nan
 
-    # replace OE_len with np.nan where reciprocal_overlap threshold (0.8) not met
-    hits_gene_omim.loc[hits_gene_omim['reciprocal_overlap'] < 0.8, 'OE_len'] = np.nan
-    hits_gene_omim.loc[hits_gene_omim['Overlap'] < 0, 'Overlap'] = np.nan
-    hits_gene_omim.drop(columns=["Start_constraint", "End_constraint", "len_constraint", "len_TRID", "len_ratio"], inplace=True)
+def get_distance_from_cutoff(row, proband_id, stat):
+    trid = row["TRID"]
+    if stat == "LPS":
+        if row[f'{proband_id}_LPS'] == ".":
+            return np.nan
+        LPS = sum([int(lps) for lps in row[f'{proband_id}_LPS'].split("|")])
+        if "X" not in trid:
+            return round(LPS - float(row["LPS_cutoff_DBSCAN"]), 3)
+        else:
+            return round(LPS - float(row["hemi_LPS_cutoff_DBSCAN"]), 3)
+    elif stat == "AL":
+        if row[f'{proband_id}_AL'] == 'None':
+            return np.nan
+        AL = sum([int(al) for al in row[f'{proband_id}_AL'].split("|")])
+        if "X" not in trid:
+            return round(AL - float(row["AL_cutoff_DBSCAN"]), 3)
+        else:
+            return round(AL - float(row["hemi_AL_cutoff_DBSCAN"]), 3)
 
-    # column cleanup
-    for col in ["gene_name", "gene_id", "gene_biotype", "Feature"]:
-        hits_gene_omim[col] = hits_gene_omim[col].apply(lambda genes: gene_set(genes))
+def is_greater_than_max_HPRC_AoU1027(row, id, outlier_type):
+    TRID = row["TRID"]
+    if outlier_type == "False":
+        return "False"
+    if outlier_type == "LPS_outlier" or outlier_type == "LPS_AL_outlier":
+        LPS = row[f'{id}_LPS'].split("|")
+        if "X" in TRID and len(LPS) == 1:
+            LPS = int(LPS[0])
+            lps_col = "lps_max_hemi"
+        else:
+            LPS = max([int(lps) for lps in LPS])
+            lps_col = "lps_max"
+        try:
+            HPRC_max = int(row[lps_col])
+        except:
+            HPRC_max = 0
+        if LPS > HPRC_max:
+            AoU1027_lps_max = row["AoU1027_MaxAllele"] # we only have max LPS for AoU1027
+            if not pd.isna(AoU1027_lps_max):
+                if LPS > AoU1027_lps_max:
+                    return "True"
+                else:
+                    return "False"
+            else:
+                return "True"
+        else:
+            return "False"
+    else:
+        AL = row[f'{id}_AL'].split("|")
+        if "X" in TRID and len(AL) == 1:
+            AL = int(AL[0])
+            al_col = "allele_len_max_hemi"
+        else:
+            AL = max([int(al) for al in AL])
+            al_col = "allele_len_max"
+        try:
+            HPRC_max = int(row[al_col])
+        except:
+            HPRC_max = 0
+        if AL > HPRC_max:
+            return "True"
+        else:
+            return "False"
 
-    am_cols = [col for col in hits_gene_omim.columns if "AM" in col]
-    mp_cols = [col for col in hits_gene_omim.columns if "MP" in col]
-    z_score_ranks_cols = [col for col in hits_gene_omim.columns if "z_score_len_rank" in col and 'min' not in col]
-    lps_cols = [col for col in hits_gene_omim.columns if "LPS" in col and 'max' not in col and 'min' not in col]
+def compute_genomic_region_of_row(row, genes_gtf_path=None, verbose=False, show_progress_bar=False, n=None, promoter_size=PROMOTER_SIZE):
+    TRID = row["TRID"]
+    chrom = "chr" + str(TRID.split("-")[0])
+    start_0based = TRID.split("-")[1]
+    end = TRID.split("-")[2]
+    
+    return compute_genomic_region_of_interval(chrom, int(start_0based) + 1, int(end), genes_gtf_path=genes_gtf_path, verbose=verbose, show_progress_bar=show_progress_bar, n=n, promoter_size=promoter_size)
 
-    hits_gene_omim = hits_gene_omim[
-        ["Chromosome", "Start", "End", "trid", "motif", "gene_name", "gene_id", "gene_biotype", "Feature"]
-        + ["omim_phenotype","omim_inheritance", "HPO"]
-        + ["gene", "lof.oe_ci.upper", "lof.pLI", "OE_len"]
-        + ["ENCODE_promoter_ID", "ENCODE_promoter_coord", "range", "cutoff", "allele_len_std"]
-        + c4r_col
-        + ["max_sample_allele_len", "max_z_score_len", "min_z_score_len_rank", "num_outlier_samples", "max_LPS", "min_LPS_rank"]
-        + lps_cols
-        + al_cols
-        + z_score_cols
-        + z_score_ranks_cols
-        + am_cols
-        + mp_cols
-    ]
-    hits_gene_omim = hits_gene_omim.rename(
-        columns={
-            "Feature": "feature",
-            "Chromosome": "CHROM",
-            "Start": "POS",
-            "End": "END",
-            "trid": "TRID",
-            "gene": "gnomad_constraint_gene", 
-            "allele_len_std": "CMH_allele_len_std",
-            "range": "CMH_allele_len_range",
-            "cutoff": "CMH_outlier_cutoff",
-            "OE_len": "TR_constraint"
-        }
-    )
+def main():
+    args = parse_args()
+    # Create a dictionary of TRID to LPS values for each sample
+    print("Creating dictionary of TRID to LPS values for each sample")
+    lps = pd.read_csv(args.lps, sep="\t", engine="pyarrow")
+    lps = lps[~lps["trid"].str.contains("VC:")]
+    samples = [col for col in lps.columns if col != "trid" and col != "motif"]
+    lps_dict = lps.set_index("trid")[samples].to_dict("index")
 
-    # sort by max_LPS
-    hits_gene_omim = hits_gene_omim.sort_values(by="max_LPS", ascending=False)
+    # Parse VCF file to extract allele lengths and other information
+    print("Parsing VCF file to extract allele lengths and other information")
+    with pysam.VariantFile(args.vcf, 'r') as vcf_in:
+        samples = list(vcf_in.header.samples)
+        variant_df = pd.DataFrame()
+        for variant in vcf_in:
+            trid = variant.info['TRID']
+            if not "VC" in trid:
+                allele_dict = process_variant(trid, variant, samples, lps_dict)
+                variant_df = pd.concat([variant_df, pd.DataFrame([allele_dict])], ignore_index=True)
 
-    # recode dtypes and missing values
-    hits_gene_omim["CHROM"] = hits_gene_omim["CHROM"].astype(str)
-    try:
-    	hits_gene_omim["C4R_outlier_count"] = hits_gene_omim["C4R_outlier_count"].astype(int)
-    except KeyError:
-        pass 
-    hits_gene_omim.fillna(".", inplace=True)
-    hits_gene_omim.replace({"-1": ".", "1:-1--1": ".", " ": ".", "nan": "."}, inplace=True)
+    # Convert list columns into "|" separated strings
+    cols = [col for col in variant_df.columns if col != "TRID"]
+    for col in cols:
+        variant_df[col] = variant_df[col].apply(lambda x: list_col_to_str(x))
 
-    # drop dups
-    hits_gene_omim = hits_gene_omim.drop_duplicates()
+    # Filter out variation clusters
+    variant_df = variant_df[~variant_df["TRID"].str.contains("VC:")]
 
-    # write to file
-    today = date.today()
-    today = today.strftime("%Y-%m-%d")
-    out_file = out_file.replace(".csv", "")
-    hits_gene_omim.to_csv(f"{out_file}.csv", index=False)
-    hits_gene_omim.to_csv(f"{out_file}.{today}.csv", index=False)
+    # Import DBSCAN cutoffs
+    LPS_cutoffs = pd.read_csv(args.dbscan_cutoffs_lps, sep="\t", engine="pyarrow")
+    LPS_cutoffs.columns = ["TRID", "LPS_cutoff_DBSCAN"]
+    LPS_cutoffs_hemi = LPS_cutoffs[LPS_cutoffs["TRID"].str.startswith("hemi")].rename(columns={"LPS_cutoff_DBSCAN": "hemi_LPS_cutoff_DBSCAN"})
+    LPS_cutoffs_hemi["TRID"] = LPS_cutoffs_hemi["TRID"].str.replace("hemi", "")
+    AL_cutoffs = pd.read_csv(args.dbscan_cutoffs_al, sep="\t", engine="pyarrow")
+    AL_cutoffs.columns = ["TRID", "AL_cutoff_DBSCAN"]
+    AL_cutoffs_hemi = AL_cutoffs[AL_cutoffs["TRID"].str.startswith("hemi")].rename(columns={"AL_cutoff_DBSCAN": "hemi_AL_cutoff_DBSCAN"})
+    AL_cutoffs_hemi["TRID"] = AL_cutoffs_hemi["TRID"].str.replace("hemi", "")
 
+    # Merge TRs with DBSCAN cutoffs
+    variant_df_cutoffs = variant_df.merge(LPS_cutoffs, on="TRID", how="left").merge(AL_cutoffs, on="TRID", how="left")
+    # Add hemizygous cutoffs
+    variant_df_cutoffs = variant_df_cutoffs.merge(LPS_cutoffs_hemi, on="TRID", how="left").merge(AL_cutoffs_hemi, on="TRID", how="left")
+
+    # Filter out non-variant calls in proband
+    if args.ped is not None:
+        fam_dict = infer_pedigree_roles(args.ped)
+        proband_id = fam_dict["child"]
+        variant_df_cutoffs = variant_df_cutoffs[(variant_df_cutoffs[f"{proband_id}_GT"] != "0|0") & (variant_df_cutoffs[f"{proband_id}_GT"] != "None")].copy()
+
+    # Filter out loci not present in cutoffs file, i.e. not in HPRC v2.0 VCF
+    variant_df_cutoffs = variant_df_cutoffs[variant_df_cutoffs["AL_cutoff_DBSCAN"].notna()]
+
+    # Find outliers
+    print("Finding outliers")
+    for id in samples:
+        variant_df_cutoffs[f"{id}_OUTLIER"] = variant_df_cutoffs.apply(lambda row: is_outlier(row, id), axis=1)
+
+    # Add HPRC stats
+    print("Adding HPRC stats")
+    stats = pd.read_csv(args.hprc_stats, sep="\t", compression="gzip", engine="pyarrow")
+    variant_df_cutoffs = variant_df_cutoffs.merge(stats, left_on="TRID", right_on="trid", how="left")
+
+    variant_df_cutoffs = variant_df_cutoffs[variant_df_cutoffs["AN"].notna()] # TODO: exclude this filter for cohort analyses?
+
+
+    for id in samples:
+        variant_df_cutoffs[f'{id}_distance_from_LPS_cutoff_DBSCAN'] = variant_df_cutoffs.apply(lambda row: get_distance_from_cutoff(row, id, "LPS"), axis=1)
+        variant_df_cutoffs[f'{id}_distance_from_AL_cutoff_DBSCAN'] = variant_df_cutoffs.apply(lambda row: get_distance_from_cutoff(row, id, "AL"), axis=1)
+        variant_df_cutoffs[f'{id}_z_score_LPS'] = variant_df_cutoffs.apply(lambda row: calc_z_score(row[f'{id}_LPS'], row["lps_mean"], row["lps_std"]), axis=1)
+        variant_df_cutoffs[f'{id}_z_score_AL'] = variant_df_cutoffs.apply(lambda row: calc_z_score(row[f'{id}_AL'], row["allele_len_mean"], row["allele_len_std"]), axis=1)
+        variant_df_cutoffs[f'{id}_z_score_max'] = variant_df_cutoffs[[f'{id}_z_score_LPS', f'{id}_z_score_AL']].max(axis=1)
+
+    # Add motif column
+    variant_df_cutoffs["MOTIF"] = variant_df_cutoffs["TRID"].str.split("-").str[3]
+
+
+    # Add TRExplorer annotations and stats
+    print("Adding TRExplorer annotations and stats")
+    anno_cols = ['LocusId',
+        'KnownDiseaseAssociatedMotif', 'KnownDiseaseAssociatedLocus',
+        'NumRepeatsInReference',
+        'ReferenceRepeatPurity',
+        'AoU1027_MaxAllele', 'AoU1027_Stdev',
+        'AoU1027_99thPercentile', 'AoU1027_NumCalledAlleles',
+        'AoU1027_OE_Length','AoU1027_OE_LengthPercentile',
+        'TenK10K_MaxAllele', 'TenK10K_Stdev', 'TenK10K_99thPercentile', 'TenK10K_NumCalledAlleles']
+
+    annos = pd.read_csv(args.annotated_catalog, sep="\t", compression="gzip", usecols=anno_cols, engine="pyarrow")
+    variant_df_cutoffs_anno = variant_df_cutoffs.merge(annos, left_on="TRID", right_on="LocusId", how="left")
+
+    # Add GENCODE gene annotations
+    print("Adding GENCODE gene annotations")
+    variant_df_cutoffs_anno[[f"GencodeGeneRegion", f"GencodeGeneName", f"GencodeGeneId", f"GencodeTranscriptId"]] = variant_df_cutoffs_anno.apply(
+        lambda input_row, gtf=args.gtf: compute_genomic_region_of_row(input_row, genes_gtf_path=gtf, verbose=False, show_progress_bar=False, n=None, promoter_size=PROMOTER_SIZE), axis=1, result_type='expand')
+
+    # Add OMIM phenotype
+    print("Adding OMIM phenotype")
+    omim = prepare_OMIM(f"{args.omim}/genemap2.txt")
+    omim = omim[omim["gene_id"].notna()]
+    variant_df_cutoffs_anno = variant_df_cutoffs_anno.merge(omim, how="left", left_on="GencodeGeneId", right_on="gene_id")
+
+    # Add HPO annotations
+    print("Adding HPO annotations")
+    if args.hpo is not None:
+        hpo = pd.read_csv(args.hpo, sep="\t", usecols=["Gene ID", "Features"])
+        hpo = hpo[hpo["Gene ID"].notna()]
+        variant_df_cutoffs_anno = variant_df_cutoffs_anno.merge(hpo, how="left", left_on="GencodeGeneId", right_on="Gene ID")
+    else:
+        variant_df_cutoffs_anno["Features"] = "."
+
+    # Add SCREEN promoters
+    print("Adding SCREEN promoters")
+    promoters = pr.read_bed(args.SCREEN_promoters)
+    # Convert STRs to BED format and then PyRanges object
+    variant_bed = variant_df_cutoffs_anno[["TRID"]].copy()
+    variant_bed["Start"] = variant_bed["TRID"].str.split("-").str[1]
+    variant_bed["End"] = variant_bed["TRID"].str.split("-").str[2]
+    variant_bed["Chromosome"] = variant_bed["TRID"].str.split("-").str[0]
+    variant_pr = pr.PyRanges(variant_bed)
+    # Intersect STRs with promoters
+    variant_promoters = variant_pr.join(promoters, how="left", suffix="_promoter").df
+    variant_promoters = variant_promoters.rename(columns={"Name": "SCREEN_ID", "Score": "SCREEN_promoter_ID", "Strand": "Type"})
+    variant_promoters = variant_promoters[["TRID", "SCREEN_promoter_ID"]].replace("-1", ".")
+    # Merge back to variant dataframe
+    variant_df_cutoffs_anno = variant_df_cutoffs_anno.merge(variant_promoters, on="TRID", how="left")
+
+    # Is AL or LPS greater than max HPRC or AoU1027?
+    print("Is AL or LPS greater than max HPRC or AoU1027?")
+    for id in samples:
+        variant_df_cutoffs_anno[f'{id}_greater_than_max_HPRC_AoU1027'] = variant_df_cutoffs_anno.apply(lambda row: is_greater_than_max_HPRC_AoU1027(row, id, row[f"{id}_OUTLIER"]), axis=1)
+
+    # Format for export
+    print("Formatting for export")
+    variant_df_cutoffs_anno.rename(columns={"AN": "HPRC_AN", 'allele_len_mean': "HPRC_allele_len_mean",
+        'allele_len_std': "HPRC_allele_len_std", 'allele_len_99': "HPRC_allele_len_99", 'allele_len_max': "HPRC_allele_len_max",
+        'allele_len_hemi_99': "HPRC_allele_len_hemi_99", 'allele_len_max_hemi': "HPRC_allele_len_max_hemi", 'AM_mean': "HPRC_AM_mean", 'AM_std': "HPRC_AM_std",
+        'MP_mean': "HPRC_MP_mean", 'MP_std': "HPRC_MP_std", 'lps_mean': "HPRC_lps_mean", 'lps_std': "HPRC_lps_std", 'lps_99': "HPRC_lps_99", 'lps_max': "HPRC_lps_max",
+        'lps_hemi_99': "HPRC_lps_hemi_99", 'lps_max_hemi': "HPRC_lps_max_hemi",
+        'AoU1027_MaxAllele': "AoU1027_lps_max", 'AoU1027_Stdev': "AoU1027_lps_std", 'AoU1027_99thPercentile': "AoU1027_lps_99",
+        'AoU1027_NumCalledAlleles': "AoU1027_AN", 'TenK10K_MaxAllele': "TenK10K_lps_max",
+        'TenK10K_NumCalledAlleles': "TenK10K_AN", 'TenK10K_Stdev': "TenK10K_lps_std", 'TenK10K_99thPercentile': "TenK10K_lps_99" }, inplace=True)
+
+    samples_cols = []
+    for id in samples:
+        samples_cols.append(f"{id}_OUTLIER")
+        samples_cols.append(f"{id}_z_score_max")
+        samples_cols.append(f"{id}_distance_from_LPS_cutoff_DBSCAN")
+        samples_cols.append(f"{id}_distance_from_AL_cutoff_DBSCAN")
+        samples_cols.append(f"{id}_GT")
+        samples_cols.append(f"{id}_LPS")
+        samples_cols.append(f"{id}_AL")
+        samples_cols.append(f"{id}_AM")
+        samples_cols.append(f"{id}_MP")
+        samples_cols.append(f"{id}_AD")
+        samples_cols.append(f"{id}_DP")
+        samples_cols.append(f"{id}_greater_than_max_HPRC_AoU1027")
+
+    cutoff_cols = ["LPS_cutoff_DBSCAN", "AL_cutoff_DBSCAN", "hemi_LPS_cutoff_DBSCAN", "hemi_AL_cutoff_DBSCAN"]
+
+    variant_df_cutoffs_anno = variant_df_cutoffs_anno[['TRID','MOTIF'] + ['GencodeGeneName', 'GencodeGeneRegion', 'GencodeGeneId',  'omim_phenotype', 'omim_inheritance', 'Features','SCREEN_promoter_ID', 'KnownDiseaseAssociatedMotif', 'KnownDiseaseAssociatedLocus'] + cutoff_cols + samples_cols +  ['HPRC_AN', 'HPRC_allele_len_mean',
+        'HPRC_allele_len_std', 'HPRC_allele_len_99', 'HPRC_allele_len_max',
+        'HPRC_allele_len_hemi_99', 'HPRC_allele_len_max_hemi', 'HPRC_AM_mean',
+        'HPRC_AM_std', 'HPRC_MP_mean', 'HPRC_MP_std', 'HPRC_lps_mean',
+        'HPRC_lps_std', 'HPRC_lps_99', 'HPRC_lps_max', 'HPRC_lps_hemi_99',
+        'HPRC_lps_max_hemi',
+        'AoU1027_lps_max', 'AoU1027_lps_std', 'AoU1027_lps_99',
+        'AoU1027_AN', 'AoU1027_OE_Length','AoU1027_OE_LengthPercentile', 'TenK10K_lps_max',
+        'TenK10K_AN', 'TenK10K_lps_std', 'TenK10K_lps_99' ]]
+
+    variant_df_cutoffs_anno.rename(columns={"omim_phenotype": "OMIM_phenotype", "omim_inheritance": "OMIM_inheritance", "Features": "HPO",
+    "GencodeGeneName": "GENCODE_gene_name", "GencodeGeneRegion": "GENCODE_gene_region", "GencodeGeneId": "GENCODE_gene_id",
+    "KnownDiseaseAssociatedMotif": "Known_disease_asociated_motif", "KnownDiseaseAssociatedLocus": "Known_disease_associated_locus"}, inplace=True)
+
+    if args.ped is not None:
+        # Filter for outliers in proband
+        variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno[variant_df_cutoffs_anno[f"{proband_id}_OUTLIER"] != "False"].copy()
+
+        # Filter out variants with allele length less than max HPRC
+        variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno_outliers[variant_df_cutoffs_anno_outliers[f"{proband_id}_greater_than_max_HPRC_AoU1027"] == "True"]
+
+        variant_df_cutoffs_anno_outliers.replace(np.nan, ".", inplace=True)
+        variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno_outliers.sort_values(by=[f"{proband_id}_z_score_max"], ascending=False)
+    else:
+        variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno.copy()
+
+    # Filter out intergenic variants
+    variant_df_cutoffs_anno_outliers = variant_df_cutoffs_anno_outliers[variant_df_cutoffs_anno_outliers["GENCODE_gene_region"] != "intergenic"]
+    
+
+    # Write to file 
+    print(f"Writing to file {args.outfile}")
+    variant_df_cutoffs_anno_outliers.to_csv(args.outfile, index=False)
 
 if __name__ == "__main__":
-    # if running from the command-line
-    description = "Annotate repeat outliers with Ensembl genes, gnomAD constraint metrics, OMIM phenotypes, and HPO terms"
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument(
-        "--repeats",
-        type=str,
-        required=True,
-        help="Repeat outlilers from find_repeat_outliers",
-    )
-    parser.add_argument(
-        "--output_file",
-        type=str,
-        required=True,
-        help="Output filepath",
-    )
-    parser.add_argument(
-        "--ensembl_gtf",
-        type=str,
-        required=True,
-        help="Path to Ensembl gene GTF",
-    )
-    parser.add_argument(
-        "--gnomad_constraint",
-        type=str,
-        required=True,
-        help="Path to Ensembl gene GTF",
-    )
-    parser.add_argument(
-        "--OMIM_path",
-        type=str,
-        required=True,
-        help="Path to directory containing OMIM mim2gene and morbidmap files",
-    )
-    parser.add_argument(
-        "--promoters",
-        type=str,
-        required=True,
-        help="Path to directory containing OMIM mim2gene and morbidmap files",
-    )
-    parser.add_argument(
-        "--TR_constraint",
-        type=str,
-        required=True,
-        help="Path to directory containing OMIM mim2gene and morbidmap files",
-    )
-    parser.add_argument(
-        "--c4r",
-        type=str,
-        required=True,
-        help="True if C4R project, otherwise false (C4R outlier sample IDs will be excluded from report)",
-    )
-    parser.add_argument(
-        "--repeat_catalog",
-        type=str,
-        help="Path to TRGT repeat catalog",
-    )
-    parser.add_argument(
-        "--hpo",
-        type=str,
-        help="Path to HPO terms file",
-    )
-    parser.add_argument(
-        "--c4r_outliers",
-        type=str,
-        help="Path to C4R tandem repeat outlier count",
-    )
-
-    args = parser.parse_args()
-    print("Annotating repeats...")
-    main(
-        args.repeats,
-        args.output_file,
-        args.ensembl_gtf,
-        args.gnomad_constraint,
-        args.OMIM_path,
-        args.promoters,
-        args.TR_constraint,
-        args.c4r,
-        args.repeat_catalog,
-        args.hpo,
-        args.c4r_outliers
-    )
+    main()
