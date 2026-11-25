@@ -78,9 +78,8 @@ snakemake --use-conda -s ${SF} --cores 4 --conda-prefix ${CP} --configfile ${CON
 ## Pipeline outputs
 ### Small variant annotation and report: reports/{family}.wgs.coding.CH.csv
 - annotate variants with [VEP](https://useast.ensembl.org/info/docs/tools/vep/index.html) and [vcfanno](https://github.com/brentp/vcfanno)
-- generate a [gemini](https://github.com/arq5x/gemini) variant database
-- generate a rare (less than 1% maximum gnomAD population AF) variant report with medium to high impact variants. Report generation scripts are derived from [cre](https://github.com/ccmbioinfo/cre), but copied to this repo for convenience. Report details are described [here](https://sickkidsca.sharepoint.com/:w:/r/sites/thecenterforcomputationalmedicineworkspace/Shared%20Documents/Translational%20Genomics/LRWGS/Report_documentation/PacBio_small_variant_report_September_2025.docx?d=w69469e9fde0543ff9228720633823aa0&csf=1&web=1&e=XAwyTF).
-
+- filter variants with [slivar](https://github.com/brentp/slivar) and generate a rare (less than 1% maximum gnomAD population AF) variant report with medium to high impact variants using [custom Python scripts](https://github.com/ccmbioinfo/crg2-pacbio/tree/master/scripts/slivar). Report details are described [here](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/docs/variant_report_docs/PacBio_small_variant_report.md).
+Report generation scripts are based on logic from [cre](https://github.com/ccmbioinfo/cre) but modified for Python and slivar.
 ### Small variant panel report: small_variants/panel/{family}/{family}.wgs.regular.{date}.csv, small_variants/panel-flank/{family}/{family}.wgs.regular.{date}.csv
 - The annotation pipeline is the same as above, but only variants in a gene panel are considered. The panel report includes variants of any impact (i.e. it includes non-coding variants and intronic variants).
 - To generate a gene panel from an HPO term to gene text file exported from Phenotips ('Suggested genes'), add the HPO filepath to `config["run"]["hpo"]`.
@@ -97,7 +96,7 @@ snakemake --use-conda -s ${SF} --cores 4 --conda-prefix ${CP} --configfile ${CON
 - annotate variants using [SnpEFF](https://github.com/pcingola/SnpEff) and [AnnotSV](https://github.com/lgmgeo/AnnotSV)
 - filter out variants under 50bp
 - annotate SVs with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_SVs.py)
-- a description of the report and fields can be found [here](https://sickkidsca.sharepoint.com/:w:/r/sites/thecenterforcomputationalmedicineworkspace/Shared%20Documents/Translational%20Genomics/LRWGS/Report_documentation/PacBio_SV_CNV_report_December_2025.docx?d=we9d984dfd2de41298ee5d7f136a7108c&csf=1&web=1&e=1LLfpA)
+- a description of the report and fields can be found [here](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/docs/variant_report_docs/PacBio_SV_CNV_report.md)
 
 ### CNV annotation and report: reports/{family}.cnv.CH.csv
 - for WDL4 inputs, select copy-number variants from the combined Sawfish structural/CNV VCF
@@ -113,19 +112,19 @@ merge sample TRGT VCFs into multi-sample VCF
 - compute repeat allele length and LPS Z-scores relative to background distribution (Children's Mercy Hospital cohort, n=1436)
 - identify repeats with outlying size in family members
 - annnotate repeat outliers with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_repeat_outliers.py)
-- a description of the report and fields can be found [here](https://sickkidsca.sharepoint.com/:w:/r/sites/thecenterforcomputationalmedicineworkspace/Shared%20Documents/Translational%20Genomics/LRWGS/Report_documentation/PacBio_TRGT_repeat_expansion_report_October_2025.docx?d=wd0a18862860c4ecbb767dca37fac017b&csf=1&web=1&e=jXW5zO)
+- a description of the report and fields can be found [here](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/docs/variant_report_docs/PacBio_repeat_expansion_report.md)
 
 ### De novo tandem repeat variant report: TRGT_denovo/{family}_{child}.TRGT.denovo.annotated.csv
 - identify de novo tandem repeats in probands using [TRGT-denovo](https://github.com/PacificBiosciences/trgt-denovo) v0.2.0
 - note that the sample TRGT spanning BAM files must reside in the same directories as the BAMs specified per-sample in `samples.tsv` to successfully run the denovo tandem repeat report
 - filter annotate de novo repeats with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_denovo_repeats.py)
-- a description of the report and fields can be found [here](https://sickkidsca.sharepoint.com/:w:/r/sites/thecenterforcomputationalmedicineworkspace/Shared%20Documents/Translational%20Genomics/LRWGS/Report_documentation/PacBio_TRGT_denovo_tandem_repeat_mutation_report_October_2024.docx?d=wc481296eb29f405a9510fc81a182f010&csf=1&web=1&e=7ulyd8)
+- a description of the report and fields can be found [here](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/docs/variant_report_docs/PacBio_denovo_repeat_mutation_report.md)
 
 ### Pathogenic repeat loci report: pathogenic_repeats/{family}.known.path.str.loci.csv
 - genotype repeats per-sample using TRGTv1.1.0 against the union of the [pathogenic repeat loci BED file](https://github.com/PacificBiosciences/trgt/blob/main/repeats/pathogenic_repeats.hg38.bed) provided by TRGT and the disease catalog provided by [STRchive](https://strchive.org/_astro/STRchive-disease-loci.hg38.TRGT.B2FLLAlV.bed) (a total of 77 loci). 
 - merge sample VCFs into multi-sample family VCF
 - annotate repeat loci with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_path_str_loci.py)
-- a description of the report and fields can be found [here](https://sickkidsca.sharepoint.com/:w:/r/sites/thecenterforcomputationalmedicineworkspace/Shared%20Documents/Translational%20Genomics/LRWGS/Report_documentation/PacBio_TRGT_known_pathogenic_repeats_October_2025.docx?d=w6b41689ec61c41af9579d908fe607cc6&csf=1&web=1&e=galrkA)
+- a description of the report and fields can be found [here](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/docs/variant_report_docs/PacBio_known_pathogenic_repeats.md)
 
 ### Methylation outlier report: methylation_outliers/{family}_{sample}.annotated.outliers.{date}.csv
 The methylation outlier workflow uses [pb-cpg-tools](https://github.com/PacificBiosciences/pb-CpG-tools) to extract CpG sites from the BAM files (coverage threshold of 5x) and [Methbat](https://github.com/PacificBiosciences/MethBat) to identify haplotype-specific methylation outliers in one sample against a background of samples. You must list both the case sample and the control samples in the `samples.tsv` file, specifying the 'case_or_control' field as 'case' for the case sample and 'control' for the control samples. There must only be one case sample, and ideally as many controls samples as possible. 
@@ -164,7 +163,7 @@ The workflow is as follows:
 - annotate methylation outliers with [custom Python script](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/scripts/annotate_methylation_outliers.py)
 
 To run the methylation outlier workflow, follow the instructions above for running the pipeline, but make sure your samples.tsv is configured for methylation outlier analysis, and use the `methylation_outliers.sh` job script instead of `crg2-pacbio.sh`.
-A description of the methyation outlier report and fields can be found [here](https://sickkidsca.sharepoint.com/:w:/r/sites/thecenterforcomputationalmedicineworkspace/Shared%20Documents/Translational%20Genomics/LRWGS/Report_documentation/PacBio_MethBat_methylation_outlier_report_TG_September_2025.docx?d=wd703d337a7394f71b0b1351af4ee4b20&csf=1&web=1&e=oI5bAz)
+A description of the methyation outlier report and fields can be found [here](https://github.com/ccmbioinfo/crg2-pacbio/blob/master/docs/variant_report_docs/PacBio_methylation_outlier_report.md)
 
 
 ### ACMG Secondary Findings annotation and report: reports/{family}.ACMG.SF.csv
